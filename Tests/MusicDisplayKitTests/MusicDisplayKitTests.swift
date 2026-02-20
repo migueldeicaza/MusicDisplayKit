@@ -7,6 +7,7 @@ import MusicDisplayKitCore
 import MusicDisplayKitLayout
 import MusicDisplayKitModel
 import MusicDisplayKitMusicXML
+import MusicDisplayKitVexAdapter
 
 private let minimalScoreXML = """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -2312,6 +2313,42 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(laidOut.barlineConnectors.count == 2)
     #expect(laidOut.barlineConnectors.map(\.side) == [.left, .right])
     #expect(laidOut.barlineConnectors.allSatisfy { $0.sourceGroupIndex == bracket.sourceGroupIndex })
+}
+
+@Test func vexAdapterBuildsRenderPlanFromLayoutMetadata() throws {
+    let score = try MusicXMLParser().parse(xml: sameSpanPartGroupOrderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 500))
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.pageCount == 1)
+    #expect(plan.canvasWidth == 500)
+    #expect(plan.canvasHeight == 272)
+    #expect(plan.staves.count == laidOut.systems.count)
+    #expect(plan.measures.count == laidOut.measures.count)
+    #expect(plan.partGroupConnectors.count == laidOut.partGroups.count)
+    #expect(plan.barlineConnectors.count == 2)
+
+    let bracketConnector = try #require(plan.partGroupConnectors.first(where: { $0.kind == .bracket }))
+    let braceConnector = try #require(plan.partGroupConnectors.first(where: { $0.kind == .brace }))
+    #expect(bracketConnector.renderOrder < braceConnector.renderOrder)
+    #expect(bracketConnector.style.hookLength > 0)
+    #expect(braceConnector.style.curvature > 0)
+
+    #expect(plan.barlineConnectors.map(\.kind) == [.singleLeft, .singleRight])
+    #expect(plan.barlineConnectors.allSatisfy { $0.sourceGroupIndex == bracketConnector.sourceGroupIndex })
+}
+
+@Test func vexAdapterImageTargetOverridesCanvasSize() throws {
+    let score = try MusicXMLParser().parse(xml: minimalScoreXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(
+        from: laidOut,
+        target: .image(width: 1024, height: 768)
+    )
+
+    #expect(plan.canvasWidth == 1024)
+    #expect(plan.canvasHeight == 768)
+    #expect(plan.pageCount == 1)
 }
 
 @Test func engineRenderAfterLoadHitsLayoutNotImplemented() throws {

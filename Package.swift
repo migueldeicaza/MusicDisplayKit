@@ -68,6 +68,7 @@ let package = Package(
                 "MusicDisplayKitLayout",
                 "MusicDisplayKitModel",
                 "MusicDisplayKitMusicXML",
+                "MusicDisplayKitVexAdapter",
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
             ]
         ),
