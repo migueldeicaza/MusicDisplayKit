@@ -555,6 +555,55 @@ private let sequentialImplicitRepeatStartXML = """
 </score-partwise>
 """
 
+private let repeatTimesAttributePlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <repeat direction="forward"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <repeat direction="backward" times="3"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let endingWithoutBackwardRepeatXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <ending number="2" type="start"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+      <barline location="right">
+        <ending number="2" type="stop"/>
+      </barline>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let dalSegnoAlCodaPlaybackXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -849,6 +898,35 @@ private let targetedToCodaDoesNotFallbackToDifferentCodaXML = """
     <measure number="6">
       <direction><direction-type><coda>C1</coda></direction-type></direction>
       <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let soundToCodaFallbackOnJumpMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.S. al Coda</words></direction-type>
+        <sound dalsegno="S" tocoda="C"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda>C</coda></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
     </measure>
   </part>
 </score-partwise>
@@ -1547,6 +1625,20 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4, 3, 4])
 }
 
+@Test func parserTreatsRepeatTimesAsTotalIterationCount() throws {
+    let score = try MusicXMLParser().parse(xml: repeatTimesAttributePlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 1, 2, 3])
+}
+
+@Test func parserDoesNotApplyEndingSkipsWithoutBackwardRepeat() throws {
+    let score = try MusicXMLParser().parse(xml: endingWithoutBackwardRepeatXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2])
+}
+
 @Test func parserBuildsPlaybackOrderForDalSegnoAlCoda() throws {
     let score = try MusicXMLParser().parse(xml: dalSegnoAlCodaPlaybackXML)
     let playback = try #require(score.parts.first?.playbackOrder)
@@ -1616,6 +1708,13 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     let playback = try #require(score.parts.first?.playbackOrder)
     #expect(playback.termination == .endOfScore)
     #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4, 5, 6])
+}
+
+@Test func parserAllowsSoundToCodaFallbackWhenNoExplicitForwardMarkerExists() throws {
+    let score = try MusicXMLParser().parse(xml: soundToCodaFallbackOnJumpMeasureXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 4])
 }
 
 @Test func parserRejectsNonPartwiseRoot() throws {

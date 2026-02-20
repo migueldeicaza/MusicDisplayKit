@@ -340,7 +340,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var start: Int
         var end: Int
         var numbers: Set<Int>
-        var repeatEnd: Int
+        var repeatEnd: Int?
     }
 
     private enum TextTarget {
@@ -1475,22 +1475,22 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             }
         )
 
-        var backwardRepeatTimesByMeasure: [Int: Int] = [:]
+        var backwardRepeatTotalIterationsByMeasure: [Int: Int] = [:]
         for index in measures.indices {
             if let instruction = measures[index].repetitionInstructions.first(where: { $0.kind == .repeatBackward }) {
-                backwardRepeatTimesByMeasure[index] = max(0, instruction.times ?? 1)
+                backwardRepeatTotalIterationsByMeasure[index] = max(1, instruction.times ?? 2)
             }
         }
 
         let repeatSectionStartByBackwardMeasure = buildRepeatSectionStartByBackwardMeasure(
             repeatForwardSet: repeatForwardSet,
-            backwardRepeatTimesByMeasure: backwardRepeatTimesByMeasure,
+            backwardRepeatTotalIterationsByMeasure: backwardRepeatTotalIterationsByMeasure,
             measureCount: measures.count
         )
 
         let endingRanges = buildEndingRanges(
             measures: measures,
-            backwardRepeatTimesByMeasure: backwardRepeatTimesByMeasure
+            backwardRepeatTotalIterationsByMeasure: backwardRepeatTotalIterationsByMeasure
         )
 
         let segnoMarkers = buildMarkerIndex(kind: .segno, measures: measures)
@@ -1577,7 +1577,12 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                    requiredTarget: roadmap.codaTarget,
                    preferExplicitMarkersOnJumpCommandMeasure: instructions.contains {
                        $0.kind == .daCapo || $0.kind == .dalSegno
-                   }
+                   },
+                   allowSoundFallbackWhenNoExplicitForwardMarker: !hasForwardExplicitToCodaTrigger(
+                       measures: measures,
+                       afterMeasureIndex: currentMeasureIndex,
+                       requiredTarget: roadmap.codaTarget
+                   )
                ) {
                 let codaTarget = roadmap.codaTarget ?? toCodaInstruction.target
                 let strictCodaTarget = normalizeMarkerTarget(codaTarget) != nil
@@ -1612,9 +1617,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 continue playbackLoop
             }
 
-            if let additionalRepeats = backwardRepeatTimesByMeasure[currentMeasureIndex] {
+            if let totalIterations = backwardRepeatTotalIterationsByMeasure[currentMeasureIndex] {
                 let sectionStart = repeatSectionStartByBackwardMeasure[currentMeasureIndex] ?? 0
-                let totalIterations = additionalRepeats + 1
                 let currentIteration = repeatIterationByEndMeasure[currentMeasureIndex] ?? 1
 
                 if currentIteration < totalIterations {
@@ -1826,19 +1830,24 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private func selectToCodaInstruction(
         from instructions: [RepetitionInstruction],
         requiredTarget: String?,
-        preferExplicitMarkersOnJumpCommandMeasure: Bool = false
+        preferExplicitMarkersOnJumpCommandMeasure: Bool = false,
+        allowSoundFallbackWhenNoExplicitForwardMarker: Bool = false
     ) -> RepetitionInstruction? {
-        let toCoda = instructions.filter { instruction in
-            guard instruction.kind == .toCoda else {
-                return false
+        let allToCoda = instructions.filter { $0.kind == .toCoda }
+        let toCoda: [RepetitionInstruction]
+        if preferExplicitMarkersOnJumpCommandMeasure {
+            let explicit = allToCoda.filter { $0.text?.trimmedNonEmpty != nil }
+            if !explicit.isEmpty {
+                toCoda = explicit
+            } else if allowSoundFallbackWhenNoExplicitForwardMarker {
+                toCoda = allToCoda
+            } else {
+                toCoda = []
             }
-            if preferExplicitMarkersOnJumpCommandMeasure {
-                // Sound-derived tocoda on a D.S./D.C. command measure encodes jump intent/target,
-                // but should not itself trigger the coda jump on that same measure.
-                return instruction.text?.trimmedNonEmpty != nil
-            }
-            return true
+        } else {
+            toCoda = allToCoda
         }
+
         guard !toCoda.isEmpty else {
             return nil
         }
@@ -1856,9 +1865,42 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         return toCoda.first
     }
 
+    private func hasForwardExplicitToCodaTrigger(
+        measures: [Measure],
+        afterMeasureIndex: Int,
+        requiredTarget: String?
+    ) -> Bool {
+        guard afterMeasureIndex + 1 < measures.count else {
+            return false
+        }
+
+        let normalizedRequired = normalizeMarkerTarget(requiredTarget)
+        for index in (afterMeasureIndex + 1)..<measures.count {
+            let instructions = measures[index].repetitionInstructions.filter {
+                $0.kind == .toCoda && $0.text?.trimmedNonEmpty != nil
+            }
+            if instructions.isEmpty {
+                continue
+            }
+
+            if normalizedRequired == nil {
+                return true
+            }
+
+            if instructions.contains(where: { instruction in
+                let target = normalizeMarkerTarget(instruction.target)
+                return target == nil || target == normalizedRequired
+            }) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     private func buildRepeatSectionStartByBackwardMeasure(
         repeatForwardSet: Set<Int>,
-        backwardRepeatTimesByMeasure: [Int: Int],
+        backwardRepeatTotalIterationsByMeasure: [Int: Int],
         measureCount: Int
     ) -> [Int: Int] {
         var lastForwardByMeasure: [Int?] = Array(repeating: nil, count: measureCount)
@@ -1870,7 +1912,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             lastForwardByMeasure[index] = lastForward
         }
 
-        let backwardIndices = backwardRepeatTimesByMeasure.keys.sorted()
+        let backwardIndices = backwardRepeatTotalIterationsByMeasure.keys.sorted()
         var output: [Int: Int] = [:]
         var lastImplicitSectionStart = 0
 
@@ -1891,9 +1933,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
     private func buildEndingRanges(
         measures: [Measure],
-        backwardRepeatTimesByMeasure: [Int: Int]
+        backwardRepeatTotalIterationsByMeasure: [Int: Int]
     ) -> [PlaybackEndingRange] {
-        let backwardIndices = backwardRepeatTimesByMeasure.keys.sorted()
+        let backwardIndices = backwardRepeatTotalIterationsByMeasure.keys.sorted()
         var ranges: [PlaybackEndingRange] = []
         var openStart: Int?
         var openNumbers: Set<Int> = []
@@ -1950,14 +1992,14 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         start: Int,
         end: Int,
         backwardIndices: [Int]
-    ) -> Int {
+    ) -> Int? {
         if let afterOrAt = backwardIndices.first(where: { $0 >= end }) {
             return afterOrAt
         }
         if let before = backwardIndices.last(where: { $0 <= start }) {
             return before
         }
-        return end
+        return nil
     }
 
     private func nextPlayableMeasureIndex(
@@ -1969,7 +2011,10 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             if range.numbers.isEmpty {
                 continue
             }
-            let iteration = repeatIterationByEndMeasure[range.repeatEnd] ?? 1
+            guard let repeatEnd = range.repeatEnd else {
+                continue
+            }
+            let iteration = repeatIterationByEndMeasure[repeatEnd] ?? 1
             if !range.numbers.contains(iteration) {
                 return range.end + 1
             }
