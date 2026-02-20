@@ -73,8 +73,14 @@ private let multiPartLayoutSynchronizationXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
   <part-list>
+    <part-group type="start" number="1">
+      <group-symbol>brace</group-symbol>
+      <group-name>Grand Staff</group-name>
+      <group-barline>yes</group-barline>
+    </part-group>
     <score-part id="P1"><part-name>Piano</part-name></score-part>
     <score-part id="P2"><part-name>Violin</part-name></score-part>
+    <part-group type="stop" number="1"/>
   </part-list>
   <part id="P1">
     <measure number="1">
@@ -97,6 +103,67 @@ private let multiPartLayoutSynchronizationXML = """
     <measure number="3">
       <attributes><time><beats>2</beats><beat-type>4</beat-type></time></attributes>
     </measure>
+  </part>
+</score-partwise>
+"""
+
+private let nestedPartGroupLayoutXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <part-group type="start" number="1">
+      <group-symbol>bracket</group-symbol>
+      <group-name>Ensemble</group-name>
+      <group-barline>yes</group-barline>
+    </part-group>
+    <part-group type="start" number="2">
+      <group-symbol>brace</group-symbol>
+      <group-name>Manuals</group-name>
+      <group-barline>no</group-barline>
+    </part-group>
+    <score-part id="P1"><part-name>Part 1</part-name></score-part>
+    <score-part id="P2"><part-name>Part 2</part-name></score-part>
+    <part-group type="stop" number="2"/>
+    <score-part id="P3"><part-name>Part 3</part-name></score-part>
+    <part-group type="stop" number="1"/>
+  </part-list>
+  <part id="P1">
+    <measure number="1"><attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes></measure>
+    <measure number="2"><attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes></measure>
+  </part>
+  <part id="P2">
+    <measure number="1"><attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes></measure>
+    <measure number="2"><attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes></measure>
+  </part>
+  <part id="P3">
+    <measure number="1"><attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes></measure>
+    <measure number="2"><attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes></measure>
+  </part>
+</score-partwise>
+"""
+
+private let sameSpanPartGroupOrderXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <part-group type="start" number="1">
+      <group-symbol>bracket</group-symbol>
+      <group-barline>yes</group-barline>
+    </part-group>
+    <part-group type="start" number="2">
+      <group-symbol>brace</group-symbol>
+      <group-barline>no</group-barline>
+    </part-group>
+    <score-part id="P1"><part-name>Part 1</part-name></score-part>
+    <score-part id="P2"><part-name>Part 2</part-name></score-part>
+    <part-group type="stop" number="2"/>
+    <part-group type="stop" number="1"/>
+  </part-list>
+  <part id="P1">
+    <measure number="1"><attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes></measure>
+  </part>
+  <part id="P2">
+    <measure number="1"><attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes></measure>
   </part>
 </score-partwise>
 """
@@ -1226,6 +1293,36 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(score.parts.first?.measures.first?.number == 1)
 }
 
+@Test func parserReadsPartGroupMetadata() throws {
+    let score = try MusicXMLParser().parse(xml: multiPartLayoutSynchronizationXML)
+    #expect(score.partGroups.count == 1)
+
+    let group = score.partGroups[0]
+    #expect(group.number == 1)
+    #expect(group.startPartID == "P1")
+    #expect(group.endPartID == "P2")
+    #expect(group.symbol == .brace)
+    #expect(group.barline == true)
+    #expect(group.name == "Grand Staff")
+}
+
+@Test func parserReadsNestedPartGroups() throws {
+    let score = try MusicXMLParser().parse(xml: nestedPartGroupLayoutXML)
+    #expect(score.partGroups.count == 2)
+
+    let ensemble = try #require(score.partGroups.first(where: { $0.number == 1 }))
+    #expect(ensemble.startPartID == "P1")
+    #expect(ensemble.endPartID == "P3")
+    #expect(ensemble.symbol == .bracket)
+    #expect(ensemble.barline == true)
+
+    let manuals = try #require(score.partGroups.first(where: { $0.number == 2 }))
+    #expect(manuals.startPartID == "P1")
+    #expect(manuals.endPartID == "P2")
+    #expect(manuals.symbol == .brace)
+    #expect(manuals.barline == false)
+}
+
 @Test func parserReadsUTF16EncodedData() throws {
     let utf16Body = try #require(minimalScoreXML.data(using: .utf16LittleEndian))
     var utf16Data = Data([0xFF, 0xFE])
@@ -2130,6 +2227,17 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(p1m1.frame.x == p2m1.frame.x)
     #expect(p1m1.frame.width == p2m1.frame.width)
     #expect(p1m1.frame.width == 176)
+
+    #expect(laidOut.partGroups.count == 2)
+    #expect(laidOut.partGroups.allSatisfy { $0.symbol == .brace })
+    #expect(laidOut.partGroups.allSatisfy { $0.startPartIndex == 0 && $0.endPartIndex == 1 })
+    #expect(laidOut.partGroups.map(\.frame.x) == [20, 20])
+    #expect(laidOut.partGroups.map(\.frame.height) == [192, 192])
+    #expect(laidOut.partGroups.map(\.nestingLevel) == [0, 0])
+
+    #expect(laidOut.barlineConnectors.count == 4)
+    #expect(laidOut.barlineConnectors.map(\.side) == [.left, .right, .left, .right])
+    #expect(laidOut.barlineConnectors.map(\.frame.x) == [40, 404, 40, 216])
 }
 
 @Test func layoutEnginePageBreaksWholeRowsForMultiPartSystems() throws {
@@ -2144,6 +2252,66 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     let secondRowMeasures = laidOut.measures.filter { $0.measureIndexInPart == 2 }
     #expect(firstRowMeasures.allSatisfy { $0.pageIndex == 0 })
     #expect(secondRowMeasures.allSatisfy { $0.pageIndex == 1 })
+
+    #expect(laidOut.partGroups.count == 2)
+    #expect(laidOut.partGroups.map(\.pageIndex) == [0, 1])
+    #expect(laidOut.partGroups.map(\.frame.y) == [40, 40])
+    #expect(laidOut.barlineConnectors.map(\.pageIndex) == [0, 0, 1, 1])
+}
+
+@Test func layoutEnginePlacesNestedPartGroupsWithStackedOffsets() throws {
+    let score = try MusicXMLParser().parse(xml: nestedPartGroupLayoutXML)
+    let options = LayoutOptions(pageWidth: 500)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: options)
+
+    #expect(laidOut.systems.count == 3)
+    #expect(laidOut.partGroups.count == 2)
+
+    let outer = try #require(laidOut.partGroups.first(where: { $0.number == 1 }))
+    let inner = try #require(laidOut.partGroups.first(where: { $0.number == 2 }))
+
+    #expect(outer.symbol == .bracket)
+    #expect(inner.symbol == .brace)
+    #expect(outer.startPartIndex == 0 && outer.endPartIndex == 2)
+    #expect(inner.startPartIndex == 0 && inner.endPartIndex == 1)
+    #expect(outer.nestingLevel == 1)
+    #expect(inner.nestingLevel == 0)
+    #expect(outer.frame.x < inner.frame.x)
+    #expect(outer.frame.width == 10)
+    #expect(inner.frame.width == 12)
+
+    // Only outer group has barline-join enabled.
+    #expect(laidOut.barlineConnectors.count == 2)
+    #expect(laidOut.barlineConnectors.map(\.side) == [.left, .right])
+    #expect(laidOut.barlineConnectors.allSatisfy { $0.sourceGroupIndex == outer.sourceGroupIndex })
+}
+
+@Test func layoutEngineAppliesSameSpanGroupPriorityAndRenderMetadata() throws {
+    let score = try MusicXMLParser().parse(xml: sameSpanPartGroupOrderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 500))
+    #expect(laidOut.partGroups.count == 2)
+
+    let bracket = try #require(laidOut.partGroups.first(where: { $0.symbol == .bracket }))
+    let brace = try #require(laidOut.partGroups.first(where: { $0.symbol == .brace }))
+
+    // Same-span policy: bracket renders outside (farther left) and earlier.
+    #expect(bracket.startPartIndex == brace.startPartIndex)
+    #expect(bracket.endPartIndex == brace.endPartIndex)
+    #expect(bracket.nestingLevel > brace.nestingLevel)
+    #expect(bracket.frame.x < brace.frame.x)
+    #expect(bracket.renderOrder < brace.renderOrder)
+
+    // Renderer handoff metadata should be symbol-specific.
+    #expect(bracket.renderStyle.hookLength > 0)
+    #expect(bracket.renderStyle.curvature == 0)
+    #expect(brace.renderStyle.hookLength == 0)
+    #expect(brace.renderStyle.curvature > 0)
+    #expect(brace.renderStyle.strokeWidth > bracket.renderStyle.strokeWidth)
+
+    // Only the barline-enabled (bracket) group emits row connectors.
+    #expect(laidOut.barlineConnectors.count == 2)
+    #expect(laidOut.barlineConnectors.map(\.side) == [.left, .right])
+    #expect(laidOut.barlineConnectors.allSatisfy { $0.sourceGroupIndex == bracket.sourceGroupIndex })
 }
 
 @Test func engineRenderAfterLoadHitsLayoutNotImplemented() throws {

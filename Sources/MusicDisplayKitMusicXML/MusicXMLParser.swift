@@ -82,6 +82,29 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         }
     }
 
+    private struct PartGroupBuilder {
+        var number: Int?
+        var startPartID: String?
+        var endPartID: String?
+        var symbol: PartGroupSymbol?
+        var barline: Bool?
+        var name: String?
+
+        func build() -> PartGroup? {
+            guard let startPartID, let endPartID else {
+                return nil
+            }
+            return PartGroup(
+                number: number,
+                startPartID: startPartID,
+                endPartID: endPartID,
+                symbol: symbol,
+                barline: barline,
+                name: name
+            )
+        }
+    }
+
     private struct MeasureBuilder {
         let number: Int
         let xmlNumber: String?
@@ -347,6 +370,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case workTitle
         case movementTitle
         case partName(partID: String)
+        case partGroupSymbol
+        case partGroupName
+        case partGroupBarline
         case measureDivisions
         case noteDuration
         case noteVoice
@@ -421,6 +447,10 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private var movementTitle: String?
     private var partNamesByID: [String: String] = [:]
     private var parts: [Part] = []
+    private var activePartGroupsByKey: [String: PartGroupBuilder] = [:]
+    private var activePartGroupOrder: [String] = []
+    private var currentPartGroupKey: String?
+    private var parsedPartGroups: [PartGroup] = []
 
     func parser(
         _ parser: XMLParser,
@@ -439,9 +469,42 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "score-part" where insidePartList:
             currentScorePartID = attributeDict["id"]?.trimmedNonEmpty
+            if let currentScorePartID {
+                registerPartIDForActivePartGroups(currentScorePartID)
+            }
+
+        case "part-group" where insidePartList:
+            let key = partGroupKey(from: attributeDict["number"])
+            let groupType = attributeDict["type"]?.trimmedNonEmpty?.lowercased()
+            switch groupType {
+            case "start":
+                var builder = activePartGroupsByKey[key] ?? PartGroupBuilder()
+                if builder.number == nil {
+                    builder.number = attributeDict["number"]?.trimmedNonEmpty.flatMap(Int.init)
+                }
+                activePartGroupsByKey[key] = builder
+                if !activePartGroupOrder.contains(key) {
+                    activePartGroupOrder.append(key)
+                }
+                currentPartGroupKey = key
+            case "stop":
+                finalizePartGroup(forKey: key)
+                currentPartGroupKey = nil
+            default:
+                currentPartGroupKey = nil
+            }
 
         case "part-name" where insidePartList && currentScorePartID != nil:
             startTextCapture(.partName(partID: currentScorePartID!))
+
+        case "group-symbol" where insidePartList && currentPartGroupKey != nil:
+            startTextCapture(.partGroupSymbol)
+
+        case "group-name" where insidePartList && currentPartGroupKey != nil:
+            startTextCapture(.partGroupName)
+
+        case "group-barline" where insidePartList && currentPartGroupKey != nil:
+            startTextCapture(.partGroupBarline)
 
         case "part":
             partCounter += 1
@@ -1058,11 +1121,15 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "forward":
             finishTimingDirective(.forward)
 
+        case "part-group":
+            currentPartGroupKey = nil
+
         case "score-part":
             currentScorePartID = nil
 
         case "part-list":
             insidePartList = false
+            finalizeAllOpenPartGroups()
 
         case "work-title":
             if case .workTitle = currentTextTarget {
@@ -1077,6 +1144,30 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "part-name":
             if case .partName = currentTextTarget {
                 finishPartNameCapture()
+            }
+
+        case "group-symbol":
+            if case .partGroupSymbol = currentTextTarget,
+               let value = consumeCapturedText(),
+               var currentPartGroup = currentBuilderPartGroup() {
+                currentPartGroup.symbol = parsePartGroupSymbol(from: value)
+                updateCurrentBuilderPartGroup(currentPartGroup)
+            }
+
+        case "group-name":
+            if case .partGroupName = currentTextTarget,
+               let value = consumeCapturedText(),
+               var currentPartGroup = currentBuilderPartGroup() {
+                currentPartGroup.name = value
+                updateCurrentBuilderPartGroup(currentPartGroup)
+            }
+
+        case "group-barline":
+            if case .partGroupBarline = currentTextTarget,
+               let value = consumeCapturedText(),
+               var currentPartGroup = currentBuilderPartGroup() {
+                currentPartGroup.barline = yesNoToBool(value)
+                updateCurrentBuilderPartGroup(currentPartGroup)
             }
 
         case "divisions":
@@ -1370,6 +1461,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         if let currentPart {
             parts.append(postProcessPart(currentPart.build()))
         }
+        finalizeAllOpenPartGroups()
 
         guard sawScorePartwise else {
             throw MusicXMLParserError.missingScorePartwise
@@ -1378,7 +1470,11 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         let title = workTitle?.trimmedNonEmpty
             ?? movementTitle?.trimmedNonEmpty
             ?? "Untitled Score"
-        return Score(title: title, parts: parts)
+        return Score(
+            title: title,
+            parts: parts,
+            partGroups: normalizedPartGroups(filteredTo: parts)
+        )
     }
 
     private func postProcessPart(_ part: Part) -> Part {
@@ -2641,6 +2737,78 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 return $0.number < $1.number
             }
             return $0.endNoteIndex < $1.endNoteIndex
+        }
+    }
+
+    private func registerPartIDForActivePartGroups(_ partID: String) {
+        for key in activePartGroupOrder {
+            guard var group = activePartGroupsByKey[key] else {
+                continue
+            }
+            if group.startPartID == nil {
+                group.startPartID = partID
+            }
+            group.endPartID = partID
+            activePartGroupsByKey[key] = group
+        }
+    }
+
+    private func partGroupKey(from number: String?) -> String {
+        number?.trimmedNonEmpty ?? "1"
+    }
+
+    private func currentBuilderPartGroup() -> PartGroupBuilder? {
+        guard let key = currentPartGroupKey else {
+            return nil
+        }
+        return activePartGroupsByKey[key]
+    }
+
+    private func updateCurrentBuilderPartGroup(_ builder: PartGroupBuilder) {
+        guard let key = currentPartGroupKey else {
+            return
+        }
+        activePartGroupsByKey[key] = builder
+    }
+
+    private func finalizePartGroup(forKey key: String) {
+        guard let group = activePartGroupsByKey.removeValue(forKey: key)?.build() else {
+            activePartGroupOrder.removeAll { $0 == key }
+            return
+        }
+        activePartGroupOrder.removeAll { $0 == key }
+        parsedPartGroups.append(group)
+    }
+
+    private func finalizeAllOpenPartGroups() {
+        let keys = activePartGroupOrder
+        for key in keys {
+            finalizePartGroup(forKey: key)
+        }
+        activePartGroupOrder = []
+    }
+
+    private func normalizedPartGroups(filteredTo parts: [Part]) -> [PartGroup] {
+        let validIDs = Set(parts.map(\.id))
+        return parsedPartGroups.filter { group in
+            validIDs.contains(group.startPartID) && validIDs.contains(group.endPartID)
+        }
+    }
+
+    private func parsePartGroupSymbol(from value: String) -> PartGroupSymbol? {
+        switch value.trimmedNonEmpty?.lowercased() {
+        case "brace":
+            return .brace
+        case "bracket":
+            return .bracket
+        case "line":
+            return .line
+        case "square":
+            return .square
+        case let raw?:
+            return .unknown(raw)
+        default:
+            return nil
         }
     }
 

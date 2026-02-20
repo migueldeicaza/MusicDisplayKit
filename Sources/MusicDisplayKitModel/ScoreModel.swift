@@ -3,10 +3,16 @@ import MusicDisplayKitCore
 public struct Score: Equatable, Sendable {
     public var title: String
     public var parts: [Part]
+    public var partGroups: [PartGroup]
 
-    public init(title: String = "Untitled Score", parts: [Part] = []) {
+    public init(
+        title: String = "Untitled Score",
+        parts: [Part] = [],
+        partGroups: [PartGroup] = []
+    ) {
         self.title = title
         self.parts = parts
+        self.partGroups = partGroups
     }
 }
 
@@ -27,6 +33,39 @@ public struct Part: Equatable, Sendable {
         self.measures = measures
         self.playbackOrder = playbackOrder
     }
+}
+
+public struct PartGroup: Equatable, Sendable {
+    public var number: Int?
+    public var startPartID: String
+    public var endPartID: String
+    public var symbol: PartGroupSymbol?
+    public var barline: Bool?
+    public var name: String?
+
+    public init(
+        number: Int? = nil,
+        startPartID: String,
+        endPartID: String,
+        symbol: PartGroupSymbol? = nil,
+        barline: Bool? = nil,
+        name: String? = nil
+    ) {
+        self.number = number
+        self.startPartID = startPartID
+        self.endPartID = endPartID
+        self.symbol = symbol
+        self.barline = barline
+        self.name = name
+    }
+}
+
+public enum PartGroupSymbol: Equatable, Sendable {
+    case brace
+    case bracket
+    case line
+    case square
+    case unknown(String)
 }
 
 public struct Measure: Equatable, Sendable {
