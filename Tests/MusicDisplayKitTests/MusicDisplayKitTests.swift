@@ -1,0 +1,1662 @@
+import Foundation
+import Testing
+import ZIPFoundation
+
+@testable import MusicDisplayKit
+import MusicDisplayKitCore
+import MusicDisplayKitModel
+import MusicDisplayKitMusicXML
+
+private let minimalScoreXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <work>
+    <work-title>Prelude in C</work-title>
+  </work>
+  <part-list>
+    <score-part id="P1">
+      <part-name>Piano</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1"></measure>
+    <measure number="2"></measure>
+  </part>
+</score-partwise>
+"""
+
+private let movementTitleFallbackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <movement-title>Etude</movement-title>
+  <part-list>
+    <score-part id="Solo">
+      <part-name>Solo</part-name>
+    </score-part>
+  </part-list>
+  <part id="Solo">
+    <measure></measure>
+  </part>
+</score-partwise>
+"""
+
+private let noteVoiceTimingXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Piano</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+      </attributes>
+      <note>
+        <pitch>
+          <step>C</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <backup>
+        <duration>4</duration>
+      </backup>
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>2</voice>
+      </note>
+      <forward>
+        <duration>2</duration>
+      </forward>
+      <note>
+        <grace/>
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>5</octave>
+        </pitch>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let measureAttributesXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Piano</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="10">
+      <attributes>
+        <divisions>8</divisions>
+        <key>
+          <fifths>-3</fifths>
+          <mode>minor</mode>
+        </key>
+        <time symbol="common">
+          <beats>4</beats>
+          <beat-type>4</beat-type>
+        </time>
+        <clef number="1">
+          <sign>G</sign>
+          <line>2</line>
+        </clef>
+        <clef number="2">
+          <sign>F</sign>
+          <line>4</line>
+          <clef-octave-change>-1</clef-octave-change>
+        </clef>
+      </attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>8</duration>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let lyricTieSlurXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Voice</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <tie type="start"/>
+        <notations>
+          <tied type="start"/>
+          <slur type="start" number="1" placement="above"/>
+        </notations>
+        <lyric number="1">
+          <syllabic>begin</syllabic>
+          <text>Hel</text>
+        </lyric>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <tie type="stop"/>
+        <notations>
+          <tied type="stop"/>
+          <slur type="stop" number="1"/>
+        </notations>
+        <lyric number="1">
+          <syllabic>end</syllabic>
+          <text>lo</text>
+          <extend/>
+        </lyric>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let crossMeasureLyricsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Voice</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <lyric number="1">
+          <syllabic>begin</syllabic>
+          <text>Hal</text>
+        </lyric>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <lyric number="1">
+          <syllabic>end</syllabic>
+          <text>lo</text>
+        </lyric>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <lyric number="1">
+          <text>there</text>
+          <extend/>
+        </lyric>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let crossMeasureSlurXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>G</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="3" placement="above"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>A</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop" number="3"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let beamTupletXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>8</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <beam number="1">begin</beam>
+        <notations>
+          <tuplet type="start" number="1" bracket="yes" placement="below" show-number="both" show-type="actual"/>
+        </notations>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <beam number="1">end</beam>
+        <notations>
+          <tuplet type="stop" number="1"/>
+        </notations>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let articulationsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>G</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <articulations>
+            <staccato placement="above"/>
+            <strong-accent type="up"/>
+          </articulations>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let directionExpressionsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+      </note>
+      <direction placement="above">
+        <direction-type>
+          <metronome parentheses="yes">
+            <beat-unit>quarter</beat-unit>
+            <beat-unit-dot/>
+            <per-minute>120</per-minute>
+          </metronome>
+          <dynamics>
+            <mf/>
+          </dynamics>
+          <words>dolce</words>
+          <rehearsal>A</rehearsal>
+          <wedge type="crescendo" number="1" spread="12" niente="no" line-type="solid"/>
+          <octave-shift type="up" number="1" size="8"/>
+          <pedal type="start" line="yes" sign="no"/>
+        </direction-type>
+        <sound tempo="120"/>
+        <offset>2</offset>
+        <staff>1</staff>
+      </direction>
+      <note>
+        <rest/>
+        <duration>4</duration>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let harmonyXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony>
+        <root>
+          <root-step>C</root-step>
+          <root-alter>1</root-alter>
+        </root>
+        <kind text="maj7" use-symbols="yes">major-seventh</kind>
+        <degree>
+          <degree-value>9</degree-value>
+          <degree-alter>-1</degree-alter>
+          <degree-type>add</degree-type>
+        </degree>
+        <offset>2</offset>
+        <staff>1</staff>
+      </harmony>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let harmonyFormattingXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony>
+        <root>
+          <root-step>F</root-step>
+          <root-alter>1</root-alter>
+        </root>
+        <kind>minor-seventh</kind>
+        <bass>
+          <bass-step>C</bass-step>
+          <bass-alter>-1</bass-alter>
+        </bass>
+      </harmony>
+      <note>
+        <pitch><step>F</step><alter>1</alter><octave>4</octave></pitch>
+        <duration>4</duration>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let repeatsAndTempoXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <barline location="left">
+        <repeat direction="forward"/>
+      </barline>
+      <direction placement="above">
+        <sound tempo="96"/>
+      </direction>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+      </note>
+      <barline location="right">
+        <ending number="1" type="start"/>
+      </barline>
+    </measure>
+    <measure number="2">
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>72</per-minute>
+          </metronome>
+          <segno/>
+          <coda/>
+          <words>To Coda</words>
+          <words>Fine</words>
+        </direction-type>
+        <sound dacapo="yes" dalsegno="seg1" tocoda="coda1" fine="Fine"/>
+      </direction>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+      </note>
+      <barline location="right">
+        <repeat direction="backward" times="2"/>
+        <ending number="1" type="stop"/>
+      </barline>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let tempoTimelineFromTimeSignatureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time>
+          <beats>3</beats>
+          <beat-type>4</beat-type>
+        </time>
+      </attributes>
+      <direction>
+        <sound tempo="90"/>
+      </direction>
+    </measure>
+    <measure number="2">
+      <direction>
+        <sound tempo="110"/>
+      </direction>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let repeatEndingPlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <repeat direction="forward"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <ending number="1" type="start"/>
+        <ending number="1" type="stop"/>
+        <repeat direction="backward"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <barline location="left">
+        <ending number="2" type="start"/>
+        <ending number="2" type="stop"/>
+      </barline>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let sequentialImplicitRepeatStartXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <repeat direction="backward"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <barline location="right">
+        <repeat direction="backward"/>
+      </barline>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoAlCodaPlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno/></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type>
+          <words>D.S.</words>
+          <words>al Coda</words>
+        </direction-type>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda/></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedDalSegnoToCodaXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno>A</segno></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno>B</segno></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction>
+        <direction-type>
+          <words>D.S. al Coda</words>
+        </direction-type>
+        <sound dalsegno="B" tocoda="C2"/>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction><direction-type><coda>C1</coda></direction-type></direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6">
+      <direction><direction-type><coda>C2</coda></direction-type></direction>
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoPrecedenceOverDaCapoXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type>
+          <words>D.S.</words>
+          <words>D.C.</words>
+          <words>al Fine</words>
+        </direction-type>
+        <sound dacapo="yes" dalsegno="S3"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><segno>S3</segno></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><words>Fine</words></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let endingNumberRangeXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <ending number="1-3, 5 + 7" type="start"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+      <barline location="right">
+        <ending number="1-3, 5 + 7" type="stop"/>
+      </barline>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoAlCodaIgnoresFineXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno/></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><words>D.S. al Coda</words></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction>
+        <direction-type>
+          <words>Fine</words>
+          <words>To Coda</words>
+        </direction-type>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda/></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoAlCodaUsesForwardCodaXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><coda/></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno/></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>D.S. al Coda</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction><direction-type><coda/></direction-type></direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoAlCodaToCodaOnJumpMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno/></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type>
+          <words>D.S. al Coda</words>
+          <words>To Coda</words>
+        </direction-type>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda/></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoAlCodaWithRepeatEndingsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <barline location="left"><repeat direction="forward"/></barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="left"><ending number="1" type="start"/></barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <barline location="right">
+        <ending number="1" type="stop"/>
+        <repeat direction="backward"/>
+      </barline>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <barline location="left"><ending number="2" type="start"/></barline>
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+      <barline location="right"><ending number="2" type="stop"/></barline>
+    </measure>
+    <measure number="5">
+      <direction><direction-type><coda>C</coda></direction-type></direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6">
+      <direction>
+        <direction-type><words>D.S. al Coda</words></direction-type>
+        <sound dalsegno="S" tocoda="C"/>
+      </direction>
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedToCodaDoesNotFallbackToDifferentCodaXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.S. al Coda</words></direction-type>
+        <sound dalsegno="S" tocoda="C2"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6">
+      <direction><direction-type><coda>C1</coda></direction-type></direction>
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let instrumentTraversalXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+    <score-part id="P2"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1">
+      <attributes>
+        <divisions>8</divisions>
+      </attributes>
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>8</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private func makeMXLArchiveData(
+    rootfilePath: String = "score.musicxml",
+    rootfileXML: String = minimalScoreXML
+) throws -> Data {
+    let containerXML = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+      <rootfiles>
+        <rootfile full-path="\(rootfilePath)" media-type="application/vnd.recordare.musicxml+xml"/>
+      </rootfiles>
+    </container>
+    """
+
+    let archive = try Archive(data: Data(), accessMode: .create)
+    try addFileEntry(data: Data(containerXML.utf8), path: "META-INF/container.xml", to: archive)
+    try addFileEntry(data: Data(rootfileXML.utf8), path: rootfilePath, to: archive)
+    guard let data = archive.data else {
+        throw MusicXMLDocumentLoaderError.invalidMXLArchive
+    }
+    return data
+}
+
+private func addFileEntry(data: Data, path: String, to archive: Archive) throws {
+    try archive.addEntry(
+        with: path,
+        type: .file,
+        uncompressedSize: Int64(data.count),
+        compressionMethod: .deflate,
+        provider: { position, size in
+            let start = Int(position)
+            guard start < data.count else {
+                return Data()
+            }
+            let end = min(start + size, data.count)
+            return data.subdata(in: start..<end)
+        }
+    )
+}
+
+private struct TitleSuffixModule: AfterScoreReadingModule {
+    let suffix: String
+
+    func process(score: inout Score) throws {
+        score.title += suffix
+    }
+}
+
+@Test func renderWithoutLoadThrows() throws {
+    let engine = MusicDisplayEngine()
+
+    #expect(throws: MusicDisplayEngineError.noScoreLoaded) {
+        try engine.render(target: .view(identifier: "preview"))
+    }
+}
+
+@Test func parserReadsTitlePartsAndMeasures() throws {
+    let score = try MusicXMLParser().parse(xml: minimalScoreXML)
+    #expect(score.title == "Prelude in C")
+    #expect(score.parts.count == 1)
+    #expect(score.parts.first?.id == "P1")
+    #expect(score.parts.first?.name == "Piano")
+    #expect(score.parts.first?.measures.map(\.number) == [1, 2])
+}
+
+@Test func parserFallsBackToMovementTitleAndAutoMeasureNumber() throws {
+    let score = try MusicXMLParser().parse(xml: movementTitleFallbackXML)
+    #expect(score.title == "Etude")
+    #expect(score.parts.first?.measures.first?.number == 1)
+}
+
+@Test func parserReadsUTF16EncodedData() throws {
+    let utf16Body = try #require(minimalScoreXML.data(using: .utf16LittleEndian))
+    var utf16Data = Data([0xFF, 0xFE])
+    utf16Data.append(utf16Body)
+    let score = try MusicXMLParser().parse(data: utf16Data, pathExtension: "musicxml")
+    #expect(score.title == "Prelude in C")
+    #expect(score.parts.first?.id == "P1")
+}
+
+@Test func parserReadsMXLDataViaContainerRootfile() throws {
+    let mxlData = try makeMXLArchiveData(
+        rootfilePath: "scores/main.musicxml",
+        rootfileXML: minimalScoreXML
+    )
+    let score = try MusicXMLParser().parse(data: mxlData, pathExtension: "mxl")
+    #expect(score.title == "Prelude in C")
+    #expect(score.parts.first?.measures.map(\.number) == [1, 2])
+}
+
+@Test func parserFailsForMXLWithoutContainer() throws {
+    let archive = try Archive(data: Data(), accessMode: .create)
+    try addFileEntry(data: Data(minimalScoreXML.utf8), path: "score.musicxml", to: archive)
+    let data = try #require(archive.data)
+
+    #expect(throws: MusicXMLParserError.parserFailure("MXL container is missing META-INF/container.xml.")) {
+        _ = try MusicXMLParser().parse(data: data, pathExtension: "mxl")
+    }
+}
+
+@Test func loaderParsesFromXMLStringSource() throws {
+    let loader = MusicXMLLoader()
+    let score = try loader.loadScore(from: .xmlString(minimalScoreXML))
+    #expect(score.title == "Prelude in C")
+}
+
+@Test func loaderParsesFromDataSourceWithExtensionHint() throws {
+    let data = try makeMXLArchiveData()
+    let loader = MusicXMLLoader()
+    let score = try loader.loadScore(from: .data(data, pathExtension: "mxl"))
+    #expect(score.parts.first?.id == "P1")
+}
+
+@Test func loaderParsesFromFileURLSource() throws {
+    let tmpURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("musicxml")
+    defer { try? FileManager.default.removeItem(at: tmpURL) }
+    try Data(minimalScoreXML.utf8).write(to: tmpURL)
+
+    let loader = MusicXMLLoader()
+    let score = try loader.loadScore(from: .fileURL(tmpURL))
+    #expect(score.title == "Prelude in C")
+}
+
+@Test func loaderRejectsUnsupportedURLScheme() throws {
+    let loader = MusicXMLLoader()
+    let ftpURL = try #require(URL(string: "ftp://example.com/score.musicxml"))
+    #expect(throws: MusicXMLLoaderError.unsupportedURLScheme("ftp")) {
+        _ = try loader.loadScore(from: .url(ftpURL))
+    }
+}
+
+@Test func musicSheetReaderReadsFromSource() throws {
+    let reader = MusicSheetReader()
+    let score = try reader.read(from: .xmlString(minimalScoreXML))
+    #expect(score.title == "Prelude in C")
+}
+
+@Test func musicSheetReaderRunsAfterReadingModules() throws {
+    let reader = MusicSheetReader(
+        afterReadingModules: [TitleSuffixModule(suffix: " (Ported)")]
+    )
+    let score = try reader.read(xml: minimalScoreXML)
+    #expect(score.title == "Prelude in C (Ported)")
+}
+
+@Test func instrumentReaderTraversesMeasuresWithCarryForwardState() throws {
+    let score = try MusicXMLParser().parse(xml: instrumentTraversalXML)
+    let visits = InstrumentReader().readMeasureVisits(from: score)
+    #expect(visits.count == 3)
+
+    let p1m1 = visits[0]
+    #expect(p1m1.partID == "P1")
+    #expect(p1m1.measureNumber == 1)
+    #expect(p1m1.effectiveDivisions == 4)
+    #expect(p1m1.effectiveAttributes?.time == TimeSignature(beats: 4, beatType: 4))
+
+    let p1m2 = visits[1]
+    #expect(p1m2.partID == "P1")
+    #expect(p1m2.measureNumber == 2)
+    #expect(p1m2.effectiveDivisions == 4)
+    #expect(p1m2.effectiveAttributes?.key == KeySignature(fifths: 0, mode: nil))
+
+    let p2m1 = visits[2]
+    #expect(p2m1.partID == "P2")
+    #expect(p2m1.measureNumber == 1)
+    #expect(p2m1.effectiveDivisions == 8)
+    #expect(p2m1.effectiveAttributes?.time == nil)
+}
+
+@Test func voiceGeneratorBuildsEntriesAndSpans() throws {
+    let score = try MusicXMLParser().parse(xml: beamTupletXML)
+    let voiceMeasures = VoiceGenerator().generate(from: score)
+    #expect(voiceMeasures.count == 1)
+
+    let voice = try #require(voiceMeasures.first)
+    #expect(voice.voice == 1)
+    #expect(voice.entries.count == 2)
+    #expect(voice.entries.map(\.onsetDivisions) == [0, 4])
+    #expect(voice.beamSpans == [
+        VoiceBeamSpan(number: 1, startEntryIndex: 0, endEntryIndex: 1)
+    ])
+    #expect(voice.tupletSpans == [
+        VoiceTupletSpan(number: 1, startEntryIndex: 0, endEntryIndex: 1)
+    ])
+}
+
+@Test func voiceGeneratorGroupsChordOnsetPerVoice() throws {
+    let score = try MusicXMLParser().parse(xml: noteVoiceTimingXML)
+    let voiceMeasures = VoiceGenerator().generate(from: score)
+    #expect(voiceMeasures.count == 2)
+
+    let voice1 = try #require(voiceMeasures.first(where: { $0.voice == 1 }))
+    #expect(voice1.entries.count == 1)
+    #expect(voice1.entries[0].onsetDivisions == 0)
+    #expect(voice1.entries[0].noteIndices == [0, 2])
+    #expect(voice1.entries[0].durationDivisions == 4)
+}
+
+@Test func voiceGeneratorMapsTieAndSlurSpans() throws {
+    let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
+    let voice = try #require(VoiceGenerator().generate(from: score).first)
+    #expect(voice.entries.count == 2)
+    #expect(voice.tieSpans.count == 1)
+    #expect(voice.tieSpans[0].startEntryIndex == 0)
+    #expect(voice.tieSpans[0].endEntryIndex == 1)
+    #expect(voice.slurSpans.count == 1)
+    #expect(voice.slurSpans[0].startEntryIndex == 0)
+    #expect(voice.slurSpans[0].endEntryIndex == 1)
+}
+
+@Test func slurGeneratorBuildsCrossMeasureSlurEvents() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureSlurXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 1)
+
+    let slur = slurs[0]
+    #expect(slur.number == 3)
+    #expect(slur.placement == "above")
+    #expect(slur.voice == 1)
+    #expect(slur.startMeasureNumber == 1)
+    #expect(slur.endMeasureNumber == 2)
+    #expect(slur.spansMultipleMeasures == true)
+    #expect(slur.isOpenEnded == false)
+}
+
+@Test func lyricsGeneratorBuildsInMeasureWords() throws {
+    let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
+    let words = LyricsGenerator().generate(from: score)
+    #expect(words.count == 1)
+    #expect(words[0].text == "Hello")
+    #expect(words[0].usesHyphen == true)
+    #expect(words[0].hasExtension == true)
+    #expect(words[0].spansMultipleMeasures == false)
+}
+
+@Test func lyricsGeneratorBuildsCrossMeasureWords() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureLyricsXML)
+    let words = LyricsGenerator().generate(from: score)
+    #expect(words.count == 2)
+
+    let first = words[0]
+    #expect(first.text == "Hallo")
+    #expect(first.usesHyphen == true)
+    #expect(first.spansMultipleMeasures == true)
+    #expect(first.startMeasureNumber == 1)
+    #expect(first.endMeasureNumber == 2)
+
+    let second = words[1]
+    #expect(second.text == "there")
+    #expect(second.usesHyphen == false)
+    #expect(second.hasExtension == true)
+    #expect(second.spansMultipleMeasures == false)
+}
+
+@Test func chordSymbolGeneratorFormatsHarmonyEvents() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyXML)
+    let events = ChordSymbolGenerator().generate(from: score)
+    #expect(events.count == 1)
+    #expect(events[0].displayText == "C#maj7(addb9)")
+}
+
+@Test func chordSymbolGeneratorFormatsKindAndBassFallback() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyFormattingXML)
+    let events = ChordSymbolGenerator().generate(from: score)
+    #expect(events.count == 1)
+    #expect(events[0].displayText == "F#m7/Cb")
+}
+
+@Test func articulationGeneratorBuildsEventsFromNotes() throws {
+    let score = try MusicXMLParser().parse(xml: articulationsXML)
+    let events = ArticulationGenerator().generate(from: score)
+    #expect(events.count == 2)
+    #expect(events[0].kind == .staccato)
+    #expect(events[0].placement == "above")
+    #expect(events[1].kind == .strongAccent)
+    #expect(events[1].type == "up")
+}
+
+@Test func expressionGeneratorBuildsEventsFromDirections() throws {
+    let score = try MusicXMLParser().parse(xml: directionExpressionsXML)
+    let events = ExpressionGenerator().generate(from: score)
+    #expect(events.count == 8)
+
+    #expect(events.contains {
+        if case .dynamic("mf") = $0.value {
+            return true
+        }
+        return false
+    })
+    #expect(events.contains {
+        if case .words("dolce") = $0.value {
+            return true
+        }
+        return false
+    })
+    #expect(events.contains {
+        if case .rehearsal("A") = $0.value {
+            return true
+        }
+        return false
+    })
+    #expect(events.contains {
+        if case .soundTempo(120) = $0.value {
+            return true
+        }
+        return false
+    })
+    #expect(events.contains {
+        if case .metronome(MetronomeMark(beatUnit: "quarter", beatUnitDotCount: 1, perMinute: "120", parentheses: true)) = $0.value {
+            return true
+        }
+        return false
+    })
+}
+
+@Test func expressionGeneratorIncludesRoadmapRepetitionEvents() throws {
+    let score = try MusicXMLParser().parse(xml: repeatsAndTempoXML)
+    let events = ExpressionGenerator().generate(from: score)
+    let instructions = events.compactMap { event -> RepetitionInstruction? in
+        if case .repetition(let instruction) = event.value {
+            return instruction
+        }
+        return nil
+    }
+
+    #expect(instructions.contains { $0.kind == .segno })
+    #expect(instructions.contains { $0.kind == .coda })
+    #expect(instructions.contains { $0.kind == .daCapo })
+    #expect(instructions.contains { $0.kind == .dalSegno && $0.target == "seg1" })
+    #expect(instructions.contains { $0.kind == .toCoda && $0.target == "coda1" })
+    #expect(instructions.contains { $0.kind == .alCoda && $0.target == "coda1" })
+    #expect(instructions.contains { $0.kind == .alFine })
+    #expect(instructions.contains { $0.kind == .fine })
+}
+
+@Test func tempoTimelineGeneratorBuildsAbsolutePositionsFromMeasures() throws {
+    let score = try MusicXMLParser().parse(xml: repeatsAndTempoXML)
+    let events = TempoTimelineGenerator().generate(from: score)
+
+    #expect(events.count == 4)
+    #expect(events[0].source == .carryForward)
+    #expect(events[0].absolutePosition == MDKFraction(0, 1))
+    #expect(events[1].source == .sound)
+    #expect(events[1].absolutePosition == MDKFraction(0, 1))
+    #expect(events[2].source == .carryForward)
+    #expect(events[2].absolutePosition == MDKFraction(1, 4))
+    #expect(events[3].source == .metronome)
+    #expect(events[3].absolutePosition == MDKFraction(1, 4))
+}
+
+@Test func tempoTimelineGeneratorUsesTimeSignatureForEmptyMeasures() throws {
+    let score = try MusicXMLParser().parse(xml: tempoTimelineFromTimeSignatureXML)
+    let events = TempoTimelineGenerator().generate(from: score)
+    #expect(events.count == 4)
+
+    let measure2Events = events.filter { $0.measureNumber == 2 && $0.source != .carryForward }
+    #expect(measure2Events.count == 1)
+    #expect(measure2Events[0].absolutePosition == MDKFraction(3, 4))
+    #expect(measure2Events[0].bpm == 110)
+}
+
+@Test func musicSheetReaderReadWithTraversalReturnsInstrumentVisits() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(instrumentTraversalXML))
+    #expect(result.score.parts.count == 2)
+    #expect(result.instrumentMeasureVisits.map(\.partID) == ["P1", "P1", "P2"])
+    #expect(result.instrumentMeasureVisits.map(\.measureNumber) == [1, 2, 1])
+    #expect(result.voiceMeasures.map(\.voice) == [1, 1, 1])
+    #expect(result.chordSymbols.isEmpty)
+    #expect(result.articulationEvents.isEmpty)
+    #expect(result.expressionEvents.isEmpty)
+    #expect(result.slurEvents.isEmpty)
+    #expect(!result.tempoTimelineEvents.isEmpty)
+}
+
+@Test func musicSheetReaderReadWithTraversalIncludesChordSymbols() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(harmonyXML))
+    #expect(result.chordSymbols.count == 1)
+    #expect(result.chordSymbols[0].displayText == "C#maj7(addb9)")
+    #expect(result.articulationEvents.isEmpty)
+    #expect(result.expressionEvents.isEmpty)
+    #expect(result.slurEvents.isEmpty)
+    #expect(result.tempoTimelineEvents.count == 1)
+}
+
+@Test func musicSheetReaderReadWithTraversalIncludesArticulations() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(articulationsXML))
+    #expect(result.articulationEvents.count == 2)
+    #expect(result.articulationEvents.map(\.kind) == [.staccato, .strongAccent])
+    #expect(result.lyricWordEvents.isEmpty)
+    #expect(result.expressionEvents.isEmpty)
+    #expect(result.slurEvents.isEmpty)
+    #expect(result.tempoTimelineEvents.count == 1)
+}
+
+@Test func musicSheetReaderReadWithTraversalIncludesLyricWords() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossMeasureLyricsXML))
+    #expect(result.lyricWordEvents.count == 2)
+    #expect(result.lyricWordEvents[0].spansMultipleMeasures == true)
+    #expect(result.expressionEvents.isEmpty)
+    #expect(result.slurEvents.isEmpty)
+    #expect(result.tempoTimelineEvents.count == 2)
+}
+
+@Test func musicSheetReaderReadWithTraversalIncludesExpressionEvents() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(directionExpressionsXML))
+    #expect(result.expressionEvents.count == 8)
+    #expect(result.expressionEvents.contains {
+        if case .dynamic("mf") = $0.value {
+            return true
+        }
+        return false
+    })
+    #expect(result.slurEvents.isEmpty)
+    #expect(result.tempoTimelineEvents.count == 2)
+}
+
+@Test func musicSheetReaderReadWithTraversalIncludesSlurEvents() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossMeasureSlurXML))
+    #expect(result.slurEvents.count == 1)
+    #expect(result.slurEvents[0].spansMultipleMeasures == true)
+    #expect(result.slurEvents[0].isOpenEnded == false)
+    #expect(result.tempoTimelineEvents.count == 2)
+}
+
+@Test func musicSheetReaderReadWithTraversalIncludesTempoTimelineEvents() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(repeatsAndTempoXML))
+    #expect(result.tempoTimelineEvents.count == 4)
+    #expect(result.tempoTimelineEvents[2].absolutePosition == MDKFraction(1, 4))
+}
+
+@Test func parserReadsDivisionsNotesVoicesAndTimingDirectives() throws {
+    let score = try MusicXMLParser().parse(xml: noteVoiceTimingXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.divisions == 4)
+    #expect(measure.noteEvents.count == 3)
+    #expect(measure.timingDirectives.count == 2)
+
+    let first = measure.noteEvents[0]
+    #expect(first.kind == .pitched)
+    #expect(first.voice == 1)
+    #expect(first.onsetDivisions == 0)
+    #expect(first.durationDivisions == 4)
+    #expect(first.pitch == PitchValue(step: "C", alter: 1, octave: 4))
+    #expect(first.staff == nil)
+    #expect(first.isChord == false)
+    #expect(first.isGrace == false)
+
+    let second = measure.noteEvents[1]
+    #expect(second.kind == .rest)
+    #expect(second.voice == 2)
+    #expect(second.onsetDivisions == 0)
+    #expect(second.durationDivisions == 4)
+
+    let third = measure.noteEvents[2]
+    #expect(third.kind == .pitched)
+    #expect(third.pitch == PitchValue(step: "D", alter: 0, octave: 5))
+    #expect(third.onsetDivisions == 0)
+    #expect(third.durationDivisions == nil)
+    #expect(third.isChord == true)
+    #expect(third.isGrace == true)
+
+    #expect(measure.timingDirectives[0] == TimingDirective(kind: .backup, durationDivisions: 4))
+    #expect(measure.timingDirectives[1] == TimingDirective(kind: .forward, durationDivisions: 2))
+}
+
+@Test func parserReadsKeyTimeAndClefAttributes() throws {
+    let score = try MusicXMLParser().parse(xml: measureAttributesXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.number == 10)
+    #expect(measure.divisions == 8)
+
+    let attributes = try #require(measure.attributes)
+    #expect(attributes.key == KeySignature(fifths: -3, mode: "minor"))
+    #expect(attributes.time == TimeSignature(beats: 4, beatType: 4, symbol: "common"))
+    #expect(attributes.clefs.count == 2)
+    #expect(attributes.clefs[0] == ClefSetting(sign: "G", line: 2, number: 1, octaveChange: nil))
+    #expect(attributes.clefs[1] == ClefSetting(sign: "F", line: 4, number: 2, octaveChange: -1))
+}
+
+@Test func parserReadsLyricTieAndSlurMarkers() throws {
+    let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.noteEvents.count == 2)
+
+    let first = measure.noteEvents[0]
+    #expect(first.lyrics == [LyricEvent(number: 1, text: "Hel", syllabic: "begin", extend: false)])
+    #expect(first.ties.count == 2)
+    #expect(first.ties[0] == TieMarker(type: .start, source: .tieElement))
+    #expect(first.ties[1] == TieMarker(type: .start, source: .tiedNotation))
+    #expect(first.slurs == [SlurMarker(type: .start, number: 1, placement: "above")])
+
+    let second = measure.noteEvents[1]
+    #expect(second.onsetDivisions == 2)
+    #expect(second.lyrics == [LyricEvent(number: 1, text: "lo", syllabic: "end", extend: true)])
+    #expect(second.ties.count == 2)
+    #expect(second.ties[0] == TieMarker(type: .stop, source: .tieElement))
+    #expect(second.ties[1] == TieMarker(type: .stop, source: .tiedNotation))
+    #expect(second.slurs == [SlurMarker(type: .stop, number: 1, placement: nil)])
+
+    #expect(measure.tieSpans == [
+        TieSpan(
+            startNoteIndex: 0,
+            endNoteIndex: 1,
+            source: .tieElement,
+            voice: 1,
+            staff: nil,
+            pitch: PitchValue(step: "E", alter: 0, octave: 4)
+        )
+    ])
+    #expect(measure.slurSpans == [
+        SlurSpan(number: 1, startNoteIndex: 0, endNoteIndex: 1, voice: 1, staff: nil, placement: "above")
+    ])
+    #expect(measure.lyricWords == [
+        LyricWord(number: 1, startNoteIndex: 0, endNoteIndex: 1, text: "Hello", hasExtension: true)
+    ])
+}
+
+@Test func parserReadsBeamTupletAndTimeModificationMarkers() throws {
+    let score = try MusicXMLParser().parse(xml: beamTupletXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.noteEvents.count == 2)
+
+    let first = measure.noteEvents[0]
+    #expect(first.beams == [BeamMarker(number: 1, value: .begin)])
+    #expect(first.tuplets == [
+        TupletMarker(
+            type: .start,
+            number: 1,
+            bracket: true,
+            placement: "below",
+            showNumber: "both",
+            showType: "actual"
+        )
+    ])
+    #expect(first.timeModification == TimeModification(actualNotes: 3, normalNotes: 2))
+
+    let second = measure.noteEvents[1]
+    #expect(second.beams == [BeamMarker(number: 1, value: .end)])
+    #expect(second.tuplets == [TupletMarker(type: .stop, number: 1)])
+    #expect(second.timeModification == TimeModification(actualNotes: 3, normalNotes: 2))
+}
+
+@Test func parserReadsArticulationMarkers() throws {
+    let score = try MusicXMLParser().parse(xml: articulationsXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    let note = try #require(measure.noteEvents.first)
+
+    #expect(note.articulations == [
+        ArticulationMarker(kind: .staccato, placement: "above", type: nil),
+        ArticulationMarker(kind: .strongAccent, placement: nil, type: "up")
+    ])
+}
+
+@Test func parserReadsDirectionExpressionMarkers() throws {
+    let score = try MusicXMLParser().parse(xml: directionExpressionsXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.directionEvents.count == 1)
+
+    let direction = measure.directionEvents[0]
+    #expect(direction.onsetDivisions == 6)
+    #expect(direction.offsetDivisions == 2)
+    #expect(direction.placement == "above")
+    #expect(direction.staff == 1)
+    #expect(direction.soundTempo == 120)
+    #expect(direction.metronome == MetronomeMark(beatUnit: "quarter", beatUnitDotCount: 1, perMinute: "120", parentheses: true))
+    #expect(direction.dynamics == ["mf"])
+    #expect(direction.words == ["dolce"])
+    #expect(direction.rehearsal == "A")
+    #expect(direction.wedges == [
+        WedgeMarker(type: .crescendo, number: 1, spread: 12, niente: false, lineType: "solid")
+    ])
+    #expect(direction.octaveShifts == [
+        OctaveShiftMarker(type: .up, number: 1, size: 8)
+    ])
+    #expect(direction.pedals == [
+        PedalMarker(type: .start, line: true, sign: false)
+    ])
+}
+
+@Test func parserReadsHarmonyEvents() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.harmonyEvents.count == 1)
+
+    let harmony = measure.harmonyEvents[0]
+    #expect(harmony.onsetDivisions == 2)
+    #expect(harmony.offsetDivisions == 2)
+    #expect(harmony.rootStep == "C")
+    #expect(harmony.rootAlter == 1)
+    #expect(harmony.kind == "major-seventh")
+    #expect(harmony.kindText == "maj7")
+    #expect(harmony.kindUsesSymbols == true)
+    #expect(harmony.staff == 1)
+    #expect(harmony.degrees == [
+        HarmonyDegree(value: 9, alter: -1, type: .add)
+    ])
+}
+
+@Test func parserReadsRepetitionInstructionsAndCalculatesTempoTimeline() throws {
+    let score = try MusicXMLParser().parse(xml: repeatsAndTempoXML)
+    let part = try #require(score.parts.first)
+    #expect(part.measures.count == 2)
+
+    let m1 = part.measures[0]
+    #expect(m1.repetitionInstructions.contains {
+        $0.kind == .repeatForward && $0.location == "left"
+    })
+    #expect(m1.repetitionInstructions.contains {
+        $0.kind == .endingStart && $0.location == "right" && $0.endingNumbers == [1]
+    })
+    #expect(m1.tempoEvents == [
+        TempoEvent(onsetDivisions: 0, bpm: 120, source: .carryForward),
+        TempoEvent(onsetDivisions: 0, bpm: 96, source: .sound)
+    ])
+
+    let m2 = part.measures[1]
+    #expect(m2.repetitionInstructions.contains {
+        $0.kind == .repeatBackward && $0.times == 2 && $0.location == "right"
+    })
+    #expect(m2.repetitionInstructions.contains {
+        $0.kind == .endingStop && $0.endingNumbers == [1]
+    })
+    #expect(m2.repetitionInstructions.contains { $0.kind == .segno })
+    #expect(m2.repetitionInstructions.contains { $0.kind == .coda })
+    #expect(m2.repetitionInstructions.contains { $0.kind == .daCapo })
+    #expect(m2.repetitionInstructions.contains { $0.kind == .dalSegno && $0.target == "seg1" })
+    #expect(m2.repetitionInstructions.contains { $0.kind == .toCoda && $0.target == "coda1" })
+    #expect(m2.repetitionInstructions.contains { $0.kind == .alCoda && $0.target == "coda1" })
+    #expect(m2.repetitionInstructions.contains { $0.kind == .alFine })
+    #expect(m2.repetitionInstructions.contains { $0.kind == .fine })
+    #expect(m2.tempoEvents == [
+        TempoEvent(onsetDivisions: 0, bpm: 96, source: .carryForward),
+        TempoEvent(onsetDivisions: 0, bpm: 72, source: .metronome)
+    ])
+
+    let playback = try #require(part.playbackOrder)
+    #expect(playback.termination == .fine)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2])
+}
+
+@Test func parserBuildsPlaybackOrderForRepeatEndings() throws {
+    let score = try MusicXMLParser().parse(xml: repeatEndingPlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 3, 4])
+}
+
+@Test func parserBuildsPlaybackOrderForSequentialImplicitRepeatStarts() throws {
+    let score = try MusicXMLParser().parse(xml: sequentialImplicitRepeatStartXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4, 3, 4])
+}
+
+@Test func parserBuildsPlaybackOrderForDalSegnoAlCoda() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoAlCodaPlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4])
+}
+
+@Test func parserBuildsPlaybackOrderWithTargetedSegnoAndCoda() throws {
+    let score = try MusicXMLParser().parse(xml: targetedDalSegnoToCodaXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 2, 3, 4, 6])
+}
+
+@Test func parserPrefersDalSegnoOverDaCapoWhenBothPresent() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoPrecedenceOverDaCapoXML)
+    let measure2 = try #require(score.parts.first?.measures.dropFirst().first)
+    #expect(measure2.repetitionInstructions.contains { $0.kind == .alFine })
+    #expect(!measure2.repetitionInstructions.contains { $0.kind == .fine })
+
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .fine)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 4])
+}
+
+@Test func parserParsesEndingNumberRanges() throws {
+    let score = try MusicXMLParser().parse(xml: endingNumberRangeXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.repetitionInstructions.contains {
+        $0.kind == .endingStart && $0.endingNumbers == [1, 2, 3, 5, 7]
+    })
+    #expect(measure.repetitionInstructions.contains {
+        $0.kind == .endingStop && $0.endingNumbers == [1, 2, 3, 5, 7]
+    })
+}
+
+@Test func parserDoesNotStopAtFineWithoutAlFine() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoAlCodaIgnoresFineXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4])
+}
+
+@Test func parserUsesForwardCodaTargetForToCodaJump() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoAlCodaUsesForwardCodaXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 2, 3, 4, 5])
+}
+
+@Test func parserAppliesToCodaOnJumpCommandMeasureAfterJumpExecution() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoAlCodaToCodaOnJumpMeasureXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 4])
+}
+
+@Test func parserBuildsPlaybackOrderForDalSegnoAlCodaWithRepeatEndings() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoAlCodaWithRepeatEndingsXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 1, 4, 5, 6, 1, 4, 5, 6])
+}
+
+@Test func parserDoesNotFallbackToDifferentCodaWhenTargetMissing() throws {
+    let score = try MusicXMLParser().parse(xml: targetedToCodaDoesNotFallbackToDifferentCodaXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4, 5, 6])
+}
+
+@Test func parserRejectsNonPartwiseRoot() throws {
+    let invalidXML = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <score-timewise></score-timewise>
+    """
+    #expect(throws: MusicXMLParserError.missingScorePartwise) {
+        try MusicXMLParser().parse(xml: invalidXML)
+    }
+}
+
+@Test func engineRenderAfterLoadHitsLayoutNotImplemented() throws {
+    let engine = MusicDisplayEngine()
+    try engine.load(xml: minimalScoreXML)
+
+    #expect(throws: NotImplementedError.self) {
+        try engine.render(target: .view(identifier: "preview"))
+    }
+}
+
+@Test func engineLoadMXLFileURLThenRenderHitsLayoutNotImplemented() throws {
+    let engine = MusicDisplayEngine()
+    let data = try makeMXLArchiveData()
+
+    let tmpURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("mxl")
+    defer { try? FileManager.default.removeItem(at: tmpURL) }
+    try data.write(to: tmpURL)
+
+    try engine.load(fileURL: tmpURL)
+    #expect(throws: NotImplementedError.self) {
+        try engine.render(target: .view(identifier: "preview"))
+    }
+}
+
+@Test func engineLoadSourceThenRenderHitsLayoutNotImplemented() throws {
+    let engine = MusicDisplayEngine()
+    try engine.load(source: .xmlString(minimalScoreXML))
+    #expect(throws: NotImplementedError.self) {
+        try engine.render(target: .view(identifier: "preview"))
+    }
+}
