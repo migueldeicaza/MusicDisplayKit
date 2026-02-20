@@ -4,6 +4,7 @@ import ZIPFoundation
 
 @testable import MusicDisplayKit
 import MusicDisplayKitCore
+import MusicDisplayKitLayout
 import MusicDisplayKitModel
 import MusicDisplayKitMusicXML
 
@@ -36,6 +37,34 @@ private let movementTitleFallbackXML = """
   </part-list>
   <part id="Solo">
     <measure></measure>
+  </part>
+</score-partwise>
+"""
+
+private let layoutTimeSignatureSpacingXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Piano</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+    </measure>
+    <measure number="2">
+      <attributes>
+        <time><beats>2</beats><beat-type>4</beat-type></time>
+      </attributes>
+    </measure>
+    <measure number="3">
+      <attributes>
+        <time><beats>6</beats><beat-type>8</beat-type></time>
+      </attributes>
+    </measure>
   </part>
 </score-partwise>
 """
@@ -2000,6 +2029,52 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(throws: MusicXMLParserError.missingScorePartwise) {
         try MusicXMLParser().parse(xml: invalidXML)
     }
+}
+
+@Test func layoutEngineBuildsDeterministicGeometryForMinimalScore() throws {
+    let score = try MusicXMLParser().parse(xml: minimalScoreXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+
+    #expect(laidOut.systems.count == 1)
+    #expect(laidOut.measures.count == 2)
+    #expect(laidOut.measures[0].frame == LayoutRect(x: 40, y: 40, width: 176, height: 72))
+    #expect(laidOut.measures[1].frame == LayoutRect(x: 228, y: 40, width: 176, height: 72))
+    #expect(laidOut.systems[0].measureIndices == [0, 1])
+}
+
+@Test func layoutEngineWrapsSystemsWhenPageWidthIsSmall() throws {
+    let score = try MusicXMLParser().parse(xml: minimalScoreXML)
+    let options = LayoutOptions(pageWidth: 300)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: options)
+
+    #expect(laidOut.systems.count == 2)
+    #expect(laidOut.measures.count == 2)
+    #expect(laidOut.measures[0].systemIndex == 0)
+    #expect(laidOut.measures[0].frame == LayoutRect(x: 40, y: 40, width: 176, height: 72))
+    #expect(laidOut.measures[1].systemIndex == 1)
+    #expect(laidOut.measures[1].frame == LayoutRect(x: 40, y: 140, width: 176, height: 72))
+}
+
+@Test func layoutEngineScalesMeasureWidthFromTimeSignatureDuration() throws {
+    let score = try MusicXMLParser().parse(xml: layoutTimeSignatureSpacingXML)
+    let options = LayoutOptions(pageWidth: 600)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: options)
+
+    #expect(laidOut.systems.count == 1)
+    #expect(laidOut.measures.count == 3)
+    #expect(laidOut.measures.map { $0.frame.width } == [176, 88, 132])
+}
+
+@Test func layoutEngineBreaksToNextPageWhenHeightIsExceeded() throws {
+    let score = try MusicXMLParser().parse(xml: minimalScoreXML)
+    let options = LayoutOptions(pageWidth: 300, pageHeight: 200)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: options)
+
+    #expect(laidOut.systems.count == 2)
+    #expect(laidOut.systems.map(\.pageIndex) == [0, 1])
+    #expect(laidOut.measures.map(\.pageIndex) == [0, 1])
+    #expect(laidOut.measures[0].frame == LayoutRect(x: 40, y: 40, width: 176, height: 72))
+    #expect(laidOut.measures[1].frame == LayoutRect(x: 40, y: 40, width: 176, height: 72))
 }
 
 @Test func engineRenderAfterLoadHitsLayoutNotImplemented() throws {

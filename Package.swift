@@ -65,6 +65,7 @@ let package = Package(
             dependencies: [
                 "MusicDisplayKit",
                 "MusicDisplayKitCore",
+                "MusicDisplayKitLayout",
                 "MusicDisplayKitModel",
                 "MusicDisplayKitMusicXML",
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
