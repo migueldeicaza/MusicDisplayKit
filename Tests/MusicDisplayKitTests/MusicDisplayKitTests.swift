@@ -2351,16 +2351,59 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(plan.pageCount == 1)
 }
 
-@Test func engineRenderAfterLoadHitsLayoutNotImplemented() throws {
-    let engine = MusicDisplayEngine()
-    try engine.load(xml: minimalScoreXML)
+@Test func vexAdapterExecutesRenderPlanIntoFactoryObjects() throws {
+    let score = try MusicXMLParser().parse(xml: nestedPartGroupLayoutXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 500))
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
 
-    #expect(throws: NotImplementedError.self) {
-        try engine.render(target: .view(identifier: "preview"))
+    #expect(execution.staves.count == plan.staves.count)
+    #expect(execution.partGroupConnectors.count == plan.partGroupConnectors.count)
+    #expect(execution.barlineConnectors.count == plan.barlineConnectors.count)
+
+    for (connector, connectorPlan) in zip(execution.partGroupConnectors, plan.partGroupConnectors) {
+        let anchorX: Double
+        switch connectorPlan.kind {
+        case .singleRight:
+            anchorX = connector.topStave.getX() + connector.topStave.getWidth() + connector.getXShift()
+        case .singleLeft, .brace, .bracket:
+            anchorX = connector.topStave.getX() + connector.getXShift()
+        }
+        #expect(abs(anchorX - connectorPlan.frame.x) < 0.0001)
     }
+
+    for (connector, connectorPlan) in zip(execution.barlineConnectors, plan.barlineConnectors) {
+        let anchorX: Double
+        switch connectorPlan.kind {
+        case .singleRight:
+            anchorX = connector.topStave.getX() + connector.topStave.getWidth() + connector.getXShift()
+        case .singleLeft, .brace, .bracket:
+            anchorX = connector.topStave.getX() + connector.getXShift()
+        }
+        #expect(abs(anchorX - connectorPlan.frame.x) < 0.0001)
+    }
+
+    let labels = Set(
+        execution.partGroupConnectors
+            .compactMap { connector in connector.texts.first?.content }
+    )
+    #expect(labels == Set(["Ensemble", "Manuals"]))
 }
 
-@Test func engineLoadMXLFileURLThenRenderHitsLayoutNotImplemented() throws {
+@Test func vexAdapterRenderExecutesHeadlessDraw() throws {
+    let score = try MusicXMLParser().parse(xml: nestedPartGroupLayoutXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 500))
+    try VexFoundationRenderer().render(laidOut, target: .view(identifier: "preview"))
+}
+
+@Test func engineRenderAfterLoadCompletes() throws {
+    let engine = MusicDisplayEngine()
+    try engine.load(xml: minimalScoreXML)
+    try engine.render(target: .view(identifier: "preview"))
+}
+
+@Test func engineLoadMXLFileURLThenRenderCompletes() throws {
     let engine = MusicDisplayEngine()
     let data = try makeMXLArchiveData()
 
@@ -2371,15 +2414,11 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     try data.write(to: tmpURL)
 
     try engine.load(fileURL: tmpURL)
-    #expect(throws: NotImplementedError.self) {
-        try engine.render(target: .view(identifier: "preview"))
-    }
+    try engine.render(target: .view(identifier: "preview"))
 }
 
-@Test func engineLoadSourceThenRenderHitsLayoutNotImplemented() throws {
+@Test func engineLoadSourceThenRenderCompletes() throws {
     let engine = MusicDisplayEngine()
     try engine.load(source: .xmlString(minimalScoreXML))
-    #expect(throws: NotImplementedError.self) {
-        try engine.render(target: .view(identifier: "preview"))
-    }
+    try engine.render(target: .view(identifier: "preview"))
 }
