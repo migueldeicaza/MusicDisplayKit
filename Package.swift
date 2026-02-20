@@ -17,7 +17,7 @@ let package = Package(
         .library(name: "MusicDisplayKitVexAdapter", targets: ["MusicDisplayKitVexAdapter"]),
     ],
     dependencies: [
-        .package(path: "../VexFoundation"),
+        .package(path: "../work/VexFoundation"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
     ],
     targets: [

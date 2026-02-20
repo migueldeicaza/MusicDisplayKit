@@ -581,6 +581,110 @@ private let repeatTimesAttributePlaybackXML = """
 </score-partwise>
 """
 
+private let repeatTimesOnePlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <repeat direction="forward"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <repeat direction="backward" times="1"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let repeatTimesZeroPlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <repeat direction="forward"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <repeat direction="backward" times="0"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let repeatTimesNegativePlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <repeat direction="forward"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <repeat direction="backward" times="-2"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let repeatTimesDefaultPlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <repeat direction="forward"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <repeat direction="backward"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let endingWithoutBackwardRepeatXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -983,6 +1087,34 @@ private func makeMXLArchiveData(
         throw MusicXMLDocumentLoaderError.invalidMXLArchive
     }
     return data
+}
+
+private func osmdFixtureURL(named filename: String) throws -> URL {
+    let fileManager = FileManager.default
+
+    let cwdCandidate = URL(fileURLWithPath: fileManager.currentDirectoryPath, isDirectory: true)
+        .appendingPathComponent("../opensheetmusicdisplay/test/data/\(filename)")
+        .standardizedFileURL
+    if fileManager.fileExists(atPath: cwdCandidate.path) {
+        return cwdCandidate
+    }
+
+    let testFileURL = URL(fileURLWithPath: #filePath, isDirectory: false)
+    let packageRootCandidate = testFileURL
+        .deletingLastPathComponent() // MusicDisplayKitTests
+        .deletingLastPathComponent() // Tests
+        .deletingLastPathComponent() // MusicDisplayKit
+        .appendingPathComponent("opensheetmusicdisplay/test/data/\(filename)")
+        .standardizedFileURL
+    if fileManager.fileExists(atPath: packageRootCandidate.path) {
+        return packageRootCandidate
+    }
+
+    throw NSError(
+        domain: "MusicDisplayKitTests",
+        code: 1,
+        userInfo: [NSLocalizedDescriptionKey: "Could not find OSMD fixture: \(filename)"]
+    )
 }
 
 private func addFileEntry(data: Data, path: String, to archive: Archive) throws {
@@ -1632,6 +1764,34 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 1, 2, 3])
 }
 
+@Test func parserTreatsRepeatTimesOneAsNoRepeat() throws {
+    let score = try MusicXMLParser().parse(xml: repeatTimesOnePlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3])
+}
+
+@Test func parserClampsRepeatTimesZeroToNoRepeat() throws {
+    let score = try MusicXMLParser().parse(xml: repeatTimesZeroPlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3])
+}
+
+@Test func parserClampsNegativeRepeatTimesToNoRepeat() throws {
+    let score = try MusicXMLParser().parse(xml: repeatTimesNegativePlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3])
+}
+
+@Test func parserDefaultsBackwardRepeatToTwoTotalPlays() throws {
+    let score = try MusicXMLParser().parse(xml: repeatTimesDefaultPlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3])
+}
+
 @Test func parserDoesNotApplyEndingSkipsWithoutBackwardRepeat() throws {
     let score = try MusicXMLParser().parse(xml: endingWithoutBackwardRepeatXML)
     let playback = try #require(score.parts.first?.playbackOrder)
@@ -1701,6 +1861,121 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     let playback = try #require(score.parts.first?.playbackOrder)
     #expect(playback.termination == .endOfScore)
     #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 1, 4, 5, 6, 1, 4, 5, 6])
+}
+
+@Test func parserParsesOSMDRepetitionFixturesWithoutStepLimit() throws {
+    let fixtures = [
+        "test_staverepetitions_coda_etc.musicxml",
+        "test_staverepetitions_coda_etc_positioning.musicxml",
+        "test_voltas_interrupted_1615.musicxml",
+        "test_repeat_left_barline_simple.musicxml",
+        "OSMD_function_Test_Repeat.musicxml",
+        "test_repeat_volta_simple.musicxml",
+    ]
+    let parser = MusicXMLParser()
+
+    for fixture in fixtures {
+        let url = try osmdFixtureURL(named: fixture)
+        let score = try parser.parse(fileURL: url)
+        let part = try #require(score.parts.first)
+        let playback = try #require(part.playbackOrder)
+
+        #expect(playback.termination != .stepLimit)
+        #expect(!playback.visits.isEmpty)
+        #expect(!part.measures.flatMap(\.repetitionInstructions).isEmpty)
+    }
+}
+
+@Test func parserParsesAdditionalOSMDRepeatAdjacentFixturesWithoutStepLimit() throws {
+    let fixtures = [
+        "OSMD_function_test_multiple_rest_measures.musicxml",
+        "test_multiple_rest_measures_repeat_2_measures.musicxml",
+        "test_multiple_rest_measures_repeat_3_measures.musicxml",
+        "test_implicit_measure_repeat_singlenote.musicxml",
+    ]
+    let parser = MusicXMLParser()
+
+    for fixture in fixtures {
+        let url = try osmdFixtureURL(named: fixture)
+        let score = try parser.parse(fileURL: url)
+        let part = try #require(score.parts.first)
+        let playback = try #require(part.playbackOrder)
+
+        #expect(playback.termination != .stepLimit)
+        #expect(!playback.visits.isEmpty)
+        #expect(playback.visits.count <= max(1, part.measures.count * 32))
+    }
+}
+
+@Test func musicSheetReaderParsesOSMDExpressionAndTempoFixtures() throws {
+    let fixtures = [
+        "OSMD_function_test_expressions.musicxml",
+        "test_tempo_expression_poco_meno_continuoustempoexpression.musicxml",
+    ]
+    let reader = MusicSheetReader()
+
+    for fixture in fixtures {
+        let url = try osmdFixtureURL(named: fixture)
+        let result = try reader.readWithTraversal(from: .fileURL(url))
+        #expect(!result.expressionEvents.isEmpty)
+        #expect(!result.tempoTimelineEvents.isEmpty)
+    }
+}
+
+@Test func musicSheetReaderParsesOSMDChordSymbolFixtures() throws {
+    let fixtures = [
+        "OSMD_function_test_chord_symbols.musicxml",
+        "test_chord_symbol_centering_short_symbols.musicxml",
+    ]
+    let reader = MusicSheetReader()
+
+    for fixture in fixtures {
+        let url = try osmdFixtureURL(named: fixture)
+        let result = try reader.readWithTraversal(from: .fileURL(url))
+        #expect(!result.chordSymbols.isEmpty)
+    }
+}
+
+@Test func musicSheetReaderParsesOSMDLyricsFixtures() throws {
+    let fixtures = [
+        "test_lyrics_centering.musicxml",
+        "test_lyrics_spacing_short_notes_four_characters.musicxml",
+    ]
+    let reader = MusicSheetReader()
+
+    for fixture in fixtures {
+        let url = try osmdFixtureURL(named: fixture)
+        let result = try reader.readWithTraversal(from: .fileURL(url))
+        #expect(!result.lyricWordEvents.isEmpty)
+    }
+}
+
+@Test func musicSheetReaderParsesOSMDSlurFixtures() throws {
+    let fixtures = [
+        "test_slur_double.musicxml",
+        "test_slurs_highNotes.musicxml",
+    ]
+    let reader = MusicSheetReader()
+
+    for fixture in fixtures {
+        let url = try osmdFixtureURL(named: fixture)
+        let result = try reader.readWithTraversal(from: .fileURL(url))
+        #expect(!result.slurEvents.isEmpty)
+    }
+}
+
+@Test func musicSheetReaderParsesOSMDArticulationFixtures() throws {
+    let fixtures = [
+        "test_articulation_staccato_placement_above_explicitly.musicxml",
+        "test_articulation_staccato_placement_below.musicxml",
+    ]
+    let reader = MusicSheetReader()
+
+    for fixture in fixtures {
+        let url = try osmdFixtureURL(named: fixture)
+        let result = try reader.readWithTraversal(from: .fileURL(url))
+        #expect(!result.articulationEvents.isEmpty)
+    }
 }
 
 @Test func parserDoesNotFallbackToDifferentCodaWhenTargetMissing() throws {
