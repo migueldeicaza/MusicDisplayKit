@@ -145,100 +145,103 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
         let usableWidth = max(1, options.pageWidth - (options.pageMargin * 2))
         let maxSystemBottom = options.pageHeight.map { $0 - options.pageMargin }
 
+        let partMeasureWidths: [[Double]] = score.parts.map { part in
+            measuredWidths(for: part, usableWidth: usableWidth, options: options)
+        }
+        let maxMeasureCount = partMeasureWidths.map(\.count).max() ?? 0
+        guard maxMeasureCount > 0 else {
+            return LaidOutScore(
+                score: score,
+                pageWidth: options.pageWidth,
+                pageHeight: options.pageHeight,
+                systems: [],
+                measures: []
+            )
+        }
+
+        let columnWidths: [Double] = (0..<maxMeasureCount).map { measureIndex in
+            let intrinsic = partMeasureWidths.compactMap { widths in
+                measureIndex < widths.count ? widths[measureIndex] : nil
+            }.max() ?? options.measureMinWidth
+            return max(options.measureMinWidth, intrinsic)
+        }
+        let columnRanges = buildColumnRanges(
+            columnWidths: columnWidths,
+            usableWidth: usableWidth,
+            measureGap: options.measureGap
+        )
+
+        let rowHeight = (Double(score.parts.count) * options.staffHeight)
+            + (Double(max(0, score.parts.count - 1)) * options.partSpacing)
+
         var systems: [LaidOutSystem] = []
         var measures: [LaidOutMeasure] = []
-
         var pageIndex = 0
-        var currentY = options.pageMargin
+        var rowTopY = options.pageMargin
 
-        for (partIndex, part) in score.parts.enumerated() {
+        for columnRange in columnRanges {
+            if let maxSystemBottom,
+               rowTopY > options.pageMargin,
+               rowTopY + rowHeight > maxSystemBottom {
+                pageIndex += 1
+                rowTopY = options.pageMargin
+            }
+
+            var columnX: [Double] = []
             var currentX = options.pageMargin
-            var currentSystemIndex: Int?
-            var effectiveDivisions: Int?
-            var effectiveTime: TimeSignature?
+            for column in columnRange {
+                columnX.append(currentX)
+                currentX += columnWidths[column] + options.measureGap
+            }
 
-            for (measureIndex, measure) in part.measures.enumerated() {
-                if let divisions = measure.divisions, divisions > 0 {
-                    effectiveDivisions = divisions
-                }
-                if let time = measure.attributes?.time {
-                    effectiveTime = time
-                }
-
-                let measureWidth = min(
-                    usableWidth,
-                    computedMeasureWidth(
-                        measure: measure,
-                        effectiveDivisions: effectiveDivisions,
-                        effectiveTime: effectiveTime,
-                        options: options
-                    )
-                )
-
-                let needsLineBreak = currentSystemIndex != nil
-                    && (currentX + measureWidth > options.pageWidth - options.pageMargin)
-
-                if currentSystemIndex == nil || needsLineBreak {
-                    if currentSystemIndex != nil {
-                        currentY += options.staffHeight + options.systemSpacing
-                    }
-
-                    if let maxSystemBottom,
-                       currentY + options.staffHeight > maxSystemBottom {
-                        pageIndex += 1
-                        currentY = options.pageMargin
-                    }
-
-                    let systemIndex = systems.count
-                    let systemFrame = LayoutRect(
-                        x: options.pageMargin,
-                        y: currentY,
-                        width: usableWidth,
-                        height: options.staffHeight
-                    )
-                    systems.append(
-                        LaidOutSystem(
-                            systemIndex: systemIndex,
-                            partIndex: partIndex,
-                            pageIndex: pageIndex,
-                            frame: systemFrame,
-                            measureIndices: []
-                        )
-                    )
-                    currentSystemIndex = systemIndex
-                    currentX = options.pageMargin
-                }
-
-                let systemIndex = currentSystemIndex ?? 0
-                let frame = LayoutRect(
-                    x: currentX,
-                    y: currentY,
-                    width: measureWidth,
+            for (partIndex, part) in score.parts.enumerated() {
+                let systemIndex = systems.count
+                let systemY = rowTopY + (Double(partIndex) * (options.staffHeight + options.partSpacing))
+                let systemFrame = LayoutRect(
+                    x: options.pageMargin,
+                    y: systemY,
+                    width: usableWidth,
                     height: options.staffHeight
                 )
-                let laidOutMeasure = LaidOutMeasure(
-                    index: measures.count,
-                    partIndex: partIndex,
-                    measureIndexInPart: measureIndex,
-                    measureNumber: measure.number,
-                    systemIndex: systemIndex,
-                    pageIndex: pageIndex,
-                    frame: frame
-                )
-                measures.append(laidOutMeasure)
-                systems[systemIndex].measureIndices.append(laidOutMeasure.index)
 
-                currentX += measureWidth + options.measureGap
-            }
+                var systemMeasureIndices: [Int] = []
+                for (offset, column) in columnRange.enumerated() {
+                    guard column < part.measures.count else {
+                        continue
+                    }
 
-            if partIndex < score.parts.count - 1 {
-                currentY += options.staffHeight + options.partSpacing
-                if let maxSystemBottom,
-                   currentY + options.staffHeight > maxSystemBottom {
-                    pageIndex += 1
-                    currentY = options.pageMargin
+                    let measure = part.measures[column]
+                    let frame = LayoutRect(
+                        x: columnX[offset],
+                        y: systemY,
+                        width: columnWidths[column],
+                        height: options.staffHeight
+                    )
+                    let laidOutMeasure = LaidOutMeasure(
+                        index: measures.count,
+                        partIndex: partIndex,
+                        measureIndexInPart: column,
+                        measureNumber: measure.number,
+                        systemIndex: systemIndex,
+                        pageIndex: pageIndex,
+                        frame: frame
+                    )
+                    measures.append(laidOutMeasure)
+                    systemMeasureIndices.append(laidOutMeasure.index)
                 }
+
+                systems.append(
+                    LaidOutSystem(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        pageIndex: pageIndex,
+                        frame: systemFrame,
+                        measureIndices: systemMeasureIndices
+                    )
+                )
             }
+
+            rowTopY += rowHeight + options.systemSpacing
         }
 
         return LaidOutScore(
@@ -248,6 +251,66 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
             systems: systems,
             measures: measures
         )
+    }
+
+    private func measuredWidths(
+        for part: Part,
+        usableWidth: Double,
+        options: LayoutOptions
+    ) -> [Double] {
+        var widths: [Double] = []
+        var effectiveDivisions: Int?
+        var effectiveTime: TimeSignature?
+
+        for measure in part.measures {
+            if let divisions = measure.divisions, divisions > 0 {
+                effectiveDivisions = divisions
+            }
+            if let time = measure.attributes?.time {
+                effectiveTime = time
+            }
+
+            let width = min(
+                usableWidth,
+                computedMeasureWidth(
+                    measure: measure,
+                    effectiveDivisions: effectiveDivisions,
+                    effectiveTime: effectiveTime,
+                    options: options
+                )
+            )
+            widths.append(width)
+        }
+
+        return widths
+    }
+
+    private func buildColumnRanges(
+        columnWidths: [Double],
+        usableWidth: Double,
+        measureGap: Double
+    ) -> [Range<Int>] {
+        guard !columnWidths.isEmpty else {
+            return []
+        }
+
+        var ranges: [Range<Int>] = []
+        var rangeStart = 0
+        var accumulatedWidth = columnWidths[0]
+
+        for index in 1..<columnWidths.count {
+            let proposedWidth = accumulatedWidth + measureGap + columnWidths[index]
+            if proposedWidth <= usableWidth {
+                accumulatedWidth = proposedWidth
+            } else {
+                ranges.append(rangeStart..<index)
+                rangeStart = index
+                accumulatedWidth = columnWidths[index]
+            }
+        }
+
+        ranges.append(rangeStart..<columnWidths.count)
+        return ranges
     }
 
     private func computedMeasureWidth(

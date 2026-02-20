@@ -69,6 +69,38 @@ private let layoutTimeSignatureSpacingXML = """
 </score-partwise>
 """
 
+private let multiPartLayoutSynchronizationXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+    <score-part id="P2"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+    </measure>
+    <measure number="2">
+      <attributes><time><beats>2</beats><beat-type>4</beat-type></time></attributes>
+    </measure>
+    <measure number="3">
+      <attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1">
+      <attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+    </measure>
+    <measure number="2">
+      <attributes><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+    </measure>
+    <measure number="3">
+      <attributes><time><beats>2</beats><beat-type>4</beat-type></time></attributes>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let noteVoiceTimingXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2075,6 +2107,43 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(laidOut.measures.map(\.pageIndex) == [0, 1])
     #expect(laidOut.measures[0].frame == LayoutRect(x: 40, y: 40, width: 176, height: 72))
     #expect(laidOut.measures[1].frame == LayoutRect(x: 40, y: 40, width: 176, height: 72))
+}
+
+@Test func layoutEngineSynchronizesSystemBreaksAcrossParts() throws {
+    let score = try MusicXMLParser().parse(xml: multiPartLayoutSynchronizationXML)
+    let options = LayoutOptions(pageWidth: 500)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: options)
+
+    #expect(laidOut.systems.count == 4)
+    #expect(laidOut.measures.count == 6)
+
+    // Row 1: both parts share a 2-measure system segment with aligned x/width.
+    #expect(laidOut.systems[0].partIndex == 0)
+    #expect(laidOut.systems[0].frame.y == 40)
+    #expect(laidOut.systems[0].measureIndices.count == 2)
+    #expect(laidOut.systems[1].partIndex == 1)
+    #expect(laidOut.systems[1].frame.y == 160)
+    #expect(laidOut.systems[1].measureIndices.count == 2)
+
+    let p1m1 = try #require(laidOut.measures.first { $0.partIndex == 0 && $0.measureIndexInPart == 0 })
+    let p2m1 = try #require(laidOut.measures.first { $0.partIndex == 1 && $0.measureIndexInPart == 0 })
+    #expect(p1m1.frame.x == p2m1.frame.x)
+    #expect(p1m1.frame.width == p2m1.frame.width)
+    #expect(p1m1.frame.width == 176)
+}
+
+@Test func layoutEnginePageBreaksWholeRowsForMultiPartSystems() throws {
+    let score = try MusicXMLParser().parse(xml: multiPartLayoutSynchronizationXML)
+    let options = LayoutOptions(pageWidth: 500, pageHeight: 350)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: options)
+
+    #expect(laidOut.systems.count == 4)
+    #expect(laidOut.systems.map(\.pageIndex) == [0, 0, 1, 1])
+
+    let firstRowMeasures = laidOut.measures.filter { $0.measureIndexInPart <= 1 }
+    let secondRowMeasures = laidOut.measures.filter { $0.measureIndexInPart == 2 }
+    #expect(firstRowMeasures.allSatisfy { $0.pageIndex == 0 })
+    #expect(secondRowMeasures.allSatisfy { $0.pageIndex == 1 })
 }
 
 @Test func engineRenderAfterLoadHitsLayoutNotImplemented() throws {
