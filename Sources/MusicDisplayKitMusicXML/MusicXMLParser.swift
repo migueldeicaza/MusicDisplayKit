@@ -1605,8 +1605,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             if let perMinute = direction.metronome?.perMinute,
                let bpm = parseBPM(perMinute),
                bpm > 0 {
+                let dottedBPM = bpm * metronomeDotMultiplier(direction.metronome?.beatUnitDotCount ?? 0)
                 candidates.append(
-                    TempoEvent(onsetDivisions: onset, bpm: bpm, source: .metronome)
+                    TempoEvent(onsetDivisions: onset, bpm: dottedBPM, source: .metronome)
                 )
             }
 
@@ -1640,6 +1641,21 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case .carryForward:
             return 2
         }
+    }
+
+    private func metronomeDotMultiplier(_ dotCount: Int) -> Double {
+        guard dotCount > 0 else {
+            return 1
+        }
+
+        // Dotted beat units add halves repeatedly: 1 dot = 1.5, 2 dots = 1.75, ...
+        var multiplier = 1.0
+        var increment = 0.5
+        for _ in 0..<dotCount {
+            multiplier += increment
+            increment *= 0.5
+        }
+        return multiplier
     }
 
     private func parseBPM(_ value: String) -> Double? {
