@@ -2342,7 +2342,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
                        !stemmableNotes.allSatisfy({ $0.getIntrinsicTicks() < quarterTickThreshold }) {
                         continue
                     }
-                    let beam = factory.Beam(notes: stemmableNotes)
+                    guard let beam = factory.Beam(notes: stemmableNotes) else {
+                        continue
+                    }
                     createdBeams.append(beam)
                 }
             }
@@ -2381,7 +2383,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     options.bracketed = tupletPlan.bracketed
                     options.ratioed = tupletPlan.ratioed
                     options.location = tupletLocation(for: tupletPlan.location)
-                    let tuplet = factory.Tuplet(notes: tupletNotes, options: options)
+                    guard let tuplet = factory.Tuplet(notes: tupletNotes, options: options) else {
+                        continue
+                    }
                     createdTuplets.append(tuplet)
                 }
             }
