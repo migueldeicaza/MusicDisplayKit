@@ -70,6 +70,9 @@ let package = Package(
                 "MusicDisplayKitMusicXML",
                 "MusicDisplayKitVexAdapter",
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+            ],
+            resources: [
+                .copy("Fixtures/Goldens"),
             ]
         ),
     ]
