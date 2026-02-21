@@ -3382,13 +3382,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
         var plans: [VexDirectionTextPlan] = []
         var sourceOrder = 0
         for directionEvent in directionEvents {
-            var texts: [String] = []
-            texts.append(contentsOf: directionEvent.dynamics.compactMap(directionTextValue(for:)))
-            texts.append(contentsOf: directionEvent.words.compactMap(directionTextValue(for:)))
-            if let rehearsal = directionTextValue(for: directionEvent.rehearsal) {
-                texts.append(rehearsal)
-            }
-            guard !texts.isEmpty else {
+            let dynamicTexts = directionEvent.dynamics.compactMap(directionTextValue(for:))
+            let wordTexts = directionEvent.words.compactMap(directionTextValue(for:))
+            let rehearsalText = directionTextValue(for: directionEvent.rehearsal)
+            guard !dynamicTexts.isEmpty || !wordTexts.isEmpty || rehearsalText != nil else {
                 continue
             }
 
@@ -3397,13 +3394,16 @@ public struct VexFoundationRenderer: ScoreRenderer {
             guard let anchor = directionAnchorNotePlan(
                 from: sortedNotePlans,
                 onsetDivisions: anchorOnset,
-                requestedVoice: requestedVoice
+                    requestedVoice: requestedVoice
             ) else {
                 continue
             }
 
-            let placement = directionTextPlacementPlan(from: directionEvent.placement)
-            for text in texts {
+            let explicitPlacement = directionTextPlacementPlan(from: directionEvent.placement)
+            let dynamicPlacement = explicitPlacement ?? .below
+            let wordsPlacement = explicitPlacement ?? .above
+
+            for text in dynamicTexts {
                 plans.append(
                     VexDirectionTextPlan(
                         systemIndex: systemIndex,
@@ -3412,7 +3412,39 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         voice: anchor.voice,
                         entryIndexInVoice: anchor.entryIndexInVoice,
                         text: text,
-                        placement: placement,
+                        placement: dynamicPlacement,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+            }
+
+            for text in wordTexts {
+                plans.append(
+                    VexDirectionTextPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        voice: anchor.voice,
+                        entryIndexInVoice: anchor.entryIndexInVoice,
+                        text: text,
+                        placement: wordsPlacement,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+            }
+
+            if let rehearsalText {
+                plans.append(
+                    VexDirectionTextPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        voice: anchor.voice,
+                        entryIndexInVoice: anchor.entryIndexInVoice,
+                        text: rehearsalText,
+                        placement: wordsPlacement,
                         sourceOrder: sourceOrder
                     )
                 )

@@ -715,6 +715,32 @@ private let directionRenderXML = """
 </score-partwise>
 """
 
+private let directionDynamicDefaultPlacementXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <direction>
+        <direction-type>
+          <dynamics>
+            <mf/>
+          </dynamics>
+        </direction-type>
+      </direction>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let directionSpanRenderXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2885,6 +2911,17 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(plan.directionTexts.allSatisfy { $0.placement == .above })
 }
 
+@Test func vexAdapterDefaultsDynamicDirectionTextPlacementBelowWhenUnspecified() throws {
+    let score = try MusicXMLParser().parse(xml: directionDynamicDefaultPlacementXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.directionTexts.count == 1)
+    let dynamic = try #require(plan.directionTexts.first)
+    #expect(dynamic.text == "mf")
+    #expect(dynamic.placement == .below)
+}
+
 @Test func vexAdapterBuildsDirectionTempoMarkPlans() throws {
     let score = try MusicXMLParser().parse(xml: directionTempoRenderXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -3219,6 +3256,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
     let firstNote = try #require(execution.notes.first)
     #expect(firstNote.getModifiersByType("Annotation").count == 3)
+}
+
+@Test func vexAdapterExecutesDynamicDirectionTextBelowWhenUnspecified() throws {
+    let score = try MusicXMLParser().parse(xml: directionDynamicDefaultPlacementXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.directionTexts.count == 1)
+    let dynamic = try #require(execution.directionTexts.first)
+    #expect(dynamic.text == "mf")
+    #expect(dynamic.verticalJustification == .bottom)
+    #expect(dynamic.getPosition() == .below)
 }
 
 @Test func vexAdapterExecutesDirectionTempoMarks() throws {
