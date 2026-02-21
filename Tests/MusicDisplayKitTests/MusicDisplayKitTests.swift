@@ -8,6 +8,7 @@ import MusicDisplayKitLayout
 import MusicDisplayKitModel
 import MusicDisplayKitMusicXML
 import MusicDisplayKitVexAdapter
+import VexFoundation
 
 private let minimalScoreXML = """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -210,6 +211,134 @@ private let noteVoiceTimingXML = """
           <octave>5</octave>
         </pitch>
         <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let singleVoiceRenderNotesXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Solo</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <note>
+        <pitch><step>E</step><alter>1</alter><octave>4</octave></pitch>
+        <duration>8</duration>
+        <voice>1</voice>
+      </note>
+      <backup><duration>16</duration></backup>
+      <note>
+        <pitch><step>G</step><octave>3</octave></pitch>
+        <duration>16</duration>
+        <voice>2</voice>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>16</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let multiVoiceChordRenderNotesXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Solo</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <note>
+        <chord/>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <backup><duration>8</duration></backup>
+      <note>
+        <pitch><step>G</step><octave>3</octave></pitch>
+        <duration>8</duration>
+        <voice>2</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let beamTupletRenderNotesXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Solo</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>8</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>eighth</type>
+        <time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>
+        <beam number="1">begin</beam>
+        <notations><tuplet type="start" number="1" bracket="yes" placement="above" show-number="both"/></notations>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>eighth</type>
+        <time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>
+        <beam number="1">continue</beam>
+        <notations><tuplet type="continue" number="1"/></notations>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>eighth</type>
+        <time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>
+        <beam number="1">end</beam>
+        <notations><tuplet type="stop" number="1"/></notations>
       </note>
     </measure>
   </part>
@@ -2325,6 +2454,14 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(plan.canvasHeight == 272)
     #expect(plan.staves.count == laidOut.systems.count)
     #expect(plan.measures.count == laidOut.measures.count)
+    #expect(plan.measureBoundaries.count == laidOut.measures.count)
+    #expect(plan.notes.isEmpty)
+    #expect(plan.beams.isEmpty)
+    #expect(plan.tuplets.isEmpty)
+    #expect(plan.ties.isEmpty)
+    #expect(plan.slurs.isEmpty)
+    #expect(plan.articulations.isEmpty)
+    #expect(plan.lyrics.isEmpty)
     #expect(plan.partGroupConnectors.count == laidOut.partGroups.count)
     #expect(plan.barlineConnectors.count == 2)
 
@@ -2351,6 +2488,129 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(plan.pageCount == 1)
 }
 
+@Test func vexAdapterCarriesInitialStaveAttributesIntoPlan() throws {
+    let score = try MusicXMLParser().parse(xml: measureAttributesXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let stave = try #require(plan.staves.first)
+
+    #expect(stave.startMeasureNumber == 10)
+    #expect(stave.initialClef == "treble")
+    #expect(stave.initialClefAnnotation == nil)
+    #expect(stave.initialKeySignature == "Cm")
+    #expect(stave.initialTimeSignature == "C")
+}
+
+@Test func vexAdapterBuildsSingleVoiceNotePlans() throws {
+    let score = try MusicXMLParser().parse(xml: singleVoiceRenderNotesXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 5)
+    #expect(plan.notes.filter { $0.isRest }.count == 1)
+    #expect(plan.notes.allSatisfy { $0.partIndex == 0 })
+    #expect(Set(plan.notes.map(\.voice)) == Set([1, 2]))
+    #expect(plan.notes.contains { $0.keyTokens.contains("e#/4") })
+    #expect(plan.notes.map(\.measureIndexInPart).sorted() == [0, 0, 0, 0, 1])
+}
+
+@Test func vexAdapterBuildsChordGroupedNotePlans() throws {
+    let score = try MusicXMLParser().parse(xml: multiVoiceChordRenderNotesXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 3)
+    let chordCandidates = plan.notes.filter { $0.voice == 1 && $0.onsetDivisions == 0 }
+    let chord = try #require(chordCandidates.first)
+    #expect(chord.isRest == false)
+    #expect(chord.keyTokens == ["c/4", "e/4"])
+    #expect(plan.notes.contains { $0.voice == 2 && $0.keyTokens == ["g/3"] })
+}
+
+@Test func vexAdapterBuildsBeamAndTupletPlans() throws {
+    let score = try MusicXMLParser().parse(xml: beamTupletRenderNotesXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 3)
+    #expect(plan.beams.count == 1)
+    #expect(plan.tuplets.count == 1)
+
+    let beam = try #require(plan.beams.first)
+    #expect(beam.voice == 1)
+    #expect(beam.startEntryIndex == 0)
+    #expect(beam.endEntryIndex == 2)
+
+    let tuplet = try #require(plan.tuplets.first)
+    #expect(tuplet.voice == 1)
+    #expect(tuplet.startEntryIndex == 0)
+    #expect(tuplet.endEntryIndex == 2)
+    #expect(tuplet.numNotes == 3)
+    #expect(tuplet.notesOccupied == 2)
+    #expect(tuplet.bracketed == true)
+    #expect(tuplet.ratioed == true)
+    #expect(tuplet.location == .top)
+}
+
+@Test func vexAdapterBuildsTieAndSlurPlans() throws {
+    let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 2)
+    #expect(plan.ties.count == 1)
+    #expect(plan.slurs.count == 1)
+
+    let tie = try #require(plan.ties.first)
+    #expect(tie.voice == 1)
+    #expect(tie.startEntryIndex == 0)
+    #expect(tie.endEntryIndex == 1)
+    #expect(tie.pitchToken == "e/4")
+
+    let slur = try #require(plan.slurs.first)
+    #expect(slur.voice == 1)
+    #expect(slur.number == 1)
+    #expect(slur.startEntryIndex == 0)
+    #expect(slur.endEntryIndex == 1)
+    #expect(slur.placement == "above")
+}
+
+@Test func vexAdapterBuildsArticulationPlans() throws {
+    let score = try MusicXMLParser().parse(xml: articulationsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 1)
+    #expect(plan.articulations.count == 2)
+
+    let codes = Set(plan.articulations.map(\.articulationCode))
+    #expect(codes == Set(["a.", "a^"]))
+    #expect(plan.articulations.allSatisfy { $0.entryIndexInVoice == 0 })
+    #expect(plan.articulations.allSatisfy { $0.position == .above })
+}
+
+@Test func vexAdapterBuildsLyricPlans() throws {
+    let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 2)
+    #expect(plan.lyrics.count == 2)
+    #expect(plan.lyrics.map(\.text) == ["Hel", "lo"])
+    #expect(plan.lyrics.map(\.verse) == [1, 1])
+    #expect(plan.lyrics.map(\.entryIndexInVoice) == [0, 1])
+}
+
+@Test func vexAdapterCarriesRepeatBarlineStylesIntoStavePlan() throws {
+    let score = try MusicXMLParser().parse(xml: repeatsAndTempoXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let stave = try #require(plan.staves.first)
+
+    #expect(stave.beginBarline == .repeatBegin)
+    #expect(stave.endBarline == .repeatEnd)
+}
+
 @Test func vexAdapterExecutesRenderPlanIntoFactoryObjects() throws {
     let score = try MusicXMLParser().parse(xml: nestedPartGroupLayoutXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 500))
@@ -2359,8 +2619,22 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     let execution = renderer.executeRenderPlan(plan)
 
     #expect(execution.staves.count == plan.staves.count)
+    #expect(execution.notes.isEmpty)
+    #expect(execution.voices.isEmpty)
+    #expect(execution.beams.isEmpty)
+    #expect(execution.tuplets.isEmpty)
+    #expect(execution.ties.isEmpty)
+    #expect(execution.slurs.isEmpty)
+    #expect(execution.articulations.isEmpty)
+    #expect(execution.lyrics.isEmpty)
+    #expect(execution.measureBarlineConnectors.count == plan.measureBoundaries.count)
     #expect(execution.partGroupConnectors.count == plan.partGroupConnectors.count)
     #expect(execution.barlineConnectors.count == plan.barlineConnectors.count)
+
+    for (connector, boundaryPlan) in zip(execution.measureBarlineConnectors, plan.measureBoundaries) {
+        let anchorX = connector.topStave.getX() + connector.getXShift()
+        #expect(abs(anchorX - boundaryPlan.x) < 0.0001)
+    }
 
     for (connector, connectorPlan) in zip(execution.partGroupConnectors, plan.partGroupConnectors) {
         let anchorX: Double
@@ -2389,6 +2663,146 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
             .compactMap { connector in connector.texts.first?.content }
     )
     #expect(labels == Set(["Ensemble", "Manuals"]))
+}
+
+@Test func vexAdapterAppliesInitialStaveAttributesDuringExecution() throws {
+    let score = try MusicXMLParser().parse(xml: measureAttributesXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+    let stave = try #require(execution.staves.first)
+
+    #expect(stave.getMeasure() == 10)
+    #expect(stave.getClef().rawValue == "treble")
+
+    let beginModifierCategories = Set(stave.getModifiers(position: .begin).map { $0.getCategory() })
+    #expect(beginModifierCategories.contains("Clef"))
+    #expect(beginModifierCategories.contains("KeySignature"))
+    #expect(beginModifierCategories.contains("TimeSignature"))
+}
+
+@Test func vexAdapterExecutesSingleVoiceNotesIntoVoices() throws {
+    let score = try MusicXMLParser().parse(xml: singleVoiceRenderNotesXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.notes.count == plan.notes.count)
+    #expect(execution.voices.count == 3)
+    #expect(execution.notes.filter { $0.getNoteType() == "r" }.count == 1)
+}
+
+@Test func vexAdapterExecutesChordGroupedNotesIntoStaveNotes() throws {
+    let score = try MusicXMLParser().parse(xml: multiVoiceChordRenderNotesXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.notes.count == 3)
+    #expect(execution.voices.count == 2)
+    #expect(execution.notes.contains { $0.getKeys().count == 2 })
+    let pitchedStemDirections = Set(
+        execution.notes
+            .filter { !$0.isRest() }
+            .map { $0.getStemDirection() }
+    )
+    #expect(pitchedStemDirections == Set([.up, .down]))
+}
+
+@Test func vexAdapterExecutesBeamAndTupletObjects() throws {
+    let score = try MusicXMLParser().parse(xml: beamTupletRenderNotesXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.beams.count == 1)
+    #expect(execution.tuplets.count == 1)
+
+    let beam = try #require(execution.beams.first)
+    #expect(beam.getNotes().count == 3)
+
+    let tuplet = try #require(execution.tuplets.first)
+    #expect(tuplet.getNoteCount() == 3)
+    #expect(tuplet.getNotesOccupied() == 2)
+    #expect(tuplet.bracketed == true)
+    #expect(tuplet.ratioed == true)
+    #expect(tuplet.location == .top)
+}
+
+@Test func vexAdapterExecutesTieAndSlurObjects() throws {
+    let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.ties.count == 1)
+    #expect(execution.slurs.count == 1)
+
+    let tie = try #require(execution.ties.first)
+    let tieNotes = tie.getNotes()
+    #expect(tieNotes.firstNote != nil)
+    #expect(tieNotes.lastNote != nil)
+    #expect(tieNotes.firstIndices == [0])
+    #expect(tieNotes.lastIndices == [0])
+
+    let slur = try #require(execution.slurs.first)
+    #expect(slur.from != nil)
+    #expect(slur.to != nil)
+    #expect(slur.renderOptions.invert == true)
+}
+
+@Test func vexAdapterExecutesArticulationObjects() throws {
+    let score = try MusicXMLParser().parse(xml: articulationsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.articulations.count == 2)
+    let codes = Set(execution.articulations.map(\.type))
+    #expect(codes == Set(["a.", "a^"]))
+    #expect(execution.articulations.allSatisfy { $0.getPosition() == .above })
+
+    let firstNote = try #require(execution.notes.first)
+    #expect(firstNote.getModifiersByType("Articulation").count == 2)
+}
+
+@Test func vexAdapterExecutesLyricAnnotations() throws {
+    let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.lyrics.count == 2)
+    #expect(execution.lyrics.map(\.text) == ["Hel", "lo"])
+    #expect(execution.lyrics.allSatisfy { $0.verticalJustification == .bottom })
+    #expect(execution.lyrics.allSatisfy { $0.getPosition() == .below })
+    #expect(execution.lyrics.allSatisfy { $0.textLine == 0 })
+    #expect(execution.notes.map { $0.getModifiersByType("Annotation").count } == [1, 1])
+}
+
+@Test func vexAdapterAppliesRepeatBarlineStylesDuringExecution() throws {
+    let score = try MusicXMLParser().parse(xml: repeatsAndTempoXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+    let stave = try #require(execution.staves.first)
+
+    let beginBarline = try #require(
+        stave.getModifiers(position: .begin, category: "Barline").first as? Barline
+    )
+    let endBarline = try #require(
+        stave.getModifiers(position: .end, category: "Barline").first as? Barline
+    )
+    #expect(beginBarline.getBarlineType() == .repeatBegin)
+    #expect(endBarline.getBarlineType() == .repeatEnd)
 }
 
 @Test func vexAdapterRenderExecutesHeadlessDraw() throws {
