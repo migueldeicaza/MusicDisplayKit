@@ -581,6 +581,40 @@ private let crossMeasureSlurXML = """
 </score-partwise>
 """
 
+private let crossStaffSlurXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>5</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <staff>1</staff>
+        <notations>
+          <slur type="start" number="7" placement="above"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>B</step><octave>3</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <staff>2</staff>
+        <notations>
+          <slur type="stop" number="7"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let beamTupletXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2262,6 +2296,21 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.isOpenEnded == false)
 }
 
+@Test func slurGeneratorClosesNumberedCrossStaffSlurs() throws {
+    let score = try MusicXMLParser().parse(xml: crossStaffSlurXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 1)
+
+    let slur = slurs[0]
+    #expect(slur.number == 7)
+    #expect(slur.voice == 1)
+    #expect(slur.staff == 1)
+    #expect(slur.startMeasureNumber == 1)
+    #expect(slur.endMeasureNumber == 2)
+    #expect(slur.spansMultipleMeasures == true)
+    #expect(slur.isOpenEnded == false)
+}
+
 @Test func lyricsGeneratorBuildsInMeasureWords() throws {
     let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
     let words = LyricsGenerator().generate(from: score)
@@ -2625,6 +2674,16 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(crossMeasureSlurXML))
     #expect(result.slurEvents.count == 1)
+    #expect(result.slurEvents[0].spansMultipleMeasures == true)
+    #expect(result.slurEvents[0].isOpenEnded == false)
+    #expect(result.tempoTimelineEvents.count == 2)
+}
+
+@Test func musicSheetReaderReadWithTraversalIncludesCrossStaffSlurEvents() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossStaffSlurXML))
+    #expect(result.slurEvents.count == 1)
+    #expect(result.slurEvents[0].number == 7)
     #expect(result.slurEvents[0].spansMultipleMeasures == true)
     #expect(result.slurEvents[0].isOpenEnded == false)
     #expect(result.tempoTimelineEvents.count == 2)

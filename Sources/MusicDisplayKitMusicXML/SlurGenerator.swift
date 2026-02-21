@@ -116,7 +116,12 @@ public struct SlurGenerator: Sendable {
                             )
 
                         case .stop:
-                            guard let open = openByKey.removeValue(forKey: key) else {
+                            let resolvedKey = resolveStopKey(
+                                requestedKey: key,
+                                openByKey: openByKey
+                            )
+                            guard let resolvedKey,
+                                  let open = openByKey.removeValue(forKey: resolvedKey) else {
                                 continue
                             }
                             output.append(
@@ -201,5 +206,43 @@ public struct SlurGenerator: Sendable {
 
     private func staffSortValue(_ staff: Int?) -> Int {
         staff ?? Int.max
+    }
+
+    private func resolveStopKey(
+        requestedKey: SlurKey,
+        openByKey: [SlurKey: OpenSlur]
+    ) -> SlurKey? {
+        if openByKey[requestedKey] != nil {
+            return requestedKey
+        }
+
+        // Cross-staff fallback: if a numbered slur stop changes staff,
+        // allow closing the most recent matching voice+number open slur.
+        guard let number = requestedKey.number else {
+            return nil
+        }
+
+        let candidates = openByKey
+            .filter { candidate in
+                candidate.key.voice == requestedKey.voice &&
+                candidate.key.number == number
+            }
+
+        guard !candidates.isEmpty else {
+            return nil
+        }
+
+        return candidates.max(by: { lhs, rhs in
+            if lhs.value.start.measureIndex != rhs.value.start.measureIndex {
+                return lhs.value.start.measureIndex < rhs.value.start.measureIndex
+            }
+            if lhs.value.start.onsetDivisions != rhs.value.start.onsetDivisions {
+                return lhs.value.start.onsetDivisions < rhs.value.start.onsetDivisions
+            }
+            if lhs.value.start.noteIndex != rhs.value.start.noteIndex {
+                return lhs.value.start.noteIndex < rhs.value.start.noteIndex
+            }
+            return staffSortValue(lhs.key.staff) < staffSortValue(rhs.key.staff)
+        })?.key
     }
 }
