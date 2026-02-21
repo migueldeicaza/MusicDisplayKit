@@ -255,6 +255,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private struct HarmonyBuilder {
         var offsetDivisions: Int = 0
         var placement: String?
+        var printObject: Bool?
         var numeralRoot: String?
         var numeralAlter: Int?
         var rootStep: String?
@@ -281,6 +282,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 onsetDivisions: onset,
                 offsetDivisions: offsetDivisions,
                 placement: placement,
+                printObject: printObject,
                 numeralRoot: numeralRoot,
                 numeralAlter: numeralAlter,
                 rootStep: rootStep,
@@ -622,7 +624,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "harmony" where currentMeasure != nil:
             currentHarmonyBuilder = HarmonyBuilder(
-                placement: attributeDict["placement"]?.trimmedNonEmpty?.lowercased()
+                placement: attributeDict["placement"]?.trimmedNonEmpty?.lowercased(),
+                printObject: yesNoToBool(attributeDict["print-object"])
             )
             currentHarmonyDegreeBuilder = nil
 

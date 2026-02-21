@@ -40,6 +40,9 @@ public struct ChordSymbolGenerator: Sendable {
         for (partIndex, part) in score.parts.enumerated() {
             for (measureIndex, measure) in part.measures.enumerated() {
                 for harmony in measure.harmonyEvents {
+                    if harmony.printObject == false {
+                        continue
+                    }
                     guard let display = formatHarmony(harmony) else {
                         continue
                     }

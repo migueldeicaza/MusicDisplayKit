@@ -962,6 +962,46 @@ private let harmonyWholeRestXML = """
 </score-partwise>
 """
 
+private let harmonyPrintObjectXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <backup><duration>4</duration></backup>
+      <harmony print-object="no">
+        <root>
+          <root-step>C</root-step>
+        </root>
+        <kind>major</kind>
+      </harmony>
+      <forward><duration>4</duration></forward>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <backup><duration>4</duration></backup>
+      <harmony print-object="yes">
+        <root>
+          <root-step>D</root-step>
+        </root>
+        <kind>major</kind>
+      </harmony>
+      <forward><duration>4</duration></forward>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let harmonyFormattingXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -1985,6 +2025,13 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(events[0].displayText == "I")
 }
 
+@Test func chordSymbolGeneratorSkipsHarmonyWhenPrintObjectIsNo() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyPrintObjectXML)
+    let events = ChordSymbolGenerator().generate(from: score)
+    #expect(events.count == 1)
+    #expect(events[0].displayText == "D")
+}
+
 @Test func articulationGeneratorBuildsEventsFromNotes() throws {
     let score = try MusicXMLParser().parse(xml: articulationsXML)
     let events = ArticulationGenerator().generate(from: score)
@@ -2101,6 +2148,13 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.expressionEvents.isEmpty)
     #expect(result.slurEvents.isEmpty)
     #expect(result.tempoTimelineEvents.count == 1)
+}
+
+@Test func musicSheetReaderReadWithTraversalSkipsHiddenChordSymbols() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(harmonyPrintObjectXML))
+    #expect(result.chordSymbols.count == 1)
+    #expect(result.chordSymbols[0].displayText == "D")
 }
 
 @Test func musicSheetReaderReadWithTraversalIncludesArticulations() throws {
@@ -2317,6 +2371,7 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(harmony.kindText == "maj7")
     #expect(harmony.kindUsesSymbols == true)
     #expect(harmony.placement == nil)
+    #expect(harmony.printObject == nil)
     #expect(harmony.numeralRoot == nil)
     #expect(harmony.numeralAlter == nil)
     #expect(harmony.staff == 1)
@@ -2330,6 +2385,14 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let measure = try #require(score.parts.first?.measures.first)
     let harmony = try #require(measure.harmonyEvents.first)
     #expect(harmony.placement == "below")
+}
+
+@Test func parserReadsHarmonyPrintObject() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyPrintObjectXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.harmonyEvents.count == 2)
+    #expect(measure.harmonyEvents[0].printObject == false)
+    #expect(measure.harmonyEvents[1].printObject == true)
 }
 
 @Test func parserReadsHarmonyNumeralContent() throws {
@@ -3116,6 +3179,17 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(numeralPlans.allSatisfy { $0.placement == .below })
 }
 
+@Test func vexAdapterBuildsChordSymbolPlansSkippingHiddenHarmony() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyPrintObjectXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.chordSymbols.count == 1)
+    let chordSymbol = try #require(plan.chordSymbols.first)
+    #expect(chordSymbol.displayText == "D")
+    #expect(chordSymbol.entryIndexInVoice == 1)
+}
+
 @Test func vexAdapterBuildsDirectionTextPlans() throws {
     let score = try MusicXMLParser().parse(xml: directionRenderXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -3518,6 +3592,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(chordSymbol.getVertical() == .top)
     #expect(chordSymbol.getPosition() == .above)
     #expect(restNote.getModifiersByType("ChordSymbol").count == 1)
+}
+
+@Test func vexAdapterExecutesChordSymbolModifiersSkippingHiddenHarmony() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyPrintObjectXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.chordSymbols.count == 1)
+    let chordSymbol = try #require(execution.chordSymbols.first)
+    #expect(chordSymbol.getVertical() == .top)
+    #expect(chordSymbol.getPosition() == .above)
+    #expect(execution.notes.last?.getModifiersByType("ChordSymbol").count == 1)
 }
 
 @Test func vexAdapterExecutesDirectionTextAnnotations() throws {

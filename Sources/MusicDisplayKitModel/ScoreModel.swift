@@ -312,6 +312,7 @@ public struct HarmonyEvent: Equatable, Sendable {
     public var onsetDivisions: Int
     public var offsetDivisions: Int
     public var placement: String?
+    public var printObject: Bool?
     public var numeralRoot: String?
     public var numeralAlter: Int?
     public var rootStep: String?
@@ -328,6 +329,7 @@ public struct HarmonyEvent: Equatable, Sendable {
         onsetDivisions: Int,
         offsetDivisions: Int = 0,
         placement: String? = nil,
+        printObject: Bool? = nil,
         numeralRoot: String? = nil,
         numeralAlter: Int? = nil,
         rootStep: String? = nil,
@@ -343,6 +345,7 @@ public struct HarmonyEvent: Equatable, Sendable {
         self.onsetDivisions = onsetDivisions
         self.offsetDivisions = offsetDivisions
         self.placement = placement
+        self.printObject = printObject
         self.numeralRoot = numeralRoot
         self.numeralAlter = numeralAlter
         self.rootStep = rootStep

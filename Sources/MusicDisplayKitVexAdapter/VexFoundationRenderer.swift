@@ -3343,6 +3343,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
 
         var plans: [VexChordSymbolPlan] = []
         for (sourceOrder, harmony) in harmonyEvents.enumerated() {
+            if harmony.printObject == false {
+                continue
+            }
             guard let displayText = harmonyDisplayText(for: harmony) else {
                 continue
             }
