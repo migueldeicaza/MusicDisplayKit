@@ -125,6 +125,7 @@ public struct SlurGenerator: Sendable {
                         case .stop:
                             let resolvedKey = resolveStopKey(
                                 requestedKey: key,
+                                requestedRawNumber: marker.number,
                                 openByKey: openByKey
                             )
                             guard let resolvedKey,
@@ -143,7 +144,47 @@ public struct SlurGenerator: Sendable {
                                 )
                             )
 
-                        case .`continue`, .unknown:
+                        case .`continue`:
+                            let resolvedKey = resolveStopKey(
+                                requestedKey: key,
+                                requestedRawNumber: marker.number,
+                                openByKey: openByKey
+                            )
+                            if let resolvedKey,
+                               let open = openByKey.removeValue(forKey: resolvedKey) {
+                                output.append(
+                                    buildEvent(
+                                        partIndex: partIndex,
+                                        partID: part.id,
+                                        openSlur: open,
+                                        endPosition: notePosition,
+                                        endNumber: marker.number,
+                                        endPlacement: marker.placement,
+                                        isOpenEnded: false
+                                    )
+                                )
+                                let continuationRawNumber = marker.number ?? open.rawNumber
+                                let continuationKey = SlurKey(
+                                    voice: note.voice,
+                                    staff: note.staff,
+                                    number: normalizedSlurNumber(continuationRawNumber)
+                                )
+                                openByKey[continuationKey] = OpenSlur(
+                                    key: continuationKey,
+                                    rawNumber: continuationRawNumber,
+                                    start: notePosition,
+                                    placement: marker.placement ?? open.placement
+                                )
+                            } else {
+                                openByKey[key] = OpenSlur(
+                                    key: key,
+                                    rawNumber: marker.number,
+                                    start: notePosition,
+                                    placement: marker.placement
+                                )
+                            }
+
+                        case .unknown:
                             continue
                         }
                     }
@@ -220,10 +261,26 @@ public struct SlurGenerator: Sendable {
 
     private func resolveStopKey(
         requestedKey: SlurKey,
+        requestedRawNumber: Int?,
         openByKey: [SlurKey: OpenSlur]
     ) -> SlurKey? {
         if openByKey[requestedKey] != nil {
             return requestedKey
+        }
+
+        // Robustness fallback for malformed input:
+        // if stop/continue omits a number and no implicit "1" match exists,
+        // close the most recent open slur in the same voice/staff.
+        if requestedRawNumber == nil {
+            let sameVoiceCandidates = openByKey.filter { candidate in
+                candidate.key.voice == requestedKey.voice
+            }
+            if let match = mostRecentKey(
+                from: sameVoiceCandidates,
+                preferredStaff: requestedKey.staff
+            ) {
+                return match
+            }
         }
 
         // Cross-staff fallback: if a numbered slur stop changes staff,
@@ -234,11 +291,21 @@ public struct SlurGenerator: Sendable {
                 candidate.key.number == requestedKey.number
             }
 
+        return mostRecentKey(from: candidates, preferredStaff: requestedKey.staff)
+    }
+
+    private func mostRecentKey(
+        from candidates: [SlurKey: OpenSlur],
+        preferredStaff: Int?
+    ) -> SlurKey? {
         guard !candidates.isEmpty else {
             return nil
         }
-
-        return candidates.max(by: { lhs, rhs in
+        let preferredCandidates = candidates.filter { candidate in
+            candidate.key.staff == preferredStaff
+        }
+        let prioritized = preferredCandidates.isEmpty ? candidates : preferredCandidates
+        return prioritized.max(by: { lhs, rhs in
             if lhs.value.start.measureIndex != rhs.value.start.measureIndex {
                 return lhs.value.start.measureIndex < rhs.value.start.measureIndex
             }

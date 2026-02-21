@@ -2742,6 +2742,66 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var openByKey: [SlurOpenKey: [SlurOpenValue]] = [:]
         var spans: [SlurSpan] = []
 
+        func mostRecentKey(
+            from candidates: [SlurOpenKey: [SlurOpenValue]],
+            preferredStaff: Int?
+        ) -> SlurOpenKey? {
+            guard !candidates.isEmpty else {
+                return nil
+            }
+            let preferredCandidates = candidates.filter { candidate in
+                candidate.key.staff == preferredStaff
+            }
+            let prioritized = preferredCandidates.isEmpty ? candidates : preferredCandidates
+            return prioritized.max(by: { lhs, rhs in
+                let lhsStart = lhs.value.last?.startIndex ?? Int.min
+                let rhsStart = rhs.value.last?.startIndex ?? Int.min
+                if lhsStart != rhsStart {
+                    return lhsStart < rhsStart
+                }
+                let lhsStaff = lhs.key.staff ?? Int.max
+                let rhsStaff = rhs.key.staff ?? Int.max
+                return lhsStaff < rhsStaff
+            })?.key
+        }
+
+        func resolveStopKey(
+            requestedKey: SlurOpenKey,
+            requestedRawNumber: Int?
+        ) -> SlurOpenKey? {
+            if let stack = openByKey[requestedKey], !stack.isEmpty {
+                return requestedKey
+            }
+
+            // Robustness fallback for malformed input:
+            // if stop/continue omits a number and no implicit "1" match exists,
+            // close the most recent open slur in the same voice/staff.
+            if requestedRawNumber == nil {
+                let sameVoiceCandidates = openByKey.filter { candidate in
+                    candidate.key.voice == requestedKey.voice &&
+                    !candidate.value.isEmpty
+                }
+                if let match = mostRecentKey(
+                    from: sameVoiceCandidates,
+                    preferredStaff: requestedKey.staff
+                ) {
+                    return match
+                }
+            }
+
+            // Cross-staff fallback for numbered slurs:
+            // allow voice+number pairing when staff changes.
+            let voiceNumberCandidates = openByKey.filter { candidate in
+                candidate.key.voice == requestedKey.voice &&
+                candidate.key.number == requestedKey.number &&
+                !candidate.value.isEmpty
+            }
+            return mostRecentKey(
+                from: voiceNumberCandidates,
+                preferredStaff: requestedKey.staff
+            )
+        }
+
         for (index, note) in notes.enumerated() {
             for marker in note.slurs {
                 let normalizedNumber = marker.number ?? 1
@@ -2757,7 +2817,12 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     openByKey[key, default: []].append(open)
 
                 case .stop:
-                    guard var stack = openByKey[key], let open = stack.popLast() else {
+                    guard let resolvedKey = resolveStopKey(
+                        requestedKey: key,
+                        requestedRawNumber: marker.number
+                    ),
+                    var stack = openByKey[resolvedKey],
+                    let open = stack.popLast() else {
                         continue
                     }
                     spans.append(
@@ -2771,13 +2836,18 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                         )
                     )
                     if stack.isEmpty {
-                        openByKey.removeValue(forKey: key)
+                        openByKey.removeValue(forKey: resolvedKey)
                     } else {
-                        openByKey[key] = stack
+                        openByKey[resolvedKey] = stack
                     }
 
                 case .continue:
-                    if var stack = openByKey[key], let open = stack.popLast() {
+                    if let resolvedKey = resolveStopKey(
+                        requestedKey: key,
+                        requestedRawNumber: marker.number
+                    ),
+                    var stack = openByKey[resolvedKey],
+                    let open = stack.popLast() {
                         spans.append(
                             SlurSpan(
                                 number: open.rawNumber ?? marker.number,
@@ -2788,13 +2858,23 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                                 placement: open.placement ?? marker.placement
                             )
                         )
+                        if stack.isEmpty {
+                            openByKey.removeValue(forKey: resolvedKey)
+                        } else {
+                            openByKey[resolvedKey] = stack
+                        }
+                        let continuationRawNumber = marker.number ?? open.rawNumber
+                        let continuationKey = SlurOpenKey(
+                            number: continuationRawNumber ?? 1,
+                            voice: note.voice,
+                            staff: note.staff
+                        )
                         let continuation = SlurOpenValue(
-                            rawNumber: marker.number ?? open.rawNumber,
+                            rawNumber: continuationRawNumber,
                             startIndex: index,
                             placement: marker.placement ?? open.placement
                         )
-                        stack.append(continuation)
-                        openByKey[key] = stack
+                        openByKey[continuationKey, default: []].append(continuation)
                     } else {
                         let open = SlurOpenValue(
                             rawNumber: marker.number,

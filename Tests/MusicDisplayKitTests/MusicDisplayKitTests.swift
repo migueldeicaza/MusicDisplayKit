@@ -615,6 +615,44 @@ private let crossStaffSlurXML = """
 </score-partwise>
 """
 
+private let slurContinueXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="2" placement="above"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="continue" number="2"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop" number="2"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let slurImplicitExplicitNumberOneXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -654,6 +692,44 @@ private let slurImplicitExplicitNumberOneXML = """
         <voice>1</voice>
         <notations>
           <slur type="stop" number="1"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let slurNumberedStartImplicitContinueStopXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="6" placement="above"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="continue"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop"/>
         </notations>
       </note>
     </measure>
@@ -2357,6 +2433,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.isOpenEnded == false)
 }
 
+@Test func slurGeneratorSegmentsContinuedSlurs() throws {
+    let score = try MusicXMLParser().parse(xml: slurContinueXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 2)
+
+    #expect(slurs[0].number == 2)
+    #expect(slurs[0].startNoteIndex == 0)
+    #expect(slurs[0].endNoteIndex == 1)
+    #expect(slurs[1].number == 2)
+    #expect(slurs[1].startNoteIndex == 1)
+    #expect(slurs[1].endNoteIndex == 2)
+    #expect(slurs.allSatisfy { !$0.isOpenEnded })
+}
+
 @Test func slurGeneratorMatchesImplicitAndExplicitNumberOne() throws {
     let score = try MusicXMLParser().parse(xml: slurImplicitExplicitNumberOneXML)
     let slurs = SlurGenerator().generate(from: score)
@@ -2368,6 +2458,17 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slurs[1].number == 1)
     #expect(slurs[1].startNoteIndex == 2)
     #expect(slurs[1].endNoteIndex == 3)
+    #expect(slurs.allSatisfy { !$0.isOpenEnded })
+}
+
+@Test func slurGeneratorFallsBackForImplicitContinueAndStopNumbering() throws {
+    let score = try MusicXMLParser().parse(xml: slurNumberedStartImplicitContinueStopXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 2)
+
+    #expect(slurs.map(\.number) == [6, 6])
+    #expect(slurs.map(\.startNoteIndex) == [0, 1])
+    #expect(slurs.map(\.endNoteIndex) == [1, 2])
     #expect(slurs.allSatisfy { !$0.isOpenEnded })
 }
 
@@ -2749,6 +2850,16 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.tempoTimelineEvents.count == 2)
 }
 
+@Test func musicSheetReaderReadWithTraversalSegmentsContinuedSlurs() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(slurContinueXML))
+    #expect(result.slurEvents.count == 2)
+    #expect(result.slurEvents.map(\.number) == [2, 2])
+    #expect(result.slurEvents.map(\.startNoteIndex) == [0, 1])
+    #expect(result.slurEvents.map(\.endNoteIndex) == [1, 2])
+    #expect(result.slurEvents.allSatisfy { !$0.isOpenEnded })
+}
+
 @Test func musicSheetReaderReadWithTraversalMatchesImplicitExplicitSlurNumberOne() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(slurImplicitExplicitNumberOneXML))
@@ -2756,6 +2867,16 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.slurEvents.map(\.number) == [1, 1])
     #expect(result.slurEvents.map(\.startNoteIndex) == [0, 2])
     #expect(result.slurEvents.map(\.endNoteIndex) == [1, 3])
+}
+
+@Test func musicSheetReaderReadWithTraversalFallsBackForImplicitContinueAndStopNumbering() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(slurNumberedStartImplicitContinueStopXML))
+    #expect(result.slurEvents.count == 2)
+    #expect(result.slurEvents.map(\.number) == [6, 6])
+    #expect(result.slurEvents.map(\.startNoteIndex) == [0, 1])
+    #expect(result.slurEvents.map(\.endNoteIndex) == [1, 2])
+    #expect(result.slurEvents.allSatisfy { !$0.isOpenEnded })
 }
 
 @Test func musicSheetReaderReadWithTraversalIncludesTempoTimelineEvents() throws {
@@ -2849,6 +2970,24 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     ])
     #expect(measure.lyricWords == [
         LyricWord(number: 1, startNoteIndex: 0, endNoteIndex: 1, text: "Hello", hasExtension: true)
+    ])
+}
+
+@Test func parserLinksContinuedSlurMarkersAsAdjacentSpans() throws {
+    let score = try MusicXMLParser().parse(xml: slurContinueXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.slurSpans == [
+        SlurSpan(number: 2, startNoteIndex: 0, endNoteIndex: 1, voice: 1, staff: nil, placement: "above"),
+        SlurSpan(number: 2, startNoteIndex: 1, endNoteIndex: 2, voice: 1, staff: nil, placement: "above")
+    ])
+}
+
+@Test func parserLinksImplicitContinueStopMarkersForNumberedSlurs() throws {
+    let score = try MusicXMLParser().parse(xml: slurNumberedStartImplicitContinueStopXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.slurSpans == [
+        SlurSpan(number: 6, startNoteIndex: 0, endNoteIndex: 1, voice: 1, staff: nil, placement: "above"),
+        SlurSpan(number: 6, startNoteIndex: 1, endNoteIndex: 2, voice: 1, staff: nil, placement: "above")
     ])
 }
 
