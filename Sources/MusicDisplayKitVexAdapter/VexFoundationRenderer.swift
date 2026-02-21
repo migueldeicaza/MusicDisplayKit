@@ -2680,6 +2680,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
             height: plan.canvasHeight,
             target: target
         )
+        try drawExecution(execution, on: context)
+    }
+
+    private func drawExecution(_ execution: VexFactoryExecution, on context: RenderContext) throws {
         _ = execution.factory.setContext(context)
         try execution.factory.draw()
         for wedge in execution.directionWedges {
@@ -5318,15 +5322,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
 #if DEBUG && canImport(SwiftUI)
 import SwiftUI
 
-private struct SwiftUICanvasRenderContextProvider: VexRenderContextProvider {
-    let context: SwiftUICanvasContext
-
-    func makeContext(width: Double, height: Double, target: RenderTarget) -> RenderContext {
-        _ = context.resize(width, height)
-        return context
-    }
-}
-
+@available(iOS 17.0, macOS 14.0, *)
 private struct VexFoundationRendererPreviewView: View {
     var body: some View {
         VexCanvas(width: 560, height: 240) { ctx in
@@ -5345,7 +5341,7 @@ private struct VexFoundationRendererPreviewView: View {
                     )
                 )
                 let renderer = VexFoundationRenderer(
-                    contextProvider: SwiftUICanvasRenderContextProvider(context: ctx)
+                    contextProvider: VexSwiftUICanvasContextProvider(context: ctx)
                 )
                 try renderer.render(laidOut, target: .view(identifier: "preview"))
             } catch {

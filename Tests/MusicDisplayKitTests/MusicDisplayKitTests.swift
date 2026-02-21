@@ -9,6 +9,9 @@ import MusicDisplayKitModel
 import MusicDisplayKitMusicXML
 import MusicDisplayKitVexAdapter
 import VexFoundation
+#if canImport(SwiftUI)
+import SwiftUI
+#endif
 
 private let minimalScoreXML = """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1583,6 +1586,12 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
         score.title += suffix
     }
 }
+
+private struct NoOpScoreRenderer: ScoreRenderer {
+    func render(_ score: LaidOutScore, target: RenderTarget) throws {}
+}
+
+private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
 @Test func renderWithoutLoadThrows() throws {
     let engine = MusicDisplayEngine()
@@ -3289,6 +3298,60 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     try VexFoundationRenderer().render(laidOut, target: .view(identifier: "preview"))
 }
 
+#if canImport(SwiftUI)
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderPNGDataWithoutLoadThrows() throws {
+    let engine = MusicDisplayEngine()
+    #expect(throws: MusicDisplayEngineError.noScoreLoaded) {
+        _ = try engine.renderPNGData()
+    }
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderPNGDataRequiresCapableRenderer() throws {
+    let engine = MusicDisplayEngine(renderer: NoOpScoreRenderer())
+    try engine.load(xml: directionTempoRenderXML)
+
+    #expect(throws: MusicDisplayEngineError.rendererDoesNotSupportImageExport) {
+        _ = try engine.renderPNGData()
+    }
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func vexScoreViewInitializesFromLaidOutScore() throws {
+    let score = try MusicXMLParser().parse(xml: minimalScoreXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let view = VexScoreView(laidOutScore: laidOut, targetIdentifier: "preview")
+    #expect(String(describing: view).contains("VexScoreView"))
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func musicDisplayScoreViewInitializesFromScore() throws {
+    let score = try MusicXMLParser().parse(xml: minimalScoreXML)
+    let view = MusicDisplayScoreView(score: score, layoutOptions: LayoutOptions(pageWidth: 500))
+    #expect(String(describing: view).contains("MusicDisplayScoreView"))
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func vexAdapterRenderPNGDataProducesPNGBytes() throws {
+    let score = try MusicXMLParser().parse(xml: directionTempoRenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let data = try VexFoundationRenderer().renderPNGData(
+        from: laidOut,
+        target: .image(width: 520, height: 220),
+        scale: 1.0
+    )
+
+    #expect(data.count > 0)
+    #expect(Array(data.prefix(8)) == pngSignaturePrefix)
+}
+#endif
+
 @Test func engineRenderAfterLoadCompletes() throws {
     let engine = MusicDisplayEngine()
     try engine.load(xml: minimalScoreXML)
@@ -3314,3 +3377,16 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     try engine.load(source: .xmlString(minimalScoreXML))
     try engine.render(target: .view(identifier: "preview"))
 }
+
+#if canImport(SwiftUI)
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func engineRenderPNGDataAfterLoadCompletes() throws {
+    let engine = MusicDisplayEngine()
+    try engine.load(xml: directionTempoRenderXML)
+    let data = try engine.renderPNGData(target: .image(width: 520, height: 220), scale: 1.0)
+
+    #expect(data.count > 0)
+    #expect(Array(data.prefix(8)) == pngSignaturePrefix)
+}
+#endif

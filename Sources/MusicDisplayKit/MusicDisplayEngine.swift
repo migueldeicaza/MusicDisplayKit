@@ -3,10 +3,14 @@ import MusicDisplayKitLayout
 import MusicDisplayKitModel
 import MusicDisplayKitMusicXML
 import MusicDisplayKitVexAdapter
+#if canImport(SwiftUI)
+import SwiftUI
+#endif
 
 public enum MusicDisplayEngineError: Error {
     case noScoreLoaded
     case undecodableInputData
+    case rendererDoesNotSupportImageExport
 }
 
 public final class MusicDisplayEngine {
@@ -55,4 +59,23 @@ public final class MusicDisplayEngine {
         let laidOut = try layoutEngine.layout(score: loadedScore, options: options)
         try renderer.render(laidOut, target: target)
     }
+
+    #if canImport(SwiftUI)
+    @available(iOS 17.0, macOS 14.0, *)
+    @MainActor
+    public func renderPNGData(
+        target: RenderTarget = .view(identifier: "music-display-image-export"),
+        options: LayoutOptions = LayoutOptions(),
+        scale: Double = 2.0
+    ) throws -> Data {
+        guard let loadedScore else {
+            throw MusicDisplayEngineError.noScoreLoaded
+        }
+        guard let imageRenderer = renderer as? any PNGScoreRenderer else {
+            throw MusicDisplayEngineError.rendererDoesNotSupportImageExport
+        }
+        let laidOut = try layoutEngine.layout(score: loadedScore, options: options)
+        return try imageRenderer.renderPNGData(from: laidOut, target: target, scale: scale)
+    }
+    #endif
 }
