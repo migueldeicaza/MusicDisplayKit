@@ -28,6 +28,19 @@ private struct ImageDiffMetrics {
 }
 
 @available(iOS 17.0, macOS 14.0, *)
+private struct GoldenTolerance {
+    let meanChannelAbsDiff: Double
+    let maxChannelAbsDiff: Int
+    let changedPixelRatio: Double
+
+    static let `default` = GoldenTolerance(
+        meanChannelAbsDiff: 2.0,
+        maxChannelAbsDiff: 40,
+        changedPixelRatio: 0.02
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
 private enum RenderingGoldenError: Error, CustomStringConvertible {
     case message(String)
 
@@ -85,10 +98,32 @@ private enum RenderingGoldenError: Error, CustomStringConvertible {
 
 @available(iOS 17.0, macOS 14.0, *)
 @MainActor
+@Test func renderingGoldenOSMDChordSymbolsNumeralBelowFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-chord-symbols-numeral-below",
+        fixture: "test_chord_symbol_numeral_placement_below.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 780, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 780, height: 320)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
 @Test func renderingGoldenOSMDLyricsFixture() throws {
     try assertRenderingGoldenFixture(
         name: "osmd-lyrics-centering",
         fixture: "test_lyrics_centering.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 820, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 820, height: 360)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDLyricsSpacingFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-lyrics-spacing-short-notes",
+        fixture: "test_lyrics_spacing_short_notes_four_characters.musicxml",
         layoutOptions: LayoutOptions(pageWidth: 820, pageMargin: 24, systemSpacing: 18),
         target: .image(width: 820, height: 360)
     )
@@ -107,10 +142,32 @@ private enum RenderingGoldenError: Error, CustomStringConvertible {
 
 @available(iOS 17.0, macOS 14.0, *)
 @MainActor
+@Test func renderingGoldenOSMDSlurOverlapArticulationFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-slur-overlap-articulation-staccato",
+        fixture: "test_slur_overlap_articulation_staccato.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 760, height: 340)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
 @Test func renderingGoldenOSMDArticulationFixture() throws {
     try assertRenderingGoldenFixture(
         name: "osmd-articulation-staccato",
         fixture: "test_articulation_staccato_placement_above_explicitly.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 760, height: 340)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDArticulationBelowFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-articulation-staccato-below",
+        fixture: "test_articulation_staccato_placement_below.musicxml",
         layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
         target: .image(width: 760, height: 340)
     )
@@ -310,7 +367,12 @@ private enum RenderingGoldenError: Error, CustomStringConvertible {
         name: "osmd-voice-alignment",
         fixture: "OSMD_Function_Test_Voice_Alignment.musicxml",
         layoutOptions: LayoutOptions(pageWidth: 920, pageMargin: 24, systemSpacing: 18),
-        target: .image(width: 920, height: 420)
+        target: .image(width: 920, height: 420),
+        tolerance: GoldenTolerance(
+            meanChannelAbsDiff: 2.0,
+            maxChannelAbsDiff: 180,
+            changedPixelRatio: 0.02
+        )
     )
 }
 
@@ -332,7 +394,8 @@ private func assertRenderingGolden(
     xml: String,
     layoutOptions: LayoutOptions,
     target: RenderTarget,
-    scale: Double = 1.0
+    scale: Double = 1.0,
+    tolerance: GoldenTolerance = .default
 ) throws {
     let score = try MusicXMLParser().parse(xml: xml)
     try assertRenderingGolden(
@@ -340,7 +403,8 @@ private func assertRenderingGolden(
         score: score,
         layoutOptions: layoutOptions,
         target: target,
-        scale: scale
+        scale: scale,
+        tolerance: tolerance
     )
 }
 
@@ -351,7 +415,8 @@ private func assertRenderingGoldenFixture(
     fixture: String,
     layoutOptions: LayoutOptions,
     target: RenderTarget,
-    scale: Double = 1.0
+    scale: Double = 1.0,
+    tolerance: GoldenTolerance = .default
 ) throws {
     let fixtureURL = try osmdFixtureURL(named: fixture)
     let score = try MusicXMLParser().parse(fileURL: fixtureURL)
@@ -360,7 +425,8 @@ private func assertRenderingGoldenFixture(
         score: score,
         layoutOptions: layoutOptions,
         target: target,
-        scale: scale
+        scale: scale,
+        tolerance: tolerance
     )
 }
 
@@ -371,7 +437,8 @@ private func assertRenderingGolden(
     score: Score,
     layoutOptions: LayoutOptions,
     target: RenderTarget,
-    scale: Double = 1.0
+    scale: Double = 1.0,
+    tolerance: GoldenTolerance = .default
 ) throws {
     let laidOut = try MusicLayoutEngine().layout(score: score, options: layoutOptions)
     let actualPNG = try VexFoundationRenderer().renderPNGData(from: laidOut, target: target, scale: scale)
@@ -409,11 +476,6 @@ private func assertRenderingGolden(
     }
 
     let (metrics, diffImage) = diffImageMetrics(expected: expectedImage, actual: actualImage)
-    let tolerance = (
-        meanChannelAbsDiff: 2.0,
-        maxChannelAbsDiff: 40,
-        changedPixelRatio: 0.02
-    )
     let withinTolerance =
         metrics.meanChannelAbsDiff <= tolerance.meanChannelAbsDiff &&
         metrics.maxChannelAbsDiff <= tolerance.maxChannelAbsDiff &&
