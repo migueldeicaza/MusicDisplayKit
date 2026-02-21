@@ -173,6 +173,160 @@ private enum RenderingGoldenError: Error, CustomStringConvertible {
 
 @available(iOS 17.0, macOS 14.0, *)
 @MainActor
+@Test func renderingGoldenOSMDBeamTupletFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-beam-svg-double",
+        fixture: "test_beam_svg_double.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 760, height: 300)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDPedalSignsFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-pedal-signs",
+        fixture: "test_pedal_signs.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 760, height: 300)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDRepeatVoltaFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-repeat-volta",
+        fixture: "test_repeat_volta_simple.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 760, height: 300)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDExpressionsOverlapFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-expressions-overlap",
+        fixture: "OSMD_function_test_expressions_overlap.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 920, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 920, height: 360)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDAutobeamFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-autobeam",
+        fixture: "OSMD_function_test_autobeam.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 980, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 980, height: 420)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDMultipleRestMeasuresFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-multiple-rest-measures",
+        fixture: "OSMD_function_test_multiple_rest_measures.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 920, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 920, height: 360)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDOctaveShiftFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-octave-shift-simple",
+        fixture: "test_octave-shift_simple_piano.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 920, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 920, height: 360)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDRehearsalMarksFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-rehearsal-marks",
+        fixture: "test_rehearsal_marks_simple_one_measure.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 760, height: 280)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDTempoChangeFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-tempo-change",
+        fixture: "test_tempo_change.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 760, height: 280)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDSoftAccentCrescDecrescFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-soft-accent-cresc-decresc",
+        fixture: "test_soft-accent_cresc_decresc_single_note.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 760, height: 300)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDMetronomeMarksFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-metronome-marks",
+        fixture: "OSMD_function_test_metronome_marks.mxl",
+        layoutOptions: LayoutOptions(pageWidth: 920, pageMargin: 24, systemSpacing: 18),
+        target: .view(identifier: "golden-metronome-marks")
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDCodaPositioningFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-coda-positioning",
+        fixture: "test_staverepetitions_coda_etc_positioning.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 920, pageMargin: 24, systemSpacing: 18),
+        target: .view(identifier: "golden-coda-positioning")
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDVoiceAlignmentFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-voice-alignment",
+        fixture: "OSMD_Function_Test_Voice_Alignment.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 920, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 920, height: 420)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
+@Test func renderingGoldenOSMDDirectionOffsetWordsFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-direction-offset-words",
+        fixture: "test_direction_offset_node_words_placement_issue1581.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 760, pageMargin: 24, systemSpacing: 18),
+        target: .view(identifier: "golden-direction-offset-words")
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
 private func assertRenderingGolden(
     name: String,
     xml: String,

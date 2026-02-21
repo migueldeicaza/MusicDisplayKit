@@ -2459,6 +2459,58 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     }
 }
 
+@Test func musicSheetReaderParsesOSMDDirectionSpannerFixtures() throws {
+    let reader = MusicSheetReader()
+
+    let octaveShiftURL = try osmdFixtureURL(named: "test_octave-shift_simple_piano.musicxml")
+    let octaveShiftResult = try reader.readWithTraversal(from: .fileURL(octaveShiftURL))
+    #expect(octaveShiftResult.expressionEvents.contains {
+        if case .octaveShift = $0.value {
+            return true
+        }
+        return false
+    })
+
+    let pedalURL = try osmdFixtureURL(named: "test_pedal_signs.musicxml")
+    let pedalResult = try reader.readWithTraversal(from: .fileURL(pedalURL))
+    #expect(pedalResult.expressionEvents.contains {
+        if case .pedal = $0.value {
+            return true
+        }
+        return false
+    })
+
+    let wedgeURL = try osmdFixtureURL(named: "test_wedge_cresc_dim_simultaneous_quartet.musicxml")
+    let wedgeResult = try reader.readWithTraversal(from: .fileURL(wedgeURL))
+    #expect(wedgeResult.expressionEvents.contains {
+        if case .wedge = $0.value {
+            return true
+        }
+        return false
+    })
+}
+
+@Test func musicSheetReaderParsesOSMDRehearsalAndTempoFixtures() throws {
+    let reader = MusicSheetReader()
+
+    let rehearsalURL = try osmdFixtureURL(named: "test_rehearsal_marks_simple_one_measure.musicxml")
+    let rehearsalResult = try reader.readWithTraversal(from: .fileURL(rehearsalURL))
+    #expect(rehearsalResult.expressionEvents.contains {
+        if case .rehearsal = $0.value {
+            return true
+        }
+        return false
+    })
+
+    let tempoChangeURL = try osmdFixtureURL(named: "test_tempo_change.musicxml")
+    let tempoChangeResult = try reader.readWithTraversal(from: .fileURL(tempoChangeURL))
+    #expect(tempoChangeResult.tempoTimelineEvents.count >= 2)
+
+    let metronomeURL = try osmdFixtureURL(named: "OSMD_function_test_metronome_marks.mxl")
+    let metronomeResult = try reader.readWithTraversal(from: .fileURL(metronomeURL))
+    #expect(!metronomeResult.tempoTimelineEvents.isEmpty)
+}
+
 @Test func parserDoesNotFallbackToDifferentCodaWhenTargetMissing() throws {
     let score = try MusicXMLParser().parse(xml: targetedToCodaDoesNotFallbackToDifferentCodaXML)
     let playback = try #require(score.parts.first?.playbackOrder)
