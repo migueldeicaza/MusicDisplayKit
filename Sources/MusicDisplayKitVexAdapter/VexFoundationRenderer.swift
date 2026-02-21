@@ -3318,17 +3318,19 @@ public struct VexFoundationRenderer: ScoreRenderer {
         harmonyEvents: [MusicDisplayKitModel.HarmonyEvent],
         notePlans: [VexNotePlan]
     ) -> [VexChordSymbolPlan] {
-        let anchorCandidates = notePlans
-            .filter { !$0.isRest }
-            .sorted { lhs, rhs in
-                if lhs.onsetDivisions != rhs.onsetDivisions {
-                    return lhs.onsetDivisions < rhs.onsetDivisions
-                }
-                if lhs.voice != rhs.voice {
-                    return lhs.voice < rhs.voice
-                }
-                return lhs.sourceOrder < rhs.sourceOrder
+        let sortedNotePlans = notePlans.sorted { lhs, rhs in
+            if lhs.onsetDivisions != rhs.onsetDivisions {
+                return lhs.onsetDivisions < rhs.onsetDivisions
             }
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+
+        let nonRestAnchors = sortedNotePlans
+            .filter { !$0.isRest }
+        let anchorCandidates = nonRestAnchors.isEmpty ? sortedNotePlans : nonRestAnchors
 
         guard !anchorCandidates.isEmpty else {
             return []

@@ -936,6 +936,32 @@ private let harmonyNumeralXML = """
 </score-partwise>
 """
 
+private let harmonyWholeRestXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony>
+        <root>
+          <root-step>G</root-step>
+        </root>
+        <kind>major</kind>
+      </harmony>
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>whole</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let harmonyFormattingXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2542,6 +2568,8 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         "OSMD_function_test_chord_symbols.musicxml",
         "test_chord_symbol_centering_short_symbols.musicxml",
         "test_chord_symbol_numeral_placement_below.musicxml",
+        "test_chord_symbol_position_whole_rest.musicxml",
+        "test_chord_whole_rest_double_chord.musicxml",
     ]
     let reader = MusicSheetReader()
 
@@ -3044,6 +3072,31 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(chordSymbol.placement == .below)
 }
 
+@Test func vexAdapterBuildsChordSymbolPlansOnWholeRestMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyWholeRestXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 1)
+    #expect(plan.notes[0].isRest == true)
+    #expect(plan.chordSymbols.count == 1)
+    let chordSymbol = try #require(plan.chordSymbols.first)
+    #expect(chordSymbol.displayText == "G")
+    #expect(chordSymbol.entryIndexInVoice == 0)
+    #expect(chordSymbol.placement == .above)
+}
+
+@Test func vexAdapterBuildsChordSymbolPlansForOSMDWholeRestFixture() throws {
+    let fixtureURL = try osmdFixtureURL(named: "test_chord_symbol_position_whole_rest.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: fixtureURL)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.chordSymbols.count == 3)
+    #expect(Set(plan.chordSymbols.map(\.displayText)) == Set(["G", "A", "C"]))
+    #expect(plan.chordSymbols.allSatisfy { $0.placement == .above })
+}
+
 @Test func vexAdapterBuildsDirectionTextPlans() throws {
     let score = try MusicXMLParser().parse(xml: directionRenderXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -3429,6 +3482,23 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let chordSymbol = try #require(execution.chordSymbols.first)
     #expect(chordSymbol.getVertical() == .bottom)
     #expect(chordSymbol.getPosition() == .below)
+}
+
+@Test func vexAdapterExecutesChordSymbolModifiersOnWholeRestMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyWholeRestXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.notes.count == 1)
+    let restNote = try #require(execution.notes.first)
+    #expect(restNote.isRest() == true)
+    #expect(execution.chordSymbols.count == 1)
+    let chordSymbol = try #require(execution.chordSymbols.first)
+    #expect(chordSymbol.getVertical() == .top)
+    #expect(chordSymbol.getPosition() == .above)
+    #expect(restNote.getModifiersByType("ChordSymbol").count == 1)
 }
 
 @Test func vexAdapterExecutesDirectionTextAnnotations() throws {

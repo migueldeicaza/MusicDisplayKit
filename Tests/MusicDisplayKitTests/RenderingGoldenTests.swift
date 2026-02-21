@@ -109,6 +109,17 @@ private enum RenderingGoldenError: Error, CustomStringConvertible {
 
 @available(iOS 17.0, macOS 14.0, *)
 @MainActor
+@Test func renderingGoldenOSMDChordSymbolsWholeRestFixture() throws {
+    try assertRenderingGoldenFixture(
+        name: "osmd-chord-symbols-whole-rest",
+        fixture: "test_chord_symbol_position_whole_rest.musicxml",
+        layoutOptions: LayoutOptions(pageWidth: 780, pageMargin: 24, systemSpacing: 18),
+        target: .image(width: 780, height: 320)
+    )
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+@MainActor
 @Test func renderingGoldenOSMDLyricsFixture() throws {
     try assertRenderingGoldenFixture(
         name: "osmd-lyrics-centering",
