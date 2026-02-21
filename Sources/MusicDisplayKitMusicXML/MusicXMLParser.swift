@@ -1611,14 +1611,19 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
     private func parseBPM(_ value: String) -> Double? {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let direct = Double(normalized) {
+        if let direct = Double(normalized.replacingOccurrences(of: ",", with: ".")) {
             return direct
         }
 
-        let filtered = normalized.filter {
-            $0.isNumber || $0 == "." || $0 == ","
-        }.replacingOccurrences(of: ",", with: ".")
-        return Double(filtered)
+        if let range = normalized.range(
+            of: #"[-+]?\d+(?:[.,]\d+)?"#,
+            options: .regularExpression
+        ) {
+            let token = normalized[range].replacingOccurrences(of: ",", with: ".")
+            return Double(token)
+        }
+
+        return nil
     }
 
     private func normalizeMarkerTarget(_ value: String?) -> String? {

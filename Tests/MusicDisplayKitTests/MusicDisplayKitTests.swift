@@ -1296,6 +1296,38 @@ private let tempoTimelineFromTimeSignatureXML = """
 </score-partwise>
 """
 
+private let metronomeRangePerMinuteXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>96-108</per-minute>
+          </metronome>
+        </direction-type>
+      </direction>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let repeatEndingPlaybackXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2415,6 +2447,19 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(measure2Events[0].bpm == 110)
 }
 
+@Test func tempoTimelineGeneratorParsesMetronomeRangeUsingLeadingValue() throws {
+    let score = try MusicXMLParser().parse(xml: metronomeRangePerMinuteXML)
+    let events = TempoTimelineGenerator().generate(from: score)
+    #expect(events.count == 3)
+
+    #expect(events[0].source == .carryForward)
+    #expect(events[0].bpm == 120)
+    #expect(events[1].source == .metronome)
+    #expect(events[1].bpm == 96)
+    #expect(events[2].source == .carryForward)
+    #expect(events[2].bpm == 96)
+}
+
 @Test func musicSheetReaderReadWithTraversalReturnsInstrumentVisits() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(instrumentTraversalXML))
@@ -2770,6 +2815,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let playback = try #require(part.playbackOrder)
     #expect(playback.termination == .fine)
     #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2])
+}
+
+@Test func parserParsesMetronomeRangePerMinuteAsLeadingBPM() throws {
+    let score = try MusicXMLParser().parse(xml: metronomeRangePerMinuteXML)
+    let part = try #require(score.parts.first)
+    #expect(part.measures.count == 2)
+
+    #expect(part.measures[0].tempoEvents == [
+        TempoEvent(onsetDivisions: 0, bpm: 120, source: .carryForward),
+        TempoEvent(onsetDivisions: 0, bpm: 96, source: .metronome)
+    ])
+    #expect(part.measures[1].tempoEvents == [
+        TempoEvent(onsetDivisions: 0, bpm: 96, source: .carryForward)
+    ])
 }
 
 @Test func parserBuildsPlaybackOrderForRepeatEndings() throws {
