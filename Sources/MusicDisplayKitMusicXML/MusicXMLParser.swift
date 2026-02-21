@@ -278,9 +278,13 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var staff: Int?
         var degrees: [HarmonyDegree] = []
         var hasInvalidDegree: Bool = false
+        var hasInvalidPitchStep: Bool = false
 
         func build(currentOnset: Int) -> HarmonyEvent? {
-            if hasInvalidDegree {
+            if hasInvalidDegree || hasInvalidPitchStep {
+                return nil
+            }
+            if numeralRoot == nil && rootStep == nil {
                 return nil
             }
             let onset = max(0, currentOnset + offsetDivisions)
@@ -1363,9 +1367,13 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "root-step":
             if case .harmonyRootStep = currentTextTarget,
-               let value = consumeCapturedText()?.uppercased(),
                var currentHarmonyBuilder {
-                currentHarmonyBuilder.rootStep = value
+                let value = harmonyStepToken(from: consumeCapturedText())
+                if let value {
+                    currentHarmonyBuilder.rootStep = value
+                } else {
+                    currentHarmonyBuilder.hasInvalidPitchStep = true
+                }
                 self.currentHarmonyBuilder = currentHarmonyBuilder
             }
 
@@ -1400,9 +1408,13 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "bass-step":
             if case .harmonyBassStep = currentTextTarget,
-               let value = consumeCapturedText()?.uppercased(),
                var currentHarmonyBuilder {
-                currentHarmonyBuilder.bassStep = value
+                let value = harmonyStepToken(from: consumeCapturedText())
+                if let value {
+                    currentHarmonyBuilder.bassStep = value
+                } else {
+                    currentHarmonyBuilder.hasInvalidPitchStep = true
+                }
                 self.currentHarmonyBuilder = currentHarmonyBuilder
             }
 
@@ -2410,6 +2422,18 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             return .subtract
         default:
             return .unknown(normalized)
+        }
+    }
+
+    private func harmonyStepToken(from value: String?) -> String? {
+        guard let normalized = value?.trimmedNonEmpty?.uppercased() else {
+            return nil
+        }
+        switch normalized {
+        case "A", "B", "C", "D", "E", "F", "G":
+            return normalized
+        default:
+            return nil
         }
     }
 

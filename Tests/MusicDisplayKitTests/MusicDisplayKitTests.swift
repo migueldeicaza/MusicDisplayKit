@@ -1131,6 +1131,93 @@ private let harmonyUnknownDegreeTypeXML = """
 </score-partwise>
 """
 
+private let harmonyInvalidRootStepXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony>
+        <root><root-step>H</root-step></root>
+        <kind>major</kind>
+      </harmony>
+      <harmony>
+        <root><root-step>F</root-step></root>
+        <kind>major</kind>
+      </harmony>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let harmonyInvalidBassStepXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony>
+        <root><root-step>C</root-step></root>
+        <kind>major</kind>
+        <bass><bass-step>H</bass-step></bass>
+      </harmony>
+      <harmony>
+        <root><root-step>D</root-step></root>
+        <kind>major</kind>
+      </harmony>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let harmonyMissingRootOrNumeralXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony>
+        <kind>major</kind>
+      </harmony>
+      <harmony>
+        <root/>
+        <kind>major</kind>
+      </harmony>
+      <harmony>
+        <numeral>
+          <numeral-root text="V">5</numeral-root>
+        </numeral>
+        <kind>major</kind>
+      </harmony>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let repeatsAndTempoXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2196,6 +2283,24 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(events.map(\.displayText) == ["E"])
 }
 
+@Test func chordSymbolGeneratorSkipsHarmonyWithInvalidRootStep() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyInvalidRootStepXML)
+    let events = ChordSymbolGenerator().generate(from: score)
+    #expect(events.map(\.displayText) == ["F"])
+}
+
+@Test func chordSymbolGeneratorSkipsHarmonyWithInvalidBassStep() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyInvalidBassStepXML)
+    let events = ChordSymbolGenerator().generate(from: score)
+    #expect(events.map(\.displayText) == ["D"])
+}
+
+@Test func chordSymbolGeneratorSkipsHarmonyWithoutRootOrNumeral() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyMissingRootOrNumeralXML)
+    let events = ChordSymbolGenerator().generate(from: score)
+    #expect(events.map(\.displayText) == ["V"])
+}
+
 @Test func chordSymbolGeneratorMapsSuspendedAliasesFromOSMDFixture() throws {
     let fixtureURL = try osmdFixtureURL(named: "OSMD_function_test_chord_tests_various.musicxml")
     let score = try MusicXMLParser().parse(fileURL: fixtureURL)
@@ -2577,6 +2682,27 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let measure = try #require(score.parts.first?.measures.first)
     #expect(measure.harmonyEvents.count == 1)
     #expect(measure.harmonyEvents[0].rootStep == "E")
+}
+
+@Test func parserSkipsHarmonyWithInvalidRootStep() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyInvalidRootStepXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.harmonyEvents.count == 1)
+    #expect(measure.harmonyEvents[0].rootStep == "F")
+}
+
+@Test func parserSkipsHarmonyWithInvalidBassStep() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyInvalidBassStepXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.harmonyEvents.count == 1)
+    #expect(measure.harmonyEvents[0].rootStep == "D")
+}
+
+@Test func parserSkipsHarmonyWithoutRootOrNumeral() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyMissingRootOrNumeralXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.harmonyEvents.count == 1)
+    #expect(measure.harmonyEvents[0].numeralRoot == "V")
 }
 
 @Test func parserReadsHarmonyPlacement() throws {
