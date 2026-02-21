@@ -378,30 +378,50 @@ public struct ChordSymbolGenerator: Sendable {
     }
 
     private func formatDegrees(_ degrees: [HarmonyDegree]) -> String {
-        let tokens = degrees.compactMap { degree -> String? in
+        var adds: [String] = []
+        var alts: [String] = []
+        var subs: [String] = []
+        var unknowns: [String] = []
+
+        for degree in degrees {
             guard let value = degree.value else {
-                return nil
+                continue
             }
             let accidental = accidentalString(alter: degree.alter ?? 0)
+            let token = "\(accidental)\(value)"
             switch degree.type {
             case .add:
-                return "add\(accidental)\(value)"
-            case .subtract:
-                return "no\(value)"
+                adds.append(token)
             case .alter:
-                return "\(accidental)\(value)"
+                alts.append(token)
+            case .subtract:
+                subs.append(token)
             case .unknown(let raw):
                 let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-                return cleaned.isEmpty ? "\(accidental)\(value)" : "\(cleaned)\(accidental)\(value)"
+                unknowns.append(cleaned.isEmpty ? token : "\(cleaned)\(token)")
             case .none:
-                return "\(accidental)\(value)"
+                adds.append(token)
             }
         }
 
-        guard !tokens.isEmpty else {
+        guard !adds.isEmpty || !alts.isEmpty || !subs.isEmpty || !unknowns.isEmpty else {
             return ""
         }
 
-        return "(\(tokens.joined(separator: ",")))"
+        var output = ""
+        if !adds.isEmpty {
+            output += "(\(adds.joined(separator: ",")))"
+        }
+        if !alts.isEmpty {
+            output += "(alt \(alts.joined(separator: ",")))"
+        }
+        if !subs.isEmpty {
+            output += "(omit \(subs.joined(separator: ",")))"
+        }
+        if !unknowns.isEmpty {
+            output += "(\(unknowns.joined(separator: ",")))"
+        }
+
+        return output
     }
 }

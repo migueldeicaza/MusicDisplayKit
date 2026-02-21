@@ -2045,7 +2045,34 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let score = try MusicXMLParser().parse(xml: harmonyXML)
     let events = ChordSymbolGenerator().generate(from: score)
     #expect(events.count == 1)
-    #expect(events[0].displayText == "C#maj7(addb9)")
+    #expect(events[0].displayText == "C#maj7(b9)")
+}
+
+@Test func chordSymbolGeneratorFormatsDegreeGroupsAsAddAltOmit() throws {
+    let score = try MusicXMLParser().parse(xml: """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <score-partwise version="3.1">
+      <part-list>
+        <score-part id="P1"><part-name>Instrument</part-name></score-part>
+      </part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes><divisions>4</divisions></attributes>
+          <harmony>
+            <root><root-step>C</root-step></root>
+            <kind>major</kind>
+            <degree><degree-value>9</degree-value><degree-alter>-1</degree-alter><degree-type>add</degree-type></degree>
+            <degree><degree-value>5</degree-value><degree-alter>-1</degree-alter><degree-type>alter</degree-type></degree>
+            <degree><degree-value>3</degree-value><degree-alter>0</degree-alter><degree-type>subtract</degree-type></degree>
+          </harmony>
+          <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+        </measure>
+      </part>
+    </score-partwise>
+    """)
+    let events = ChordSymbolGenerator().generate(from: score)
+    #expect(events.count == 1)
+    #expect(events[0].displayText == "C(b9)(alt b5)(omit 3)")
 }
 
 @Test func chordSymbolGeneratorFormatsKindAndBassFallback() throws {
@@ -2226,7 +2253,7 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(harmonyXML))
     #expect(result.chordSymbols.count == 1)
-    #expect(result.chordSymbols[0].displayText == "C#maj7(addb9)")
+    #expect(result.chordSymbols[0].displayText == "C#maj7(b9)")
     #expect(result.articulationEvents.isEmpty)
     #expect(result.expressionEvents.isEmpty)
     #expect(result.slurEvents.isEmpty)
@@ -3196,7 +3223,7 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
     #expect(plan.chordSymbols.count == 1)
     let chordSymbol = try #require(plan.chordSymbols.first)
-    #expect(chordSymbol.displayText == "C#maj7(addb9)")
+    #expect(chordSymbol.displayText == "C#maj7(b9)")
     #expect(chordSymbol.voice == 1)
     #expect(chordSymbol.entryIndexInVoice == 0)
     #expect(chordSymbol.placement == .above)
