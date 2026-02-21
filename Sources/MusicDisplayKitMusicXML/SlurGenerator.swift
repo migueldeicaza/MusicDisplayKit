@@ -59,7 +59,7 @@ public struct SlurGenerator: Sendable {
     private struct SlurKey: Hashable {
         var voice: Int
         var staff: Int?
-        var number: Int?
+        var number: Int
     }
 
     private struct NotePosition {
@@ -71,6 +71,7 @@ public struct SlurGenerator: Sendable {
 
     private struct OpenSlur {
         var key: SlurKey
+        var rawNumber: Int?
         var start: NotePosition
         var placement: String?
     }
@@ -94,7 +95,11 @@ public struct SlurGenerator: Sendable {
                     )
 
                     for marker in note.slurs {
-                        let key = SlurKey(voice: note.voice, staff: note.staff, number: marker.number)
+                        let key = SlurKey(
+                            voice: note.voice,
+                            staff: note.staff,
+                            number: normalizedSlurNumber(marker.number)
+                        )
                         switch marker.type {
                         case .start:
                             if let existing = openByKey.removeValue(forKey: key) {
@@ -104,6 +109,7 @@ public struct SlurGenerator: Sendable {
                                         partID: part.id,
                                         openSlur: existing,
                                         endPosition: existing.start,
+                                        endNumber: nil,
                                         endPlacement: marker.placement,
                                         isOpenEnded: true
                                     )
@@ -111,6 +117,7 @@ public struct SlurGenerator: Sendable {
                             }
                             openByKey[key] = OpenSlur(
                                 key: key,
+                                rawNumber: marker.number,
                                 start: notePosition,
                                 placement: marker.placement
                             )
@@ -130,6 +137,7 @@ public struct SlurGenerator: Sendable {
                                     partID: part.id,
                                     openSlur: open,
                                     endPosition: notePosition,
+                                    endNumber: marker.number,
                                     endPlacement: marker.placement,
                                     isOpenEnded: false
                                 )
@@ -149,6 +157,7 @@ public struct SlurGenerator: Sendable {
                         partID: part.id,
                         openSlur: open,
                         endPosition: open.start,
+                        endNumber: nil,
                         endPlacement: nil,
                         isOpenEnded: true
                     )
@@ -181,6 +190,7 @@ public struct SlurGenerator: Sendable {
         partID: String,
         openSlur: OpenSlur,
         endPosition: NotePosition,
+        endNumber: Int?,
         endPlacement: String?,
         isOpenEnded: Bool
     ) -> SlurEvent {
@@ -189,7 +199,7 @@ public struct SlurGenerator: Sendable {
             partID: partID,
             voice: openSlur.key.voice,
             staff: openSlur.key.staff,
-            number: openSlur.key.number,
+            number: openSlur.rawNumber ?? endNumber,
             placement: openSlur.placement ?? endPlacement,
             startMeasureIndex: openSlur.start.measureIndex,
             startMeasureNumber: openSlur.start.measureNumber,
@@ -218,14 +228,10 @@ public struct SlurGenerator: Sendable {
 
         // Cross-staff fallback: if a numbered slur stop changes staff,
         // allow closing the most recent matching voice+number open slur.
-        guard let number = requestedKey.number else {
-            return nil
-        }
-
         let candidates = openByKey
             .filter { candidate in
                 candidate.key.voice == requestedKey.voice &&
-                candidate.key.number == number
+                candidate.key.number == requestedKey.number
             }
 
         guard !candidates.isEmpty else {
@@ -244,5 +250,9 @@ public struct SlurGenerator: Sendable {
             }
             return staffSortValue(lhs.key.staff) < staffSortValue(rhs.key.staff)
         })?.key
+    }
+
+    private func normalizedSlurNumber(_ raw: Int?) -> Int {
+        raw ?? 1
     }
 }

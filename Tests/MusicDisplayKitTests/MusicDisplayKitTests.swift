@@ -615,6 +615,52 @@ private let crossStaffSlurXML = """
 </score-partwise>
 """
 
+private let slurImplicitExplicitNumberOneXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="1" placement="above"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop" number="1"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let beamTupletXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2311,6 +2357,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.isOpenEnded == false)
 }
 
+@Test func slurGeneratorMatchesImplicitAndExplicitNumberOne() throws {
+    let score = try MusicXMLParser().parse(xml: slurImplicitExplicitNumberOneXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 2)
+
+    #expect(slurs[0].number == 1)
+    #expect(slurs[0].startNoteIndex == 0)
+    #expect(slurs[0].endNoteIndex == 1)
+    #expect(slurs[1].number == 1)
+    #expect(slurs[1].startNoteIndex == 2)
+    #expect(slurs[1].endNoteIndex == 3)
+    #expect(slurs.allSatisfy { !$0.isOpenEnded })
+}
+
 @Test func lyricsGeneratorBuildsInMeasureWords() throws {
     let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
     let words = LyricsGenerator().generate(from: score)
@@ -2687,6 +2747,15 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.slurEvents[0].spansMultipleMeasures == true)
     #expect(result.slurEvents[0].isOpenEnded == false)
     #expect(result.tempoTimelineEvents.count == 2)
+}
+
+@Test func musicSheetReaderReadWithTraversalMatchesImplicitExplicitSlurNumberOne() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(slurImplicitExplicitNumberOneXML))
+    #expect(result.slurEvents.count == 2)
+    #expect(result.slurEvents.map(\.number) == [1, 1])
+    #expect(result.slurEvents.map(\.startNoteIndex) == [0, 2])
+    #expect(result.slurEvents.map(\.endNoteIndex) == [1, 3])
 }
 
 @Test func musicSheetReaderReadWithTraversalIncludesTempoTimelineEvents() throws {
