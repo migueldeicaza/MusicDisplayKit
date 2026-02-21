@@ -254,6 +254,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
     private struct HarmonyBuilder {
         var offsetDivisions: Int = 0
+        var placement: String?
         var rootStep: String?
         var rootAlter: Int = 0
         var bassStep: String?
@@ -276,6 +277,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             return HarmonyEvent(
                 onsetDivisions: onset,
                 offsetDivisions: offsetDivisions,
+                placement: placement,
                 rootStep: rootStep,
                 rootAlter: rootAlter,
                 bassStep: bassStep,
@@ -612,7 +614,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             startTextCapture(.directionOffset)
 
         case "harmony" where currentMeasure != nil:
-            currentHarmonyBuilder = HarmonyBuilder()
+            currentHarmonyBuilder = HarmonyBuilder(
+                placement: attributeDict["placement"]?.trimmedNonEmpty?.lowercased()
+            )
             currentHarmonyDegreeBuilder = nil
 
         case "offset" where currentHarmonyBuilder != nil && currentNote == nil:

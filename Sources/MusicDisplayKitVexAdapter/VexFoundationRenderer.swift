@@ -621,6 +621,11 @@ public struct VexLyricPlan: Sendable {
     }
 }
 
+public enum VexChordSymbolPlacementPlan: Sendable {
+    case above
+    case below
+}
+
 public struct VexChordSymbolPlan: Sendable {
     public let systemIndex: Int
     public let partIndex: Int
@@ -628,6 +633,7 @@ public struct VexChordSymbolPlan: Sendable {
     public let voice: Int
     public let entryIndexInVoice: Int
     public let displayText: String
+    public let placement: VexChordSymbolPlacementPlan
     public let sourceOrder: Int
 
     public init(
@@ -637,6 +643,7 @@ public struct VexChordSymbolPlan: Sendable {
         voice: Int,
         entryIndexInVoice: Int,
         displayText: String,
+        placement: VexChordSymbolPlacementPlan,
         sourceOrder: Int
     ) {
         self.systemIndex = systemIndex
@@ -645,6 +652,7 @@ public struct VexChordSymbolPlan: Sendable {
         self.voice = voice
         self.entryIndexInVoice = entryIndexInVoice
         self.displayText = displayText
+        self.placement = placement
         self.sourceOrder = sourceOrder
     }
 }
@@ -2016,9 +2024,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     ] else {
                         continue
                     }
-                    let chordSymbol = factory.ChordSymbol(vJustify: .top, hJustify: .center)
+                    let verticalJustify = chordSymbolVerticalJustify(for: chordSymbolPlan.placement)
+                    let chordSymbol = factory.ChordSymbol(vJustify: verticalJustify, hJustify: .center)
                     _ = chordSymbol.addGlyphOrText(chordSymbolPlan.displayText)
-                    _ = chordSymbol.setPosition(.above)
+                    _ = chordSymbol.setPosition(chordSymbolModifierPosition(for: chordSymbolPlan.placement))
                     _ = note.addModifier(chordSymbol, index: 0)
                     createdChordSymbols.append(chordSymbol)
                 }
@@ -3344,6 +3353,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     voice: anchor.voice,
                     entryIndexInVoice: anchor.entryIndexInVoice,
                     displayText: displayText,
+                    placement: chordSymbolPlacementPlan(from: harmony.placement) ?? .above,
                     sourceOrder: sourceOrder
                 )
             )
@@ -4559,6 +4569,24 @@ public struct VexFoundationRenderer: ScoreRenderer {
         }
     }
 
+    private func chordSymbolPlacementPlan(
+        from placement: String?
+    ) -> VexChordSymbolPlacementPlan? {
+        guard let placement = placement?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() else {
+            return nil
+        }
+        switch placement {
+        case "above", "top", "over":
+            return .above
+        case "below", "bottom", "under":
+            return .below
+        default:
+            return nil
+        }
+    }
+
     private func directionAnnotationVerticalJustify(
         for placement: VexDirectionTextPlacementPlan?
     ) -> AnnotationVerticalJustify {
@@ -4580,6 +4608,28 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return .below
         case .none:
             return nil
+        }
+    }
+
+    private func chordSymbolVerticalJustify(
+        for placement: VexChordSymbolPlacementPlan
+    ) -> ChordSymbolVerticalJustify {
+        switch placement {
+        case .above:
+            return .top
+        case .below:
+            return .bottom
+        }
+    }
+
+    private func chordSymbolModifierPosition(
+        for placement: VexChordSymbolPlacementPlan
+    ) -> ModifierPosition {
+        switch placement {
+        case .above:
+            return .above
+        case .below:
+            return .below
         }
     }
 

@@ -311,6 +311,7 @@ public struct DirectionEvent: Equatable, Sendable {
 public struct HarmonyEvent: Equatable, Sendable {
     public var onsetDivisions: Int
     public var offsetDivisions: Int
+    public var placement: String?
     public var rootStep: String?
     public var rootAlter: Int
     public var bassStep: String?
@@ -324,6 +325,7 @@ public struct HarmonyEvent: Equatable, Sendable {
     public init(
         onsetDivisions: Int,
         offsetDivisions: Int = 0,
+        placement: String? = nil,
         rootStep: String? = nil,
         rootAlter: Int = 0,
         bassStep: String? = nil,
@@ -336,6 +338,7 @@ public struct HarmonyEvent: Equatable, Sendable {
     ) {
         self.onsetDivisions = onsetDivisions
         self.offsetDivisions = offsetDivisions
+        self.placement = placement
         self.rootStep = rootStep
         self.rootAlter = rootAlter
         self.bassStep = bassStep
