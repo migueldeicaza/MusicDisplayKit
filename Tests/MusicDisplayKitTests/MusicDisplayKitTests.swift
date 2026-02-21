@@ -684,6 +684,116 @@ private let directionExpressionsXML = """
 </score-partwise>
 """
 
+private let directionRenderXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <direction placement="above">
+        <direction-type>
+          <dynamics>
+            <mf/>
+          </dynamics>
+          <words>dolce</words>
+          <rehearsal>A</rehearsal>
+        </direction-type>
+      </direction>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let directionSpanRenderXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <direction placement="below">
+        <direction-type>
+          <wedge type="crescendo" number="1"/>
+          <pedal type="start" line="yes" sign="no"/>
+        </direction-type>
+      </direction>
+      <direction placement="above">
+        <direction-type>
+          <octave-shift type="up" number="1" size="8"/>
+        </direction-type>
+      </direction>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <direction placement="below">
+        <direction-type>
+          <wedge type="stop" number="1"/>
+          <pedal type="stop" line="yes" sign="no"/>
+        </direction-type>
+      </direction>
+      <direction placement="above">
+        <direction-type>
+          <octave-shift type="stop" number="1" size="8"/>
+        </direction-type>
+      </direction>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let directionTempoRenderXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <beat-unit-dot/>
+            <per-minute>120</per-minute>
+          </metronome>
+        </direction-type>
+      </direction>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <direction placement="above">
+        <sound tempo="96"/>
+      </direction>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let harmonyXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2537,6 +2647,12 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(plan.articulations.isEmpty)
     #expect(plan.lyrics.isEmpty)
     #expect(plan.chordSymbols.isEmpty)
+    #expect(plan.directionTexts.isEmpty)
+    #expect(plan.tempoMarks.isEmpty)
+    #expect(plan.roadmapRepetitions.isEmpty)
+    #expect(plan.directionWedges.isEmpty)
+    #expect(plan.octaveShiftSpanners.isEmpty)
+    #expect(plan.pedalMarkings.isEmpty)
     #expect(plan.lyricConnectors.isEmpty)
     #expect(plan.partGroupConnectors.count == laidOut.partGroups.count)
     #expect(plan.barlineConnectors.count == 2)
@@ -2695,6 +2811,84 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(chordSymbol.entryIndexInVoice == 0)
 }
 
+@Test func vexAdapterBuildsDirectionTextPlans() throws {
+    let score = try MusicXMLParser().parse(xml: directionRenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.directionTexts.count == 3)
+    let texts = Set(plan.directionTexts.map(\.text))
+    #expect(texts == Set(["mf", "dolce", "A"]))
+    #expect(plan.directionTexts.allSatisfy { $0.voice == 1 })
+    #expect(plan.directionTexts.allSatisfy { $0.entryIndexInVoice == 0 })
+    #expect(plan.directionTexts.allSatisfy { $0.placement == .above })
+}
+
+@Test func vexAdapterBuildsDirectionTempoMarkPlans() throws {
+    let score = try MusicXMLParser().parse(xml: directionTempoRenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.tempoMarks.count == 2)
+    let firstTempo = plan.tempoMarks[0]
+    #expect(firstTempo.voice == 1)
+    #expect(firstTempo.entryIndexInVoice == 0)
+    #expect(firstTempo.bpm == 120)
+    #expect(firstTempo.duration == .quarter)
+    #expect(firstTempo.dots == 1)
+
+    let secondTempo = plan.tempoMarks[1]
+    #expect(secondTempo.voice == 1)
+    #expect(secondTempo.entryIndexInVoice == 1)
+    #expect(secondTempo.bpm == 96)
+    #expect(secondTempo.duration == .quarter)
+    #expect(secondTempo.dots == 0)
+}
+
+@Test func vexAdapterBuildsRoadmapRepetitionPlans() throws {
+    let score = try MusicXMLParser().parse(xml: repeatsAndTempoXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.roadmapRepetitions.count == 5)
+    let kinds = Set(plan.roadmapRepetitions.map(\.kind))
+    #expect(kinds.contains(.segnoLeft))
+    #expect(kinds.contains(.codaLeft))
+    #expect(kinds.contains(.dsAlCoda))
+    #expect(kinds.contains(.toCoda))
+    #expect(kinds.contains(.fine))
+}
+
+@Test func vexAdapterBuildsDirectionExpressionSpannerPlans() throws {
+    let score = try MusicXMLParser().parse(xml: directionSpanRenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.directionWedges.count == 1)
+    let wedge = try #require(plan.directionWedges.first)
+    #expect(wedge.kind == .crescendo)
+    #expect(wedge.voice == 1)
+    #expect(wedge.startEntryIndexInVoice == 0)
+    #expect(wedge.endEntryIndexInVoice == 1)
+    #expect(wedge.placement == .below)
+
+    #expect(plan.octaveShiftSpanners.count == 1)
+    let octaveShift = try #require(plan.octaveShiftSpanners.first)
+    #expect(octaveShift.voice == 1)
+    #expect(octaveShift.startEntryIndexInVoice == 0)
+    #expect(octaveShift.endEntryIndexInVoice == 1)
+    #expect(octaveShift.text == "8")
+    #expect(octaveShift.superscript == "va")
+    #expect(octaveShift.position == .top)
+
+    #expect(plan.pedalMarkings.count == 1)
+    let pedal = try #require(plan.pedalMarkings.first)
+    #expect(pedal.voice == 1)
+    #expect(pedal.startEntryIndexInVoice == 0)
+    #expect(pedal.endEntryIndexInVoice == 1)
+    #expect(pedal.kind == .bracket)
+}
+
 @Test func vexAdapterBuildsLyricExtenderConnectorPlans() throws {
     let score = try MusicXMLParser().parse(xml: lyricExtenderXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -2748,6 +2942,12 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(execution.articulations.isEmpty)
     #expect(execution.lyrics.isEmpty)
     #expect(execution.chordSymbols.isEmpty)
+    #expect(execution.directionTexts.isEmpty)
+    #expect(execution.tempoMarks.isEmpty)
+    #expect(execution.roadmapRepetitions.isEmpty)
+    #expect(execution.directionWedges.isEmpty)
+    #expect(execution.octaveShiftSpanners.isEmpty)
+    #expect(execution.pedalMarkings.isEmpty)
     #expect(execution.lyricConnectors.isEmpty)
     #expect(execution.measureBarlineConnectors.count == plan.measureBoundaries.count)
     #expect(execution.partGroupConnectors.count == plan.partGroupConnectors.count)
@@ -2943,6 +3143,93 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(execution.notes.first?.getModifiersByType("ChordSymbol").count == 1)
 }
 
+@Test func vexAdapterExecutesDirectionTextAnnotations() throws {
+    let score = try MusicXMLParser().parse(xml: directionRenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.directionTexts.count == 3)
+    let texts = Set(execution.directionTexts.map(\.text))
+    #expect(texts == Set(["mf", "dolce", "A"]))
+    #expect(execution.directionTexts.allSatisfy { $0.verticalJustification == .top })
+    #expect(execution.directionTexts.allSatisfy { $0.getPosition() == .above })
+
+    let firstNote = try #require(execution.notes.first)
+    #expect(firstNote.getModifiersByType("Annotation").count == 3)
+}
+
+@Test func vexAdapterExecutesDirectionTempoMarks() throws {
+    let score = try MusicXMLParser().parse(xml: directionTempoRenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.tempoMarks.count == 2)
+
+    let firstTempo = execution.tempoMarks[0]
+    #expect(firstTempo.tempo.bpm == 120)
+    #expect(firstTempo.tempo.duration == .quarter)
+    #expect(firstTempo.tempo.dots == 1)
+
+    let secondTempo = execution.tempoMarks[1]
+    #expect(secondTempo.tempo.bpm == 96)
+    #expect(secondTempo.tempo.duration == .quarter)
+    #expect(secondTempo.tempo.dots == 0)
+
+    let firstStave = try #require(execution.staves.first)
+    let tempoModifiers = firstStave.getModifiers().filter { $0.getCategory() == "StaveTempo" }
+    #expect(tempoModifiers.count == 2)
+}
+
+@Test func vexAdapterExecutesRoadmapRepetitions() throws {
+    let score = try MusicXMLParser().parse(xml: repeatsAndTempoXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.roadmapRepetitions.count == 5)
+    let kinds = Set(execution.roadmapRepetitions.map(\.symbolType))
+    #expect(kinds.contains(.segnoLeft))
+    #expect(kinds.contains(.codaLeft))
+    #expect(kinds.contains(.dsAlCoda))
+    #expect(kinds.contains(.toCoda))
+    #expect(kinds.contains(.fine))
+
+    let firstStave = try #require(execution.staves.first)
+    let repetitionModifiers = firstStave.getModifiers().filter { $0.getCategory() == "Repetition" }
+    #expect(repetitionModifiers.count == 5)
+}
+
+@Test func vexAdapterExecutesDirectionExpressionSpanners() throws {
+    let score = try MusicXMLParser().parse(xml: directionSpanRenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.directionWedges.count == 1)
+    let wedge = try #require(execution.directionWedges.first)
+    #expect(wedge.hairpinType == .crescendo)
+    #expect(wedge.hairpinPosition == .below)
+    #expect(wedge.firstNote != nil)
+    #expect(wedge.lastNote != nil)
+
+    #expect(execution.octaveShiftSpanners.count == 1)
+    let octaveShift = try #require(execution.octaveShiftSpanners.first)
+    #expect(octaveShift.text == "8")
+    #expect(octaveShift.superscriptText == "va")
+    #expect(octaveShift.bracketPosition == .top)
+
+    #expect(execution.pedalMarkings.count == 1)
+    let pedal = try #require(execution.pedalMarkings.first)
+    #expect(pedal.pedalType == .bracket)
+    #expect(pedal.notes.count == 2)
+}
+
 @Test func vexAdapterSeparatesMultiVoiceLyricsByTextLine() throws {
     let score = try MusicXMLParser().parse(xml: multiVoiceLyricsXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -2981,6 +3268,24 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
 @Test func vexAdapterRenderExecutesHeadlessDraw() throws {
     let score = try MusicXMLParser().parse(xml: nestedPartGroupLayoutXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 500))
+    try VexFoundationRenderer().render(laidOut, target: .view(identifier: "preview"))
+}
+
+@Test func vexAdapterRenderExecutesDirectionExpressionHeadlessDraw() throws {
+    let score = try MusicXMLParser().parse(xml: directionSpanRenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    try VexFoundationRenderer().render(laidOut, target: .view(identifier: "preview"))
+}
+
+@Test func vexAdapterRenderExecutesDirectionTempoHeadlessDraw() throws {
+    let score = try MusicXMLParser().parse(xml: directionTempoRenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    try VexFoundationRenderer().render(laidOut, target: .view(identifier: "preview"))
+}
+
+@Test func vexAdapterRenderExecutesRoadmapRepetitionHeadlessDraw() throws {
+    let score = try MusicXMLParser().parse(xml: repeatsAndTempoXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
     try VexFoundationRenderer().render(laidOut, target: .view(identifier: "preview"))
 }
 

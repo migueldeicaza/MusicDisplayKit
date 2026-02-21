@@ -649,6 +649,240 @@ public struct VexChordSymbolPlan: Sendable {
     }
 }
 
+public enum VexDirectionTextPlacementPlan: Sendable {
+    case above
+    case below
+}
+
+public struct VexDirectionTextPlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let voice: Int
+    public let entryIndexInVoice: Int
+    public let text: String
+    public let placement: VexDirectionTextPlacementPlan?
+    public let sourceOrder: Int
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        entryIndexInVoice: Int,
+        text: String,
+        placement: VexDirectionTextPlacementPlan?,
+        sourceOrder: Int
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.voice = voice
+        self.entryIndexInVoice = entryIndexInVoice
+        self.text = text
+        self.placement = placement
+        self.sourceOrder = sourceOrder
+    }
+}
+
+public struct VexTempoMarkPlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let voice: Int
+    public let entryIndexInVoice: Int
+    public let bpm: Int
+    public let duration: NoteValue
+    public let dots: Int
+    public let sourceOrder: Int
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        entryIndexInVoice: Int,
+        bpm: Int,
+        duration: NoteValue,
+        dots: Int,
+        sourceOrder: Int
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.voice = voice
+        self.entryIndexInVoice = entryIndexInVoice
+        self.bpm = bpm
+        self.duration = duration
+        self.dots = dots
+        self.sourceOrder = sourceOrder
+    }
+}
+
+public enum VexRoadmapRepetitionKind: Hashable, Sendable {
+    case codaLeft
+    case codaRight
+    case segnoLeft
+    case segnoRight
+    case dc
+    case dcAlCoda
+    case dcAlFine
+    case ds
+    case dsAlCoda
+    case dsAlFine
+    case fine
+    case toCoda
+}
+
+public enum VexRoadmapRepetitionAnchor: Hashable, Sendable {
+    case leftEdge
+    case rightEdge
+    case entry(voice: Int, entryIndexInVoice: Int)
+}
+
+public struct VexRoadmapRepetitionPlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let kind: VexRoadmapRepetitionKind
+    public let anchor: VexRoadmapRepetitionAnchor
+    public let sourceOrder: Int
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        kind: VexRoadmapRepetitionKind,
+        anchor: VexRoadmapRepetitionAnchor,
+        sourceOrder: Int
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.kind = kind
+        self.anchor = anchor
+        self.sourceOrder = sourceOrder
+    }
+}
+
+public enum VexDirectionWedgeKind: Sendable {
+    case crescendo
+    case decrescendo
+}
+
+public struct VexDirectionWedgePlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let voice: Int
+    public let startEntryIndexInVoice: Int
+    public let endEntryIndexInVoice: Int
+    public let kind: VexDirectionWedgeKind
+    public let placement: VexDirectionTextPlacementPlan?
+    public let sourceOrder: Int
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        startEntryIndexInVoice: Int,
+        endEntryIndexInVoice: Int,
+        kind: VexDirectionWedgeKind,
+        placement: VexDirectionTextPlacementPlan?,
+        sourceOrder: Int
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.voice = voice
+        self.startEntryIndexInVoice = startEntryIndexInVoice
+        self.endEntryIndexInVoice = endEntryIndexInVoice
+        self.kind = kind
+        self.placement = placement
+        self.sourceOrder = sourceOrder
+    }
+}
+
+public enum VexOctaveShiftPositionPlan: Sendable {
+    case top
+    case bottom
+}
+
+public struct VexOctaveShiftPlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let voice: Int
+    public let startEntryIndexInVoice: Int
+    public let endEntryIndexInVoice: Int
+    public let text: String
+    public let superscript: String
+    public let position: VexOctaveShiftPositionPlan
+    public let sourceOrder: Int
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        startEntryIndexInVoice: Int,
+        endEntryIndexInVoice: Int,
+        text: String,
+        superscript: String,
+        position: VexOctaveShiftPositionPlan,
+        sourceOrder: Int
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.voice = voice
+        self.startEntryIndexInVoice = startEntryIndexInVoice
+        self.endEntryIndexInVoice = endEntryIndexInVoice
+        self.text = text
+        self.superscript = superscript
+        self.position = position
+        self.sourceOrder = sourceOrder
+    }
+}
+
+public enum VexPedalKindPlan: Sendable {
+    case text
+    case bracket
+    case mixed
+}
+
+public struct VexPedalPlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let voice: Int
+    public let startEntryIndexInVoice: Int
+    public let endEntryIndexInVoice: Int
+    public let kind: VexPedalKindPlan
+    public let sourceOrder: Int
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        startEntryIndexInVoice: Int,
+        endEntryIndexInVoice: Int,
+        kind: VexPedalKindPlan,
+        sourceOrder: Int
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.voice = voice
+        self.startEntryIndexInVoice = startEntryIndexInVoice
+        self.endEntryIndexInVoice = endEntryIndexInVoice
+        self.kind = kind
+        self.sourceOrder = sourceOrder
+    }
+}
+
 public enum VexLyricConnectorKind: Sendable {
     case hyphen
     case extender
@@ -786,6 +1020,12 @@ public struct VexRenderPlan: Sendable {
     public let articulations: [VexArticulationPlan]
     public let lyrics: [VexLyricPlan]
     public let chordSymbols: [VexChordSymbolPlan]
+    public let directionTexts: [VexDirectionTextPlan]
+    public let tempoMarks: [VexTempoMarkPlan]
+    public let roadmapRepetitions: [VexRoadmapRepetitionPlan]
+    public let directionWedges: [VexDirectionWedgePlan]
+    public let octaveShiftSpanners: [VexOctaveShiftPlan]
+    public let pedalMarkings: [VexPedalPlan]
     public let lyricConnectors: [VexLyricConnectorPlan]
     public let partGroupConnectors: [VexPartGroupConnectorPlan]
     public let barlineConnectors: [VexBarlineConnectorPlan]
@@ -805,6 +1045,12 @@ public struct VexRenderPlan: Sendable {
         articulations: [VexArticulationPlan],
         lyrics: [VexLyricPlan],
         chordSymbols: [VexChordSymbolPlan],
+        directionTexts: [VexDirectionTextPlan],
+        tempoMarks: [VexTempoMarkPlan],
+        roadmapRepetitions: [VexRoadmapRepetitionPlan],
+        directionWedges: [VexDirectionWedgePlan],
+        octaveShiftSpanners: [VexOctaveShiftPlan],
+        pedalMarkings: [VexPedalPlan],
         lyricConnectors: [VexLyricConnectorPlan],
         partGroupConnectors: [VexPartGroupConnectorPlan],
         barlineConnectors: [VexBarlineConnectorPlan]
@@ -823,6 +1069,12 @@ public struct VexRenderPlan: Sendable {
         self.articulations = articulations
         self.lyrics = lyrics
         self.chordSymbols = chordSymbols
+        self.directionTexts = directionTexts
+        self.tempoMarks = tempoMarks
+        self.roadmapRepetitions = roadmapRepetitions
+        self.directionWedges = directionWedges
+        self.octaveShiftSpanners = octaveShiftSpanners
+        self.pedalMarkings = pedalMarkings
         self.lyricConnectors = lyricConnectors
         self.partGroupConnectors = partGroupConnectors
         self.barlineConnectors = barlineConnectors
@@ -841,6 +1093,12 @@ public struct VexFactoryExecution {
     public let articulations: [VexFoundation.Articulation]
     public let lyrics: [VexFoundation.Annotation]
     public let chordSymbols: [VexFoundation.ChordSymbol]
+    public let directionTexts: [VexFoundation.Annotation]
+    public let tempoMarks: [StaveTempo]
+    public let roadmapRepetitions: [StaveRepetition]
+    public let directionWedges: [StaveHairpin]
+    public let octaveShiftSpanners: [TextBracket]
+    public let pedalMarkings: [PedalMarking]
     public let lyricConnectors: [VexFoundation.Annotation]
     public let measureBarlineConnectors: [StaveConnector]
     public let partGroupConnectors: [StaveConnector]
@@ -858,6 +1116,12 @@ public struct VexFactoryExecution {
         articulations: [VexFoundation.Articulation],
         lyrics: [VexFoundation.Annotation],
         chordSymbols: [VexFoundation.ChordSymbol],
+        directionTexts: [VexFoundation.Annotation],
+        tempoMarks: [StaveTempo],
+        roadmapRepetitions: [StaveRepetition],
+        directionWedges: [StaveHairpin],
+        octaveShiftSpanners: [TextBracket],
+        pedalMarkings: [PedalMarking],
         lyricConnectors: [VexFoundation.Annotation],
         measureBarlineConnectors: [StaveConnector],
         partGroupConnectors: [StaveConnector],
@@ -874,6 +1138,12 @@ public struct VexFactoryExecution {
         self.articulations = articulations
         self.lyrics = lyrics
         self.chordSymbols = chordSymbols
+        self.directionTexts = directionTexts
+        self.tempoMarks = tempoMarks
+        self.roadmapRepetitions = roadmapRepetitions
+        self.directionWedges = directionWedges
+        self.octaveShiftSpanners = octaveShiftSpanners
+        self.pedalMarkings = pedalMarkings
         self.lyricConnectors = lyricConnectors
         self.measureBarlineConnectors = measureBarlineConnectors
         self.partGroupConnectors = partGroupConnectors
@@ -950,6 +1220,12 @@ public struct VexFoundationRenderer: ScoreRenderer {
             let articulations: [VexArticulationPlan]
             let lyrics: [VexLyricPlan]
             let chordSymbols: [VexChordSymbolPlan]
+            let directionTexts: [VexDirectionTextPlan]
+            let tempoMarks: [VexTempoMarkPlan]
+            let roadmapRepetitions: [VexRoadmapRepetitionPlan]
+            let directionWedges: [VexDirectionWedgePlan]
+            let octaveShiftSpanners: [VexOctaveShiftPlan]
+            let pedalMarkings: [VexPedalPlan]
         }
 
         var noteEntryReferenceBySourceKey: [SourceNoteKey: NoteEntryReference] = [:]
@@ -965,7 +1241,13 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     slurs: [],
                     articulations: [],
                     lyrics: [],
-                    chordSymbols: []
+                    chordSymbols: [],
+                    directionTexts: [],
+                    tempoMarks: [],
+                    roadmapRepetitions: [],
+                    directionWedges: [],
+                    octaveShiftSpanners: [],
+                    pedalMarkings: []
                 )
             }
             let part = score.score.parts[laidOutMeasure.partIndex]
@@ -979,7 +1261,13 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     slurs: [],
                     articulations: [],
                     lyrics: [],
-                    chordSymbols: []
+                    chordSymbols: [],
+                    directionTexts: [],
+                    tempoMarks: [],
+                    roadmapRepetitions: [],
+                    directionWedges: [],
+                    octaveShiftSpanners: [],
+                    pedalMarkings: []
                 )
             }
             let sourceMeasure = part.measures[laidOutMeasure.measureIndexInPart]
@@ -1164,6 +1452,34 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 harmonyEvents: sourceMeasure.harmonyEvents,
                 notePlans: notePlans
             )
+            let directionTextPlans = buildDirectionTextPlans(
+                systemIndex: laidOutMeasure.systemIndex,
+                partIndex: laidOutMeasure.partIndex,
+                measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                directionEvents: sourceMeasure.directionEvents,
+                notePlans: notePlans
+            )
+            let directionExpressionPlans = buildDirectionExpressionPlans(
+                systemIndex: laidOutMeasure.systemIndex,
+                partIndex: laidOutMeasure.partIndex,
+                measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                directionEvents: sourceMeasure.directionEvents,
+                notePlans: notePlans
+            )
+            let tempoMarkPlans = buildDirectionTempoPlans(
+                systemIndex: laidOutMeasure.systemIndex,
+                partIndex: laidOutMeasure.partIndex,
+                measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                directionEvents: sourceMeasure.directionEvents,
+                notePlans: notePlans
+            )
+            let roadmapRepetitionPlans = buildRoadmapRepetitionPlans(
+                systemIndex: laidOutMeasure.systemIndex,
+                partIndex: laidOutMeasure.partIndex,
+                measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                repetitionInstructions: sourceMeasure.repetitionInstructions,
+                notePlans: notePlans
+            )
 
             return MeasureRenderPlans(
                 notes: notePlans,
@@ -1173,7 +1489,13 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 slurs: slurPlans,
                 articulations: articulationPlans,
                 lyrics: lyricPlans,
-                chordSymbols: chordSymbolPlans
+                chordSymbols: chordSymbolPlans,
+                directionTexts: directionTextPlans,
+                tempoMarks: tempoMarkPlans,
+                roadmapRepetitions: roadmapRepetitionPlans,
+                directionWedges: directionExpressionPlans.wedges,
+                octaveShiftSpanners: directionExpressionPlans.octaveShifts,
+                pedalMarkings: directionExpressionPlans.pedals
             )
         }
         let notes = measureRenderPlans.flatMap(\.notes)
@@ -1184,6 +1506,12 @@ public struct VexFoundationRenderer: ScoreRenderer {
         let articulations = measureRenderPlans.flatMap(\.articulations)
         let lyrics = measureRenderPlans.flatMap(\.lyrics)
         let chordSymbols = measureRenderPlans.flatMap(\.chordSymbols)
+        let directionTexts = measureRenderPlans.flatMap(\.directionTexts)
+        let tempoMarks = measureRenderPlans.flatMap(\.tempoMarks)
+        let roadmapRepetitions = measureRenderPlans.flatMap(\.roadmapRepetitions)
+        let directionWedges = measureRenderPlans.flatMap(\.directionWedges)
+        let octaveShiftSpanners = measureRenderPlans.flatMap(\.octaveShiftSpanners)
+        let pedalMarkings = measureRenderPlans.flatMap(\.pedalMarkings)
         let lyricConnectors = buildLyricConnectorPlans(
             score: score.score,
             noteEntryReferenceBySourceKey: noteEntryReferenceBySourceKey
@@ -1269,6 +1597,12 @@ public struct VexFoundationRenderer: ScoreRenderer {
             articulations: articulations,
             lyrics: lyrics,
             chordSymbols: chordSymbols,
+            directionTexts: directionTexts,
+            tempoMarks: tempoMarks,
+            roadmapRepetitions: roadmapRepetitions,
+            directionWedges: directionWedges,
+            octaveShiftSpanners: octaveShiftSpanners,
+            pedalMarkings: pedalMarkings,
             lyricConnectors: lyricConnectors,
             partGroupConnectors: partGroupConnectors,
             barlineConnectors: barlineConnectors
@@ -1362,6 +1696,12 @@ public struct VexFoundationRenderer: ScoreRenderer {
         var createdArticulations: [VexFoundation.Articulation] = []
         var createdLyrics: [VexFoundation.Annotation] = []
         var createdChordSymbols: [VexFoundation.ChordSymbol] = []
+        var createdDirectionTexts: [VexFoundation.Annotation] = []
+        var createdTempoMarks: [StaveTempo] = []
+        var createdRoadmapRepetitions: [StaveRepetition] = []
+        var createdDirectionWedges: [StaveHairpin] = []
+        var createdOctaveShiftSpanners: [TextBracket] = []
+        var createdPedalMarkings: [PedalMarking] = []
         var createdLyricConnectors: [VexFoundation.Annotation] = []
         let quarterTickThreshold = Tables.durationToTicks("4").map(Double.init)
         let stavePadding = (Glyph.MUSIC_FONT_STACK.first?.lookupMetric("stave.padding") as? Double) ?? 0
@@ -1419,6 +1759,48 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 systemIndex: chordPlan.systemIndex,
                 partIndex: chordPlan.partIndex,
                 measureIndexInPart: chordPlan.measureIndexInPart
+            )
+        }
+        let groupedDirectionTexts = Dictionary(grouping: plan.directionTexts) { directionPlan in
+            NoteGroupKey(
+                systemIndex: directionPlan.systemIndex,
+                partIndex: directionPlan.partIndex,
+                measureIndexInPart: directionPlan.measureIndexInPart
+            )
+        }
+        let groupedTempoMarks = Dictionary(grouping: plan.tempoMarks) { tempoPlan in
+            NoteGroupKey(
+                systemIndex: tempoPlan.systemIndex,
+                partIndex: tempoPlan.partIndex,
+                measureIndexInPart: tempoPlan.measureIndexInPart
+            )
+        }
+        let groupedRoadmapRepetitions = Dictionary(grouping: plan.roadmapRepetitions) { repetitionPlan in
+            NoteGroupKey(
+                systemIndex: repetitionPlan.systemIndex,
+                partIndex: repetitionPlan.partIndex,
+                measureIndexInPart: repetitionPlan.measureIndexInPart
+            )
+        }
+        let groupedDirectionWedges = Dictionary(grouping: plan.directionWedges) { wedgePlan in
+            NoteGroupKey(
+                systemIndex: wedgePlan.systemIndex,
+                partIndex: wedgePlan.partIndex,
+                measureIndexInPart: wedgePlan.measureIndexInPart
+            )
+        }
+        let groupedOctaveShiftSpanners = Dictionary(grouping: plan.octaveShiftSpanners) { shiftPlan in
+            NoteGroupKey(
+                systemIndex: shiftPlan.systemIndex,
+                partIndex: shiftPlan.partIndex,
+                measureIndexInPart: shiftPlan.measureIndexInPart
+            )
+        }
+        let groupedPedalMarkings = Dictionary(grouping: plan.pedalMarkings) { pedalPlan in
+            NoteGroupKey(
+                systemIndex: pedalPlan.systemIndex,
+                partIndex: pedalPlan.partIndex,
+                measureIndexInPart: pedalPlan.measureIndexInPart
             )
         }
         let sortedNoteGroups = groupedNotes.keys.sorted { lhs, rhs in
@@ -1641,6 +2023,178 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 }
             }
 
+            if let directionTextPlans = groupedDirectionTexts[groupKey] {
+                let sortedDirectionTextPlans = directionTextPlans.sorted { lhs, rhs in
+                    if lhs.voice != rhs.voice {
+                        return lhs.voice < rhs.voice
+                    }
+                    if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                        return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+                    }
+                    return lhs.sourceOrder < rhs.sourceOrder
+                }
+                for directionTextPlan in sortedDirectionTextPlans {
+                    guard let note = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: directionTextPlan.systemIndex,
+                            partIndex: directionTextPlan.partIndex,
+                            measureIndexInPart: directionTextPlan.measureIndexInPart,
+                            voice: directionTextPlan.voice,
+                            entryIndexInVoice: directionTextPlan.entryIndexInVoice
+                        )
+                    ] else {
+                        continue
+                    }
+
+                    let verticalJustify = directionAnnotationVerticalJustify(for: directionTextPlan.placement)
+                    let annotation = factory.Annotation(
+                        text: directionTextPlan.text,
+                        hJustify: .center,
+                        vJustify: verticalJustify
+                    )
+                    if let position = directionAnnotationPosition(for: directionTextPlan.placement) {
+                        _ = annotation.setPosition(position)
+                    }
+                    _ = note.addModifier(annotation, index: 0)
+                    createdDirectionTexts.append(annotation)
+                }
+            }
+
+            if let directionWedgePlans = groupedDirectionWedges[groupKey] {
+                let sortedDirectionWedgePlans = directionWedgePlans.sorted { lhs, rhs in
+                    if lhs.voice != rhs.voice {
+                        return lhs.voice < rhs.voice
+                    }
+                    if lhs.startEntryIndexInVoice != rhs.startEntryIndexInVoice {
+                        return lhs.startEntryIndexInVoice < rhs.startEntryIndexInVoice
+                    }
+                    if lhs.endEntryIndexInVoice != rhs.endEntryIndexInVoice {
+                        return lhs.endEntryIndexInVoice < rhs.endEntryIndexInVoice
+                    }
+                    return lhs.sourceOrder < rhs.sourceOrder
+                }
+                for wedgePlan in sortedDirectionWedgePlans {
+                    guard let startNote = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: wedgePlan.systemIndex,
+                            partIndex: wedgePlan.partIndex,
+                            measureIndexInPart: wedgePlan.measureIndexInPart,
+                            voice: wedgePlan.voice,
+                            entryIndexInVoice: wedgePlan.startEntryIndexInVoice
+                        )
+                    ],
+                    let endNote = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: wedgePlan.systemIndex,
+                            partIndex: wedgePlan.partIndex,
+                            measureIndexInPart: wedgePlan.measureIndexInPart,
+                            voice: wedgePlan.voice,
+                            entryIndexInVoice: wedgePlan.endEntryIndexInVoice
+                        )
+                    ] else {
+                        continue
+                    }
+
+                    let wedge = StaveHairpin(
+                        firstNote: startNote,
+                        lastNote: endNote,
+                        type: wedgeHairpinType(for: wedgePlan.kind)
+                    )
+                    if let position = directionWedgePosition(for: wedgePlan.placement) {
+                        _ = wedge.setPosition(position)
+                    }
+                    createdDirectionWedges.append(wedge)
+                }
+            }
+
+            if let octaveShiftPlans = groupedOctaveShiftSpanners[groupKey] {
+                let sortedOctaveShiftPlans = octaveShiftPlans.sorted { lhs, rhs in
+                    if lhs.voice != rhs.voice {
+                        return lhs.voice < rhs.voice
+                    }
+                    if lhs.startEntryIndexInVoice != rhs.startEntryIndexInVoice {
+                        return lhs.startEntryIndexInVoice < rhs.startEntryIndexInVoice
+                    }
+                    if lhs.endEntryIndexInVoice != rhs.endEntryIndexInVoice {
+                        return lhs.endEntryIndexInVoice < rhs.endEntryIndexInVoice
+                    }
+                    return lhs.sourceOrder < rhs.sourceOrder
+                }
+                for octaveShiftPlan in sortedOctaveShiftPlans {
+                    guard let startNote = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: octaveShiftPlan.systemIndex,
+                            partIndex: octaveShiftPlan.partIndex,
+                            measureIndexInPart: octaveShiftPlan.measureIndexInPart,
+                            voice: octaveShiftPlan.voice,
+                            entryIndexInVoice: octaveShiftPlan.startEntryIndexInVoice
+                        )
+                    ],
+                    let endNote = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: octaveShiftPlan.systemIndex,
+                            partIndex: octaveShiftPlan.partIndex,
+                            measureIndexInPart: octaveShiftPlan.measureIndexInPart,
+                            voice: octaveShiftPlan.voice,
+                            entryIndexInVoice: octaveShiftPlan.endEntryIndexInVoice
+                        )
+                    ] else {
+                        continue
+                    }
+
+                    let textBracket = factory.TextBracket(
+                        from: startNote,
+                        to: endNote,
+                        text: octaveShiftPlan.text,
+                        superscript: octaveShiftPlan.superscript,
+                        position: textBracketPosition(for: octaveShiftPlan.position)
+                    )
+                    createdOctaveShiftSpanners.append(textBracket)
+                }
+            }
+
+            if let pedalPlans = groupedPedalMarkings[groupKey] {
+                let sortedPedalPlans = pedalPlans.sorted { lhs, rhs in
+                    if lhs.voice != rhs.voice {
+                        return lhs.voice < rhs.voice
+                    }
+                    if lhs.startEntryIndexInVoice != rhs.startEntryIndexInVoice {
+                        return lhs.startEntryIndexInVoice < rhs.startEntryIndexInVoice
+                    }
+                    if lhs.endEntryIndexInVoice != rhs.endEntryIndexInVoice {
+                        return lhs.endEntryIndexInVoice < rhs.endEntryIndexInVoice
+                    }
+                    return lhs.sourceOrder < rhs.sourceOrder
+                }
+                for pedalPlan in sortedPedalPlans {
+                    guard let startNote = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: pedalPlan.systemIndex,
+                            partIndex: pedalPlan.partIndex,
+                            measureIndexInPart: pedalPlan.measureIndexInPart,
+                            voice: pedalPlan.voice,
+                            entryIndexInVoice: pedalPlan.startEntryIndexInVoice
+                        )
+                    ],
+                    let endNote = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: pedalPlan.systemIndex,
+                            partIndex: pedalPlan.partIndex,
+                            measureIndexInPart: pedalPlan.measureIndexInPart,
+                            voice: pedalPlan.voice,
+                            entryIndexInVoice: pedalPlan.endEntryIndexInVoice
+                        )
+                    ] else {
+                        continue
+                    }
+                    let pedal = factory.PedalMarking(
+                        notes: [startNote, endNote],
+                        type: pedalMarkingType(for: pedalPlan.kind)
+                    )
+                    createdPedalMarkings.append(pedal)
+                }
+            }
+
             let formatter = factory.Formatter()
             _ = formatter.joinVoices(measureVoices).format(
                 measureVoices,
@@ -1672,6 +2226,87 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 let delta = desiredRelativeStartX - minX
                 for context in contexts {
                     _ = context.setX(context.getX() + delta)
+                }
+            }
+
+            if let tempoPlans = groupedTempoMarks[groupKey] {
+                let sortedTempoPlans = tempoPlans.sorted { lhs, rhs in
+                    if lhs.voice != rhs.voice {
+                        return lhs.voice < rhs.voice
+                    }
+                    if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                        return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+                    }
+                    return lhs.sourceOrder < rhs.sourceOrder
+                }
+                for tempoPlan in sortedTempoPlans {
+                    guard let anchorNote = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: tempoPlan.systemIndex,
+                            partIndex: tempoPlan.partIndex,
+                            measureIndexInPart: tempoPlan.measureIndexInPart,
+                            voice: tempoPlan.voice,
+                            entryIndexInVoice: tempoPlan.entryIndexInVoice
+                        )
+                    ] else {
+                        continue
+                    }
+
+                    let shiftBase = stave.getNoteStartX() - stave.getX()
+                    let x = anchorNote.getAbsoluteX() - shiftBase
+                    let tempoOptions = StaveTempoOptions(
+                        bpm: tempoPlan.bpm,
+                        duration: tempoPlan.duration,
+                        dots: tempoPlan.dots
+                    )
+                    let tempoMark = StaveTempo(
+                        tempo: tempoOptions,
+                        x: x,
+                        shiftY: -15
+                    )
+                    _ = tempoMark.setShiftX(0)
+                    _ = stave.addModifier(tempoMark)
+                    createdTempoMarks.append(tempoMark)
+                }
+            }
+
+            if let roadmapPlans = groupedRoadmapRepetitions[groupKey] {
+                let sortedRoadmapPlans = roadmapPlans.sorted { lhs, rhs in
+                    if lhs.sourceOrder != rhs.sourceOrder {
+                        return lhs.sourceOrder < rhs.sourceOrder
+                    }
+                    return roadmapRepetitionSortValue(for: lhs.kind)
+                        < roadmapRepetitionSortValue(for: rhs.kind)
+                }
+                for roadmapPlan in sortedRoadmapPlans {
+                    let shiftBase = stave.getNoteStartX() - stave.getX()
+                    let x: Double
+                    switch roadmapPlan.anchor {
+                    case .leftEdge:
+                        x = stave.getX() - shiftBase
+                    case .rightEdge:
+                        x = stave.getX()
+                    case .entry(let voice, let entryIndexInVoice):
+                        guard let anchorNote = notesByEntryKey[
+                            NoteEntryKey(
+                                systemIndex: groupKey.systemIndex,
+                                partIndex: groupKey.partIndex,
+                                measureIndexInPart: groupKey.measureIndexInPart,
+                                voice: voice,
+                                entryIndexInVoice: entryIndexInVoice
+                            )
+                        ] else {
+                            continue
+                        }
+                        x = anchorNote.getAbsoluteX() - shiftBase
+                    }
+                    let repetition = StaveRepetition(
+                        type: roadmapRepetitionType(for: roadmapPlan.kind),
+                        x: x,
+                        yShift: 0
+                    )
+                    _ = stave.addModifier(repetition)
+                    createdRoadmapRepetitions.append(repetition)
                 }
             }
 
@@ -2024,6 +2659,12 @@ public struct VexFoundationRenderer: ScoreRenderer {
             articulations: createdArticulations,
             lyrics: createdLyrics,
             chordSymbols: createdChordSymbols,
+            directionTexts: createdDirectionTexts,
+            tempoMarks: createdTempoMarks,
+            roadmapRepetitions: createdRoadmapRepetitions,
+            directionWedges: createdDirectionWedges,
+            octaveShiftSpanners: createdOctaveShiftSpanners,
+            pedalMarkings: createdPedalMarkings,
             lyricConnectors: createdLyricConnectors,
             measureBarlineConnectors: measureBarlineConnectors,
             partGroupConnectors: partGroupConnectors,
@@ -2041,6 +2682,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
         )
         _ = execution.factory.setContext(context)
         try execution.factory.draw()
+        for wedge in execution.directionWedges {
+            _ = wedge.setContext(context)
+            try wedge.draw()
+        }
     }
 
     private func partGroupConnectorKind(for symbol: PartGroupSymbol?) -> VexConnectorKind {
@@ -2100,6 +2745,18 @@ public struct VexFoundationRenderer: ScoreRenderer {
         let measureIndexInPart: Int
         let voice: Int
         let entryIndexInVoice: Int
+    }
+
+    private struct DirectionExpressionPlanBundle {
+        let wedges: [VexDirectionWedgePlan]
+        let octaveShifts: [VexOctaveShiftPlan]
+        let pedals: [VexPedalPlan]
+
+        static let empty = DirectionExpressionPlanBundle(
+            wedges: [],
+            octaveShifts: [],
+            pedals: []
+        )
     }
 
     private func initialStaveState(
@@ -2694,6 +3351,841 @@ public struct VexFoundationRenderer: ScoreRenderer {
         }
     }
 
+    private func buildDirectionTextPlans(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        directionEvents: [MusicDisplayKitModel.DirectionEvent],
+        notePlans: [VexNotePlan]
+    ) -> [VexDirectionTextPlan] {
+        guard !notePlans.isEmpty else {
+            return []
+        }
+        let sortedNotePlans = notePlans.sorted { lhs, rhs in
+            if lhs.onsetDivisions != rhs.onsetDivisions {
+                return lhs.onsetDivisions < rhs.onsetDivisions
+            }
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+
+        var plans: [VexDirectionTextPlan] = []
+        var sourceOrder = 0
+        for directionEvent in directionEvents {
+            var texts: [String] = []
+            texts.append(contentsOf: directionEvent.dynamics.compactMap(directionTextValue(for:)))
+            texts.append(contentsOf: directionEvent.words.compactMap(directionTextValue(for:)))
+            if let rehearsal = directionTextValue(for: directionEvent.rehearsal) {
+                texts.append(rehearsal)
+            }
+            guard !texts.isEmpty else {
+                continue
+            }
+
+            let requestedVoice = directionEvent.voice.flatMap { $0 > 0 ? $0 : nil }
+            let anchorOnset = max(0, directionEvent.onsetDivisions + directionEvent.offsetDivisions)
+            guard let anchor = directionAnchorNotePlan(
+                from: sortedNotePlans,
+                onsetDivisions: anchorOnset,
+                requestedVoice: requestedVoice
+            ) else {
+                continue
+            }
+
+            let placement = directionTextPlacementPlan(from: directionEvent.placement)
+            for text in texts {
+                plans.append(
+                    VexDirectionTextPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        voice: anchor.voice,
+                        entryIndexInVoice: anchor.entryIndexInVoice,
+                        text: text,
+                        placement: placement,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+            }
+        }
+
+        return plans.sorted { lhs, rhs in
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+    }
+
+    private func buildDirectionTempoPlans(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        directionEvents: [MusicDisplayKitModel.DirectionEvent],
+        notePlans: [VexNotePlan]
+    ) -> [VexTempoMarkPlan] {
+        guard !notePlans.isEmpty else {
+            return []
+        }
+        let sortedNotePlans = notePlans.sorted { lhs, rhs in
+            if lhs.onsetDivisions != rhs.onsetDivisions {
+                return lhs.onsetDivisions < rhs.onsetDivisions
+            }
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+
+        var plans: [VexTempoMarkPlan] = []
+        var sourceOrder = 0
+        for directionEvent in directionEvents {
+            let requestedVoice = directionEvent.voice.flatMap { $0 > 0 ? $0 : nil }
+            let anchorOnset = max(0, directionEvent.onsetDivisions + directionEvent.offsetDivisions)
+            guard let anchor = directionAnchorNotePlan(
+                from: sortedNotePlans,
+                onsetDivisions: anchorOnset,
+                requestedVoice: requestedVoice
+            ) else {
+                continue
+            }
+
+            if let metronomePlan = metronomeTempoPlan(
+                from: directionEvent.metronome,
+                fallbackSoundTempo: directionEvent.soundTempo
+            ) {
+                plans.append(
+                    VexTempoMarkPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        voice: anchor.voice,
+                        entryIndexInVoice: anchor.entryIndexInVoice,
+                        bpm: metronomePlan.bpm,
+                        duration: metronomePlan.duration,
+                        dots: metronomePlan.dots,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+                continue
+            }
+
+            if let soundPlan = soundTempoPlan(from: directionEvent.soundTempo) {
+                plans.append(
+                    VexTempoMarkPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        voice: anchor.voice,
+                        entryIndexInVoice: anchor.entryIndexInVoice,
+                        bpm: soundPlan.bpm,
+                        duration: soundPlan.duration,
+                        dots: soundPlan.dots,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+            }
+        }
+
+        return plans.sorted { lhs, rhs in
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+    }
+
+    private func buildRoadmapRepetitionPlans(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        repetitionInstructions: [MusicDisplayKitModel.RepetitionInstruction],
+        notePlans: [VexNotePlan]
+    ) -> [VexRoadmapRepetitionPlan] {
+        struct PlanKey: Hashable {
+            let kind: VexRoadmapRepetitionKind
+            let anchor: VexRoadmapRepetitionAnchor
+        }
+        enum Edge {
+            case left
+            case right
+        }
+
+        let roadmapInstructions = repetitionInstructions.filter { instruction in
+            switch instruction.kind {
+            case .segno, .coda, .daCapo, .dalSegno, .toCoda, .fine, .alFine, .alCoda:
+                return true
+            default:
+                return false
+            }
+        }
+        guard !roadmapInstructions.isEmpty else {
+            return []
+        }
+
+        let sortedNotePlans = notePlans.sorted { lhs, rhs in
+            if lhs.onsetDivisions != rhs.onsetDivisions {
+                return lhs.onsetDivisions < rhs.onsetDivisions
+            }
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+
+        func edge(from location: String?) -> Edge? {
+            guard let location = location?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased() else {
+                return nil
+            }
+            switch location {
+            case "left", "begin", "start":
+                return .left
+            case "right", "end", "stop":
+                return .right
+            default:
+                return nil
+            }
+        }
+
+        func anchorForOnset(_ onset: Int, fallback: VexRoadmapRepetitionAnchor) -> VexRoadmapRepetitionAnchor {
+            if let anchor = directionAnchorNotePlan(
+                from: sortedNotePlans,
+                onsetDivisions: onset,
+                requestedVoice: nil
+            ) {
+                return .entry(voice: anchor.voice, entryIndexInVoice: anchor.entryIndexInVoice)
+            }
+            return fallback
+        }
+
+        func instructionSortValue(_ instruction: MusicDisplayKitModel.RepetitionInstruction) -> Int {
+            switch instruction.kind {
+            case .dalSegno:
+                return 0
+            case .daCapo:
+                return 1
+            case .segno:
+                return 2
+            case .coda:
+                return 3
+            case .toCoda:
+                return 4
+            case .fine:
+                return 5
+            case .alCoda:
+                return 6
+            case .alFine:
+                return 7
+            default:
+                return 8
+            }
+        }
+
+        var plans: [VexRoadmapRepetitionPlan] = []
+        var seen: Set<PlanKey> = []
+        var sourceOrder = 0
+        let instructionsByOnset = Dictionary(grouping: roadmapInstructions) { instruction in
+            max(0, instruction.onsetDivisions)
+        }
+        for onset in instructionsByOnset.keys.sorted() {
+            guard var onsetInstructions = instructionsByOnset[onset], !onsetInstructions.isEmpty else {
+                continue
+            }
+            onsetInstructions.sort { lhs, rhs in
+                let lhsSort = instructionSortValue(lhs)
+                let rhsSort = instructionSortValue(rhs)
+                if lhsSort != rhsSort {
+                    return lhsSort < rhsSort
+                }
+                return (lhs.text ?? "") < (rhs.text ?? "")
+            }
+
+            let hasAlCoda = onsetInstructions.contains { $0.kind == .alCoda }
+            let hasAlFine = onsetInstructions.contains { $0.kind == .alFine }
+            let hasDalSegno = onsetInstructions.contains { $0.kind == .dalSegno }
+            let hasDaCapo = onsetInstructions.contains { $0.kind == .daCapo }
+
+            if hasDalSegno || hasDaCapo {
+                let commandKind: VexRoadmapRepetitionKind
+                if hasDalSegno {
+                    if hasAlCoda {
+                        commandKind = .dsAlCoda
+                    } else if hasAlFine {
+                        commandKind = .dsAlFine
+                    } else {
+                        commandKind = .ds
+                    }
+                } else if hasAlCoda {
+                    commandKind = .dcAlCoda
+                } else if hasAlFine {
+                    commandKind = .dcAlFine
+                } else {
+                    commandKind = .dc
+                }
+
+                let commandAnchor = anchorForOnset(onset, fallback: .leftEdge)
+                let key = PlanKey(kind: commandKind, anchor: commandAnchor)
+                if !seen.contains(key) {
+                    seen.insert(key)
+                    plans.append(
+                        VexRoadmapRepetitionPlan(
+                            systemIndex: systemIndex,
+                            partIndex: partIndex,
+                            measureIndexInPart: measureIndexInPart,
+                            kind: commandKind,
+                            anchor: commandAnchor,
+                            sourceOrder: sourceOrder
+                        )
+                    )
+                    sourceOrder += 1
+                }
+            }
+
+            for instruction in onsetInstructions {
+                let kind: VexRoadmapRepetitionKind?
+                let anchor: VexRoadmapRepetitionAnchor
+
+                switch instruction.kind {
+                case .segno:
+                    switch edge(from: instruction.location) {
+                    case .right:
+                        kind = .segnoRight
+                        anchor = .rightEdge
+                    case .left:
+                        kind = .segnoLeft
+                        anchor = .leftEdge
+                    case .none:
+                        kind = .segnoLeft
+                        anchor = anchorForOnset(onset, fallback: .leftEdge)
+                    }
+                case .coda:
+                    switch edge(from: instruction.location) {
+                    case .right:
+                        kind = .codaRight
+                        anchor = .rightEdge
+                    case .left:
+                        kind = .codaLeft
+                        anchor = .leftEdge
+                    case .none:
+                        kind = .codaLeft
+                        anchor = anchorForOnset(onset, fallback: .leftEdge)
+                    }
+                case .toCoda:
+                    kind = .toCoda
+                    anchor = anchorForOnset(onset, fallback: .leftEdge)
+                case .fine:
+                    kind = .fine
+                    anchor = anchorForOnset(onset, fallback: .leftEdge)
+                case .daCapo, .dalSegno, .alCoda, .alFine:
+                    kind = nil
+                    anchor = .leftEdge
+                default:
+                    kind = nil
+                    anchor = .leftEdge
+                }
+
+                guard let kind else {
+                    continue
+                }
+                let key = PlanKey(kind: kind, anchor: anchor)
+                if seen.contains(key) {
+                    continue
+                }
+                seen.insert(key)
+                plans.append(
+                    VexRoadmapRepetitionPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        kind: kind,
+                        anchor: anchor,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+            }
+        }
+
+        return plans.sorted { lhs, rhs in
+            if lhs.sourceOrder != rhs.sourceOrder {
+                return lhs.sourceOrder < rhs.sourceOrder
+            }
+            return roadmapRepetitionSortValue(for: lhs.kind)
+                < roadmapRepetitionSortValue(for: rhs.kind)
+        }
+    }
+
+    private func directionAnchorNotePlan(
+        from sortedNotePlans: [VexNotePlan],
+        onsetDivisions: Int,
+        requestedVoice: Int?
+    ) -> VexNotePlan? {
+        let voiceFiltered = requestedVoice.map { voice in
+            sortedNotePlans.filter { $0.voice == voice }
+        } ?? sortedNotePlans
+
+        let source = voiceFiltered.isEmpty ? sortedNotePlans : voiceFiltered
+        let preferred = source.filter { !$0.isRest }
+        let candidates = preferred.isEmpty ? source : preferred
+
+        return candidates.first(where: { $0.onsetDivisions >= onsetDivisions })
+            ?? candidates.last
+    }
+
+    private func directionTerminalNotePlan(
+        from sortedNotePlans: [VexNotePlan],
+        requestedVoice: Int?
+    ) -> VexNotePlan? {
+        let voiceFiltered = requestedVoice.map { voice in
+            sortedNotePlans.filter { $0.voice == voice }
+        } ?? sortedNotePlans
+
+        let source = voiceFiltered.isEmpty ? sortedNotePlans : voiceFiltered
+        let preferred = source.filter { !$0.isRest }
+        let candidates = preferred.isEmpty ? source : preferred
+
+        return candidates.last
+    }
+
+    private func buildDirectionExpressionPlans(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        directionEvents: [MusicDisplayKitModel.DirectionEvent],
+        notePlans: [VexNotePlan]
+    ) -> DirectionExpressionPlanBundle {
+        struct AnchoredDirectionEvent {
+            let sourceOrder: Int
+            let directionEvent: MusicDisplayKitModel.DirectionEvent
+            let anchorOnset: Int
+            let anchor: VexNotePlan
+            let placement: VexDirectionTextPlacementPlan?
+        }
+        struct WedgeSpanKey: Hashable {
+            let number: Int
+            let voice: Int
+            let staff: Int?
+        }
+        struct OpenWedgeState {
+            let anchor: VexNotePlan
+            let kind: VexDirectionWedgeKind
+            let placement: VexDirectionTextPlacementPlan?
+            let sourceOrder: Int
+        }
+        struct OctaveSpanKey: Hashable {
+            let number: Int
+            let voice: Int
+            let staff: Int?
+        }
+        struct OpenOctaveShiftState {
+            let anchor: VexNotePlan
+            let text: String
+            let superscript: String
+            let position: VexOctaveShiftPositionPlan
+            let sourceOrder: Int
+        }
+        struct PedalSpanKey: Hashable {
+            let voice: Int
+            let staff: Int?
+        }
+        struct OpenPedalState {
+            let anchor: VexNotePlan
+            let kind: VexPedalKindPlan
+            let sourceOrder: Int
+        }
+
+        guard !notePlans.isEmpty else {
+            return .empty
+        }
+
+        let sortedNotePlans = notePlans.sorted { lhs, rhs in
+            if lhs.onsetDivisions != rhs.onsetDivisions {
+                return lhs.onsetDivisions < rhs.onsetDivisions
+            }
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+
+        let anchoredEvents: [AnchoredDirectionEvent] = directionEvents.enumerated().compactMap { sourceOrder, directionEvent in
+            let requestedVoice = directionEvent.voice.flatMap { $0 > 0 ? $0 : nil }
+            let anchorOnset = max(0, directionEvent.onsetDivisions + directionEvent.offsetDivisions)
+            guard let anchor = directionAnchorNotePlan(
+                from: sortedNotePlans,
+                onsetDivisions: anchorOnset,
+                requestedVoice: requestedVoice
+            ) else {
+                return nil
+            }
+            return AnchoredDirectionEvent(
+                sourceOrder: sourceOrder,
+                directionEvent: directionEvent,
+                anchorOnset: anchorOnset,
+                anchor: anchor,
+                placement: directionTextPlacementPlan(from: directionEvent.placement)
+            )
+        }.sorted { lhs, rhs in
+            if lhs.anchorOnset != rhs.anchorOnset {
+                return lhs.anchorOnset < rhs.anchorOnset
+            }
+            if lhs.anchor.voice != rhs.anchor.voice {
+                return lhs.anchor.voice < rhs.anchor.voice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+
+        guard !anchoredEvents.isEmpty else {
+            return .empty
+        }
+
+        func spanAnchors(start: VexNotePlan, end: VexNotePlan) -> (VexNotePlan, VexNotePlan) {
+            if directionSpanSortsBefore(start, end) {
+                return (start, end)
+            }
+            return (end, start)
+        }
+
+        var openWedges: [WedgeSpanKey: OpenWedgeState] = [:]
+        var openOctaveShifts: [OctaveSpanKey: OpenOctaveShiftState] = [:]
+        var openPedals: [PedalSpanKey: OpenPedalState] = [:]
+        var wedgePlans: [VexDirectionWedgePlan] = []
+        var octaveShiftPlans: [VexOctaveShiftPlan] = []
+        var pedalPlans: [VexPedalPlan] = []
+        var wedgeSourceOrder = 0
+        var octaveSourceOrder = 0
+        var pedalSourceOrder = 0
+
+        for anchoredEvent in anchoredEvents {
+            let directionEvent = anchoredEvent.directionEvent
+            let anchor = anchoredEvent.anchor
+
+            for wedge in directionEvent.wedges {
+                let key = WedgeSpanKey(
+                    number: max(1, wedge.number ?? 1),
+                    voice: anchor.voice,
+                    staff: directionEvent.staff
+                )
+                switch wedge.type {
+                case .crescendo, .diminuendo:
+                    if let open = openWedges.removeValue(forKey: key) {
+                        let (startAnchor, endAnchor) = spanAnchors(start: open.anchor, end: anchor)
+                        wedgePlans.append(
+                            VexDirectionWedgePlan(
+                                systemIndex: systemIndex,
+                                partIndex: partIndex,
+                                measureIndexInPart: measureIndexInPart,
+                                voice: startAnchor.voice,
+                                startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                                endEntryIndexInVoice: endAnchor.entryIndexInVoice,
+                                kind: open.kind,
+                                placement: open.placement,
+                                sourceOrder: open.sourceOrder
+                            )
+                        )
+                    }
+                    let kind: VexDirectionWedgeKind = wedge.type == .crescendo ? .crescendo : .decrescendo
+                    openWedges[key] = OpenWedgeState(
+                        anchor: anchor,
+                        kind: kind,
+                        placement: anchoredEvent.placement,
+                        sourceOrder: wedgeSourceOrder
+                    )
+                    wedgeSourceOrder += 1
+                case .stop:
+                    if let open = openWedges.removeValue(forKey: key) {
+                        let (startAnchor, endAnchor) = spanAnchors(start: open.anchor, end: anchor)
+                        wedgePlans.append(
+                            VexDirectionWedgePlan(
+                                systemIndex: systemIndex,
+                                partIndex: partIndex,
+                                measureIndexInPart: measureIndexInPart,
+                                voice: startAnchor.voice,
+                                startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                                endEntryIndexInVoice: endAnchor.entryIndexInVoice,
+                                kind: open.kind,
+                                placement: open.placement,
+                                sourceOrder: open.sourceOrder
+                            )
+                        )
+                    }
+                case .continue, .unknown:
+                    continue
+                }
+            }
+
+            for octaveShift in directionEvent.octaveShifts {
+                let key = OctaveSpanKey(
+                    number: max(1, octaveShift.number ?? 1),
+                    voice: anchor.voice,
+                    staff: directionEvent.staff
+                )
+                switch octaveShift.type {
+                case .up, .down:
+                    if let open = openOctaveShifts.removeValue(forKey: key) {
+                        let (startAnchor, endAnchor) = spanAnchors(start: open.anchor, end: anchor)
+                        octaveShiftPlans.append(
+                            VexOctaveShiftPlan(
+                                systemIndex: systemIndex,
+                                partIndex: partIndex,
+                                measureIndexInPart: measureIndexInPart,
+                                voice: startAnchor.voice,
+                                startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                                endEntryIndexInVoice: endAnchor.entryIndexInVoice,
+                                text: open.text,
+                                superscript: open.superscript,
+                                position: open.position,
+                                sourceOrder: open.sourceOrder
+                            )
+                        )
+                    }
+                    guard let text = octaveShiftText(for: octaveShift.type, size: octaveShift.size) else {
+                        continue
+                    }
+                    openOctaveShifts[key] = OpenOctaveShiftState(
+                        anchor: anchor,
+                        text: text.text,
+                        superscript: text.superscript,
+                        position: octaveShiftPositionPlan(type: octaveShift.type, placement: anchoredEvent.placement),
+                        sourceOrder: octaveSourceOrder
+                    )
+                    octaveSourceOrder += 1
+                case .stop:
+                    if let open = openOctaveShifts.removeValue(forKey: key) {
+                        let (startAnchor, endAnchor) = spanAnchors(start: open.anchor, end: anchor)
+                        octaveShiftPlans.append(
+                            VexOctaveShiftPlan(
+                                systemIndex: systemIndex,
+                                partIndex: partIndex,
+                                measureIndexInPart: measureIndexInPart,
+                                voice: startAnchor.voice,
+                                startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                                endEntryIndexInVoice: endAnchor.entryIndexInVoice,
+                                text: open.text,
+                                superscript: open.superscript,
+                                position: open.position,
+                                sourceOrder: open.sourceOrder
+                            )
+                        )
+                    }
+                case .continue, .unknown:
+                    continue
+                }
+            }
+
+            for pedal in directionEvent.pedals {
+                let key = PedalSpanKey(
+                    voice: anchor.voice,
+                    staff: directionEvent.staff
+                )
+                let kind = pedalKindPlan(from: pedal)
+                switch pedal.type {
+                case .start, .resume:
+                    if let open = openPedals.removeValue(forKey: key) {
+                        let (startAnchor, endAnchor) = spanAnchors(start: open.anchor, end: anchor)
+                        pedalPlans.append(
+                            VexPedalPlan(
+                                systemIndex: systemIndex,
+                                partIndex: partIndex,
+                                measureIndexInPart: measureIndexInPart,
+                                voice: startAnchor.voice,
+                                startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                                endEntryIndexInVoice: endAnchor.entryIndexInVoice,
+                                kind: open.kind,
+                                sourceOrder: open.sourceOrder
+                            )
+                        )
+                    }
+                    openPedals[key] = OpenPedalState(
+                        anchor: anchor,
+                        kind: kind,
+                        sourceOrder: pedalSourceOrder
+                    )
+                    pedalSourceOrder += 1
+                case .change:
+                    if let open = openPedals.removeValue(forKey: key) {
+                        let (startAnchor, endAnchor) = spanAnchors(start: open.anchor, end: anchor)
+                        pedalPlans.append(
+                            VexPedalPlan(
+                                systemIndex: systemIndex,
+                                partIndex: partIndex,
+                                measureIndexInPart: measureIndexInPart,
+                                voice: startAnchor.voice,
+                                startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                                endEntryIndexInVoice: endAnchor.entryIndexInVoice,
+                                kind: open.kind,
+                                sourceOrder: open.sourceOrder
+                            )
+                        )
+                    }
+                    openPedals[key] = OpenPedalState(
+                        anchor: anchor,
+                        kind: kind,
+                        sourceOrder: pedalSourceOrder
+                    )
+                    pedalSourceOrder += 1
+                case .stop, .discontinue:
+                    if let open = openPedals.removeValue(forKey: key) {
+                        let (startAnchor, endAnchor) = spanAnchors(start: open.anchor, end: anchor)
+                        pedalPlans.append(
+                            VexPedalPlan(
+                                systemIndex: systemIndex,
+                                partIndex: partIndex,
+                                measureIndexInPart: measureIndexInPart,
+                                voice: startAnchor.voice,
+                                startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                                endEntryIndexInVoice: endAnchor.entryIndexInVoice,
+                                kind: open.kind,
+                                sourceOrder: open.sourceOrder
+                            )
+                        )
+                    }
+                case .continue, .unknown:
+                    continue
+                }
+            }
+        }
+
+        for (key, open) in openWedges.sorted(by: { lhs, rhs in
+            if lhs.key.voice != rhs.key.voice {
+                return lhs.key.voice < rhs.key.voice
+            }
+            if lhs.key.number != rhs.key.number {
+                return lhs.key.number < rhs.key.number
+            }
+            return optionalNumberSortValue(lhs.key.staff) < optionalNumberSortValue(rhs.key.staff)
+        }) {
+            guard let endAnchor = directionTerminalNotePlan(from: sortedNotePlans, requestedVoice: key.voice) else {
+                continue
+            }
+            let (startAnchor, normalizedEndAnchor) = spanAnchors(start: open.anchor, end: endAnchor)
+            wedgePlans.append(
+                VexDirectionWedgePlan(
+                    systemIndex: systemIndex,
+                    partIndex: partIndex,
+                    measureIndexInPart: measureIndexInPart,
+                    voice: startAnchor.voice,
+                    startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                    endEntryIndexInVoice: normalizedEndAnchor.entryIndexInVoice,
+                    kind: open.kind,
+                    placement: open.placement,
+                    sourceOrder: open.sourceOrder
+                )
+            )
+        }
+
+        for (key, open) in openOctaveShifts.sorted(by: { lhs, rhs in
+            if lhs.key.voice != rhs.key.voice {
+                return lhs.key.voice < rhs.key.voice
+            }
+            if lhs.key.number != rhs.key.number {
+                return lhs.key.number < rhs.key.number
+            }
+            return optionalNumberSortValue(lhs.key.staff) < optionalNumberSortValue(rhs.key.staff)
+        }) {
+            guard let endAnchor = directionTerminalNotePlan(from: sortedNotePlans, requestedVoice: key.voice) else {
+                continue
+            }
+            let (startAnchor, normalizedEndAnchor) = spanAnchors(start: open.anchor, end: endAnchor)
+            octaveShiftPlans.append(
+                VexOctaveShiftPlan(
+                    systemIndex: systemIndex,
+                    partIndex: partIndex,
+                    measureIndexInPart: measureIndexInPart,
+                    voice: startAnchor.voice,
+                    startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                    endEntryIndexInVoice: normalizedEndAnchor.entryIndexInVoice,
+                    text: open.text,
+                    superscript: open.superscript,
+                    position: open.position,
+                    sourceOrder: open.sourceOrder
+                )
+            )
+        }
+
+        for (key, open) in openPedals.sorted(by: { lhs, rhs in
+            if lhs.key.voice != rhs.key.voice {
+                return lhs.key.voice < rhs.key.voice
+            }
+            return optionalNumberSortValue(lhs.key.staff) < optionalNumberSortValue(rhs.key.staff)
+        }) {
+            guard let endAnchor = directionTerminalNotePlan(from: sortedNotePlans, requestedVoice: key.voice) else {
+                continue
+            }
+            let (startAnchor, normalizedEndAnchor) = spanAnchors(start: open.anchor, end: endAnchor)
+            pedalPlans.append(
+                VexPedalPlan(
+                    systemIndex: systemIndex,
+                    partIndex: partIndex,
+                    measureIndexInPart: measureIndexInPart,
+                    voice: startAnchor.voice,
+                    startEntryIndexInVoice: startAnchor.entryIndexInVoice,
+                    endEntryIndexInVoice: normalizedEndAnchor.entryIndexInVoice,
+                    kind: open.kind,
+                    sourceOrder: open.sourceOrder
+                )
+            )
+        }
+
+        return DirectionExpressionPlanBundle(
+            wedges: wedgePlans.sorted { lhs, rhs in
+                if lhs.voice != rhs.voice {
+                    return lhs.voice < rhs.voice
+                }
+                if lhs.startEntryIndexInVoice != rhs.startEntryIndexInVoice {
+                    return lhs.startEntryIndexInVoice < rhs.startEntryIndexInVoice
+                }
+                if lhs.endEntryIndexInVoice != rhs.endEntryIndexInVoice {
+                    return lhs.endEntryIndexInVoice < rhs.endEntryIndexInVoice
+                }
+                return lhs.sourceOrder < rhs.sourceOrder
+            },
+            octaveShifts: octaveShiftPlans.sorted { lhs, rhs in
+                if lhs.voice != rhs.voice {
+                    return lhs.voice < rhs.voice
+                }
+                if lhs.startEntryIndexInVoice != rhs.startEntryIndexInVoice {
+                    return lhs.startEntryIndexInVoice < rhs.startEntryIndexInVoice
+                }
+                if lhs.endEntryIndexInVoice != rhs.endEntryIndexInVoice {
+                    return lhs.endEntryIndexInVoice < rhs.endEntryIndexInVoice
+                }
+                return lhs.sourceOrder < rhs.sourceOrder
+            },
+            pedals: pedalPlans.sorted { lhs, rhs in
+                if lhs.voice != rhs.voice {
+                    return lhs.voice < rhs.voice
+                }
+                if lhs.startEntryIndexInVoice != rhs.startEntryIndexInVoice {
+                    return lhs.startEntryIndexInVoice < rhs.startEntryIndexInVoice
+                }
+                if lhs.endEntryIndexInVoice != rhs.endEntryIndexInVoice {
+                    return lhs.endEntryIndexInVoice < rhs.endEntryIndexInVoice
+                }
+                return lhs.sourceOrder < rhs.sourceOrder
+            }
+        )
+    }
+
     private func buildLyricConnectorPlans(
         score: MusicDisplayKitModel.Score,
         noteEntryReferenceBySourceKey: [SourceNoteKey: NoteEntryReference]
@@ -2998,6 +4490,317 @@ public struct VexFoundationRenderer: ScoreRenderer {
             }
         }
         return nil
+    }
+
+    private func directionTextValue(for rawText: String?) -> String? {
+        let text = rawText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let text, !text.isEmpty else {
+            return nil
+        }
+        return text
+    }
+
+    private func directionTextPlacementPlan(
+        from placement: String?
+    ) -> VexDirectionTextPlacementPlan? {
+        guard let placement = placement?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() else {
+            return nil
+        }
+        switch placement {
+        case "above", "top", "over":
+            return .above
+        case "below", "bottom", "under":
+            return .below
+        default:
+            return nil
+        }
+    }
+
+    private func directionAnnotationVerticalJustify(
+        for placement: VexDirectionTextPlacementPlan?
+    ) -> AnnotationVerticalJustify {
+        switch placement {
+        case .below:
+            return .bottom
+        case .above, .none:
+            return .top
+        }
+    }
+
+    private func directionAnnotationPosition(
+        for placement: VexDirectionTextPlacementPlan?
+    ) -> ModifierPosition? {
+        switch placement {
+        case .above:
+            return .above
+        case .below:
+            return .below
+        case .none:
+            return nil
+        }
+    }
+
+    private func roadmapRepetitionSortValue(
+        for kind: VexRoadmapRepetitionKind
+    ) -> Int {
+        switch kind {
+        case .segnoLeft:
+            return 0
+        case .segnoRight:
+            return 1
+        case .codaLeft:
+            return 2
+        case .codaRight:
+            return 3
+        case .dc:
+            return 4
+        case .dcAlCoda:
+            return 5
+        case .dcAlFine:
+            return 6
+        case .ds:
+            return 7
+        case .dsAlCoda:
+            return 8
+        case .dsAlFine:
+            return 9
+        case .toCoda:
+            return 10
+        case .fine:
+            return 11
+        }
+    }
+
+    private func roadmapRepetitionType(
+        for kind: VexRoadmapRepetitionKind
+    ) -> RepetitionType {
+        switch kind {
+        case .codaLeft:
+            return .codaLeft
+        case .codaRight:
+            return .codaRight
+        case .segnoLeft:
+            return .segnoLeft
+        case .segnoRight:
+            return .segnoRight
+        case .dc:
+            return .dc
+        case .dcAlCoda:
+            return .dcAlCoda
+        case .dcAlFine:
+            return .dcAlFine
+        case .ds:
+            return .ds
+        case .dsAlCoda:
+            return .dsAlCoda
+        case .dsAlFine:
+            return .dsAlFine
+        case .fine:
+            return .fine
+        case .toCoda:
+            return .toCoda
+        }
+    }
+
+    private func metronomeTempoPlan(
+        from metronome: MusicDisplayKitModel.MetronomeMark?,
+        fallbackSoundTempo: Double?
+    ) -> (bpm: Int, duration: NoteValue, dots: Int)? {
+        guard let metronome else {
+            return nil
+        }
+        let bpm = parseTempoBPM(raw: metronome.perMinute) ?? soundTempoPlan(from: fallbackSoundTempo)?.bpm
+        guard let bpm, bpm > 0 else {
+            return nil
+        }
+        return (
+            bpm: bpm,
+            duration: tempoDuration(fromBeatUnit: metronome.beatUnit) ?? .quarter,
+            dots: max(0, metronome.beatUnitDotCount)
+        )
+    }
+
+    private func soundTempoPlan(
+        from soundTempo: Double?
+    ) -> (bpm: Int, duration: NoteValue, dots: Int)? {
+        guard let soundTempo, soundTempo > 0 else {
+            return nil
+        }
+        let bpm = Int(soundTempo.rounded())
+        guard bpm > 0 else {
+            return nil
+        }
+        return (bpm: bpm, duration: .quarter, dots: 0)
+    }
+
+    private func parseTempoBPM(raw: String?) -> Int? {
+        guard let raw = raw?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return nil
+        }
+        if let numeric = Double(raw), numeric > 0 {
+            return Int(numeric.rounded())
+        }
+
+        let pattern = #"[0-9]+(?:\.[0-9]+)?"#
+        guard let range = raw.range(of: pattern, options: .regularExpression),
+              let numeric = Double(raw[range]),
+              numeric > 0 else {
+            return nil
+        }
+        return Int(numeric.rounded())
+    }
+
+    private func tempoDuration(fromBeatUnit beatUnit: String?) -> NoteValue? {
+        guard let beatUnit = beatUnit?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+              !beatUnit.isEmpty else {
+            return nil
+        }
+        switch beatUnit {
+        case "breve":
+            return .doubleWhole
+        case "whole":
+            return .whole
+        case "half":
+            return .half
+        case "quarter":
+            return .quarter
+        case "eighth":
+            return .eighth
+        case "16th", "sixteenth":
+            return .sixteenth
+        case "32nd", "thirty-second":
+            return .thirtySecond
+        case "64th", "sixty-fourth":
+            return .sixtyFourth
+        case "128th":
+            return .oneTwentyEighth
+        case "256th":
+            return .twoFiftySixth
+        default:
+            return nil
+        }
+    }
+
+    private func directionSpanSortsBefore(_ lhs: VexNotePlan, _ rhs: VexNotePlan) -> Bool {
+        if lhs.onsetDivisions != rhs.onsetDivisions {
+            return lhs.onsetDivisions < rhs.onsetDivisions
+        }
+        if lhs.voice != rhs.voice {
+            return lhs.voice < rhs.voice
+        }
+        if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+            return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+        }
+        return lhs.sourceOrder <= rhs.sourceOrder
+    }
+
+    private func octaveShiftText(
+        for type: MusicDisplayKitModel.OctaveShiftType,
+        size: Int?
+    ) -> (text: String, superscript: String)? {
+        let normalizedSize = max(8, size ?? 8)
+        switch type {
+        case .up:
+            switch normalizedSize {
+            case 8:
+                return ("8", "va")
+            case 15:
+                return ("15", "ma")
+            default:
+                return ("\(normalizedSize)", "va")
+            }
+        case .down:
+            switch normalizedSize {
+            case 8:
+                return ("8", "vb")
+            case 15:
+                return ("15", "mb")
+            default:
+                return ("\(normalizedSize)", "vb")
+            }
+        case .stop, .continue, .unknown:
+            return nil
+        }
+    }
+
+    private func octaveShiftPositionPlan(
+        type: MusicDisplayKitModel.OctaveShiftType,
+        placement: VexDirectionTextPlacementPlan?
+    ) -> VexOctaveShiftPositionPlan {
+        switch type {
+        case .up:
+            return .top
+        case .down:
+            return .bottom
+        case .stop, .continue, .unknown:
+            return placement == .below ? .bottom : .top
+        }
+    }
+
+    private func pedalKindPlan(
+        from marker: MusicDisplayKitModel.PedalMarker
+    ) -> VexPedalKindPlan {
+        let line = marker.line ?? false
+        let sign = marker.sign ?? false
+        if line && !sign {
+            return .bracket
+        }
+        if sign && !line {
+            return .text
+        }
+        return .mixed
+    }
+
+    private func wedgeHairpinType(for kind: VexDirectionWedgeKind) -> HairpinType {
+        switch kind {
+        case .crescendo:
+            return .crescendo
+        case .decrescendo:
+            return .decrescendo
+        }
+    }
+
+    private func directionWedgePosition(
+        for placement: VexDirectionTextPlacementPlan?
+    ) -> ModifierPosition? {
+        switch placement {
+        case .above:
+            return .above
+        case .below:
+            return .below
+        case .none:
+            return nil
+        }
+    }
+
+    private func textBracketPosition(
+        for position: VexOctaveShiftPositionPlan
+    ) -> TextBracketPosition {
+        switch position {
+        case .top:
+            return .top
+        case .bottom:
+            return .bottom
+        }
+    }
+
+    private func pedalMarkingType(
+        for kind: VexPedalKindPlan
+    ) -> PedalMarkingType {
+        switch kind {
+        case .text:
+            return .text
+        case .bracket:
+            return .bracket
+        case .mixed:
+            return .mixed
+        }
     }
 
     private func lyricText(for lyric: MusicDisplayKitModel.LyricEvent) -> String? {
