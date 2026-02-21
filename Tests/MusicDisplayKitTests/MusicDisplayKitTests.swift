@@ -1068,6 +1068,69 @@ private let harmonyExtendedKindsXML = """
 </score-partwise>
 """
 
+private let harmonyMalformedDegreeXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony>
+        <root><root-step>C</root-step></root>
+        <kind>major</kind>
+        <degree>
+          <degree-value>9</degree-value>
+          <degree-alter>-1</degree-alter>
+        </degree>
+      </harmony>
+      <harmony>
+        <root><root-step>D</root-step></root>
+        <kind>major</kind>
+      </harmony>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let harmonyUnknownDegreeTypeXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony>
+        <root><root-step>C</root-step></root>
+        <kind>major</kind>
+        <degree>
+          <degree-value>5</degree-value>
+          <degree-alter>0</degree-alter>
+          <degree-type>mystery</degree-type>
+        </degree>
+      </harmony>
+      <harmony>
+        <root><root-step>E</root-step></root>
+        <kind>major</kind>
+      </harmony>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let repeatsAndTempoXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2121,6 +2184,18 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(texts.contains("NC"))
 }
 
+@Test func chordSymbolGeneratorSkipsHarmonyWithMalformedDegree() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyMalformedDegreeXML)
+    let events = ChordSymbolGenerator().generate(from: score)
+    #expect(events.map(\.displayText) == ["D"])
+}
+
+@Test func chordSymbolGeneratorSkipsHarmonyWithUnknownDegreeType() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyUnknownDegreeTypeXML)
+    let events = ChordSymbolGenerator().generate(from: score)
+    #expect(events.map(\.displayText) == ["E"])
+}
+
 @Test func chordSymbolGeneratorMapsSuspendedAliasesFromOSMDFixture() throws {
     let fixtureURL = try osmdFixtureURL(named: "OSMD_function_test_chord_tests_various.musicxml")
     let score = try MusicXMLParser().parse(fileURL: fixtureURL)
@@ -2488,6 +2563,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(harmony.degrees == [
         HarmonyDegree(value: 9, alter: -1, type: .add)
     ])
+}
+
+@Test func parserSkipsHarmonyWithMalformedDegree() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyMalformedDegreeXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.harmonyEvents.count == 1)
+    #expect(measure.harmonyEvents[0].rootStep == "D")
+}
+
+@Test func parserSkipsHarmonyWithUnknownDegreeType() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyUnknownDegreeTypeXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.harmonyEvents.count == 1)
+    #expect(measure.harmonyEvents[0].rootStep == "E")
 }
 
 @Test func parserReadsHarmonyPlacement() throws {

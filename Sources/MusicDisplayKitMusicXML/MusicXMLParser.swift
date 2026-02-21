@@ -244,11 +244,21 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var alter: Int?
         var type: HarmonyDegreeType?
 
-        func build() -> HarmonyDegree? {
-            if value == nil && alter == nil && type == nil {
-                return nil
+        enum BuildResult {
+            case valid(HarmonyDegree)
+            case invalid
+        }
+
+        func build() -> BuildResult {
+            guard let value,
+                  let alter,
+                  let type else {
+                return .invalid
             }
-            return HarmonyDegree(value: value, alter: alter, type: type)
+            if case .unknown = type {
+                return .invalid
+            }
+            return .valid(HarmonyDegree(value: value, alter: alter, type: type))
         }
     }
 
@@ -267,8 +277,12 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var kindUsesSymbols: Bool?
         var staff: Int?
         var degrees: [HarmonyDegree] = []
+        var hasInvalidDegree: Bool = false
 
         func build(currentOnset: Int) -> HarmonyEvent? {
+            if hasInvalidDegree {
+                return nil
+            }
             let onset = max(0, currentOnset + offsetDivisions)
             if numeralRoot == nil,
                rootStep == nil,
@@ -1093,9 +1107,14 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             currentHarmonyDegreeBuilder = nil
 
         case "degree":
-            if let degree = currentHarmonyDegreeBuilder?.build(),
+            if let degreeBuilder = currentHarmonyDegreeBuilder,
                var currentHarmonyBuilder {
-                currentHarmonyBuilder.degrees.append(degree)
+                switch degreeBuilder.build() {
+                case .valid(let degree):
+                    currentHarmonyBuilder.degrees.append(degree)
+                case .invalid:
+                    currentHarmonyBuilder.hasInvalidDegree = true
+                }
                 self.currentHarmonyBuilder = currentHarmonyBuilder
             }
             currentHarmonyDegreeBuilder = nil
