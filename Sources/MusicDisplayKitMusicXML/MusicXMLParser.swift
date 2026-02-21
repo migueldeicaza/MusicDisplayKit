@@ -255,6 +255,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private struct HarmonyBuilder {
         var offsetDivisions: Int = 0
         var placement: String?
+        var numeralRoot: String?
+        var numeralAlter: Int?
         var rootStep: String?
         var rootAlter: Int = 0
         var bassStep: String?
@@ -267,7 +269,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         func build(currentOnset: Int) -> HarmonyEvent? {
             let onset = max(0, currentOnset + offsetDivisions)
-            if rootStep == nil,
+            if numeralRoot == nil,
+               rootStep == nil,
                bassStep == nil,
                kind == nil,
                kindText == nil,
@@ -278,6 +281,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 onsetDivisions: onset,
                 offsetDivisions: offsetDivisions,
                 placement: placement,
+                numeralRoot: numeralRoot,
+                numeralAlter: numeralAlter,
                 rootStep: rootStep,
                 rootAlter: rootAlter,
                 bassStep: bassStep,
@@ -398,6 +403,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case harmonyOffset
         case harmonyRootStep
         case harmonyRootAlter
+        case harmonyNumeralRoot
+        case harmonyNumeralAlter
         case harmonyBassStep
         case harmonyBassAlter
         case harmonyKind
@@ -627,6 +634,18 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "root-alter" where currentHarmonyBuilder != nil:
             startTextCapture(.harmonyRootAlter)
+
+        case "numeral-root" where currentHarmonyBuilder != nil:
+            if var currentHarmonyBuilder {
+                currentHarmonyBuilder.numeralRoot = harmonyNumeralRootToken(
+                    from: attributeDict["text"]
+                )
+                self.currentHarmonyBuilder = currentHarmonyBuilder
+            }
+            startTextCapture(.harmonyNumeralRoot)
+
+        case "numeral-alter" where currentHarmonyBuilder != nil:
+            startTextCapture(.harmonyNumeralAlter)
 
         case "bass-step" where currentHarmonyBuilder != nil:
             startTextCapture(.harmonyBassStep)
@@ -1333,6 +1352,27 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                let value = consumeCapturedText().flatMap(Int.init),
                var currentHarmonyBuilder {
                 currentHarmonyBuilder.rootAlter = value
+                self.currentHarmonyBuilder = currentHarmonyBuilder
+            }
+
+        case "numeral-root":
+            if case .harmonyNumeralRoot = currentTextTarget,
+               var currentHarmonyBuilder {
+                if currentHarmonyBuilder.numeralRoot == nil {
+                    currentHarmonyBuilder.numeralRoot = harmonyNumeralRootToken(
+                        from: consumeCapturedText()
+                    )
+                } else {
+                    _ = consumeCapturedText()
+                }
+                self.currentHarmonyBuilder = currentHarmonyBuilder
+            }
+
+        case "numeral-alter":
+            if case .harmonyNumeralAlter = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Int.init),
+               var currentHarmonyBuilder {
+                currentHarmonyBuilder.numeralAlter = value
                 self.currentHarmonyBuilder = currentHarmonyBuilder
             }
 
@@ -2348,6 +2388,47 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             return .subtract
         default:
             return .unknown(normalized)
+        }
+    }
+
+    private func harmonyNumeralRootToken(from value: String?) -> String? {
+        guard let raw = value?.trimmedNonEmpty else {
+            return nil
+        }
+        if let number = Int(raw), let roman = romanNumeralString(for: number) {
+            return roman
+        }
+        return raw
+    }
+
+    private func romanNumeralString(for value: Int) -> String? {
+        switch value {
+        case 1:
+            return "I"
+        case 2:
+            return "II"
+        case 3:
+            return "III"
+        case 4:
+            return "IV"
+        case 5:
+            return "V"
+        case 6:
+            return "VI"
+        case 7:
+            return "VII"
+        case 8:
+            return "VIII"
+        case 9:
+            return "IX"
+        case 10:
+            return "X"
+        case 11:
+            return "XI"
+        case 12:
+            return "XII"
+        default:
+            return nil
         }
     }
 

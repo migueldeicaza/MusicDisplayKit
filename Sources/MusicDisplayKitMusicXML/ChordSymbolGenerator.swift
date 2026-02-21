@@ -63,7 +63,9 @@ public struct ChordSymbolGenerator: Sendable {
     }
 
     private func formatHarmony(_ harmony: HarmonyEvent) -> String? {
-        guard let root = formatPitch(step: harmony.rootStep, alter: harmony.rootAlter) else {
+        let root = formatPitch(step: harmony.rootStep, alter: harmony.rootAlter)
+            ?? formatNumeralRoot(root: harmony.numeralRoot, alter: harmony.numeralAlter)
+        guard let root else {
             return nil
         }
 
@@ -77,6 +79,14 @@ public struct ChordSymbolGenerator: Sendable {
         }
 
         return text
+    }
+
+    private func formatNumeralRoot(root: String?, alter: Int?) -> String? {
+        guard let root = root?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !root.isEmpty else {
+            return nil
+        }
+        return accidentalString(alter: alter ?? 0) + root
     }
 
     private func formatPitch(step: String?, alter: Int) -> String? {

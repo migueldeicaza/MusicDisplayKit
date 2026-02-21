@@ -4916,7 +4916,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
     private func harmonyDisplayText(
         for harmony: MusicDisplayKitModel.HarmonyEvent
     ) -> String? {
-        guard let root = harmonyFormatPitch(step: harmony.rootStep, alter: harmony.rootAlter) else {
+        let root = harmonyFormatPitch(step: harmony.rootStep, alter: harmony.rootAlter)
+            ?? harmonyFormatNumeralRoot(root: harmony.numeralRoot, alter: harmony.numeralAlter)
+        guard let root else {
             return nil
         }
 
@@ -4930,6 +4932,15 @@ public struct VexFoundationRenderer: ScoreRenderer {
         }
 
         return text
+    }
+
+    private func harmonyFormatNumeralRoot(root: String?, alter: Int?) -> String? {
+        guard let root = root?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !root.isEmpty else {
+            return nil
+        }
+        return harmonyAccidentalString(alter: alter ?? 0) + root
     }
 
     private func harmonyFormatPitch(step: String?, alter: Int) -> String? {
