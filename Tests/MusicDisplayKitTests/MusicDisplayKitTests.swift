@@ -1031,6 +1031,43 @@ private let harmonyFormattingXML = """
 </score-partwise>
 """
 
+private let harmonyExtendedKindsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony><root><root-step>C</root-step></root><kind>suspended-second</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>suspended-fourth</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>dominant-ninth</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>major-ninth</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>dominant-11th</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>major-11th</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>minor-11th</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>dominant-13th</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>major-13th</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>minor-13th</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>major-sixth</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>minor-sixth</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>major-minor</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>augmented-seventh</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>diminished-seventh</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>power</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind>none</kind></harmony>
+      <harmony><root><root-step>C</root-step></root><kind text="NC">none</kind></harmony>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let repeatsAndTempoXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2032,6 +2069,31 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(events[0].displayText == "D")
 }
 
+@Test func chordSymbolGeneratorFormatsExtendedHarmonyKinds() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyExtendedKindsXML)
+    let events = ChordSymbolGenerator().generate(from: score)
+    let texts = Set(events.map(\.displayText))
+
+    #expect(texts.contains("Csus2"))
+    #expect(texts.contains("Csus4"))
+    #expect(texts.contains("C9"))
+    #expect(texts.contains("Cmaj9"))
+    #expect(texts.contains("C11"))
+    #expect(texts.contains("Cmaj11"))
+    #expect(texts.contains("Cm11"))
+    #expect(texts.contains("C13"))
+    #expect(texts.contains("Cmaj13"))
+    #expect(texts.contains("Cm13"))
+    #expect(texts.contains("Cmaj6"))
+    #expect(texts.contains("Cm6"))
+    #expect(texts.contains("Cm(maj7)"))
+    #expect(texts.contains("Caug7"))
+    #expect(texts.contains("Cdim7"))
+    #expect(texts.contains("C5"))
+    #expect(texts.contains("N.C."))
+    #expect(texts.contains("NC"))
+}
+
 @Test func articulationGeneratorBuildsEventsFromNotes() throws {
     let score = try MusicXMLParser().parse(xml: articulationsXML)
     let events = ArticulationGenerator().generate(from: score)
@@ -2629,6 +2691,7 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 @Test func musicSheetReaderParsesOSMDChordSymbolFixtures() throws {
     let fixtures = [
         "OSMD_function_test_chord_symbols.musicxml",
+        "OSMD_function_test_chord_tests_various.musicxml",
         "test_chord_symbol_centering_short_symbols.musicxml",
         "test_chord_symbol_numeral_placement_below.musicxml",
         "test_chord_symbol_numeral_below_alignment.musicxml",
@@ -3188,6 +3251,24 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let chordSymbol = try #require(plan.chordSymbols.first)
     #expect(chordSymbol.displayText == "D")
     #expect(chordSymbol.entryIndexInVoice == 1)
+}
+
+@Test func vexAdapterMapsExtendedHarmonyKindsFromOSMDFixture() throws {
+    let fixtureURL = try osmdFixtureURL(named: "OSMD_function_test_chord_tests_various.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: fixtureURL)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    let displayTexts = Set(plan.chordSymbols.map(\.displayText))
+    #expect(displayTexts.contains("Csus4"))
+    #expect(displayTexts.contains("C#sus4"))
+    #expect(displayTexts.contains("C9(add4,no3)"))
+    #expect(displayTexts.contains("N.C."))
+    #expect(displayTexts.contains("NC"))
+    #expect(!displayTexts.contains("CN.C."))
+    #expect(!displayTexts.contains("CNC"))
+    #expect(!displayTexts.contains("(suspended-fourth)"))
+    #expect(!displayTexts.contains("(none)"))
 }
 
 @Test func vexAdapterBuildsDirectionTextPlans() throws {

@@ -4933,6 +4933,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
     private func harmonyDisplayText(
         for harmony: MusicDisplayKitModel.HarmonyEvent
     ) -> String? {
+        if let noChordText = harmonyNoChordText(kind: harmony.kind, explicitText: harmony.kindText) {
+            return noChordText
+        }
+
         let root = harmonyFormatPitch(step: harmony.rootStep, alter: harmony.rootAlter)
             ?? harmonyFormatNumeralRoot(root: harmony.numeralRoot, alter: harmony.numeralAlter)
         guard let root else {
@@ -4949,6 +4953,18 @@ public struct VexFoundationRenderer: ScoreRenderer {
         }
 
         return text
+    }
+
+    private func harmonyNoChordText(kind: String?, explicitText: String?) -> String? {
+        guard normalizedHarmonyKind(kind) == "none" else {
+            return nil
+        }
+        if let explicitText = explicitText?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !explicitText.isEmpty {
+            return explicitText
+        }
+        return "N.C."
     }
 
     private func harmonyFormatNumeralRoot(root: String?, alter: Int?) -> String? {
@@ -4987,30 +5003,70 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return explicitText
         }
 
-        let normalizedKind = kind?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased() ?? ""
+        let normalizedKind = normalizedHarmonyKind(kind)
 
         switch normalizedKind {
         case "", "major":
             return ""
+        case "none":
+            return "N.C."
         case "minor":
             return "m"
+        case "minor-sixth":
+            return "m6"
         case "major-seventh":
             return "maj7"
+        case "major-11th":
+            return "maj11"
+        case "major-13th":
+            return "maj13"
+        case "major-ninth":
+            return "maj9"
+        case "major-sixth":
+            return "maj6"
+        case "major-minor":
+            return "m(maj7)"
         case "minor-seventh":
             return "m7"
+        case "minor-11th":
+            return "m11"
+        case "minor-13th":
+            return "m13"
+        case "minor-ninth":
+            return "m9"
         case "dominant":
             return "7"
+        case "dominant-11th":
+            return "11"
+        case "dominant-13th":
+            return "13"
+        case "dominant-ninth":
+            return "9"
         case "augmented":
-            return "+"
+            return "aug"
+        case "augmented-seventh":
+            return "aug7"
         case "diminished":
             return "dim"
+        case "diminished-seventh":
+            return "dim7"
         case "half-diminished":
             return "m7b5"
+        case "power":
+            return "5"
+        case "suspended-second":
+            return "sus2"
+        case "suspended-fourth":
+            return "sus4"
         default:
             return normalizedKind.isEmpty ? "" : "(\(normalizedKind))"
         }
+    }
+
+    private func normalizedHarmonyKind(_ kind: String?) -> String {
+        kind?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? ""
     }
 
     private func harmonyDegreesSuffix(
