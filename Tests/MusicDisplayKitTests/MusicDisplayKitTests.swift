@@ -2568,6 +2568,7 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         "OSMD_function_test_chord_symbols.musicxml",
         "test_chord_symbol_centering_short_symbols.musicxml",
         "test_chord_symbol_numeral_placement_below.musicxml",
+        "test_chord_symbol_numeral_below_alignment.musicxml",
         "test_chord_symbol_position_whole_rest.musicxml",
         "test_chord_whole_rest_double_chord.musicxml",
     ]
@@ -2581,6 +2582,10 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
             #expect(result.chordSymbols.contains {
                 $0.displayText == "I" && $0.source.placement == "below"
             })
+        }
+        if fixture == "test_chord_symbol_numeral_below_alignment.musicxml" {
+            #expect(result.chordSymbols.contains { $0.displayText == "I" })
+            #expect(result.chordSymbols.contains { $0.displayText == "II" })
         }
     }
 }
@@ -3095,6 +3100,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(plan.chordSymbols.count == 3)
     #expect(Set(plan.chordSymbols.map(\.displayText)) == Set(["G", "A", "C"]))
     #expect(plan.chordSymbols.allSatisfy { $0.placement == .above })
+}
+
+@Test func vexAdapterAnchorsChordSymbolsToHarmonyStaffWhenAvailable() throws {
+    let fixtureURL = try osmdFixtureURL(named: "test_chord_symbol_numeral_below_alignment.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: fixtureURL)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    let numeralPlans = plan.chordSymbols.filter { $0.displayText == "I" || $0.displayText == "II" }
+    #expect(numeralPlans.count == 2)
+    #expect(numeralPlans.map(\.displayText) == ["I", "II"])
+    #expect(numeralPlans.allSatisfy { $0.voice == 5 })
+    #expect(numeralPlans.map(\.entryIndexInVoice) == [0, 1])
+    #expect(numeralPlans.allSatisfy { $0.placement == .below })
 }
 
 @Test func vexAdapterBuildsDirectionTextPlans() throws {

@@ -376,6 +376,7 @@ public struct VexNotePlan: Sendable {
     public let measureFrame: LayoutRect
     public let isFirstMeasureInSystem: Bool
     public let voice: Int
+    public let staff: Int?
     public let entryIndexInVoice: Int
     public let onsetDivisions: Int
     public let durationDivisions: Int
@@ -393,6 +394,7 @@ public struct VexNotePlan: Sendable {
         measureFrame: LayoutRect,
         isFirstMeasureInSystem: Bool,
         voice: Int,
+        staff: Int?,
         entryIndexInVoice: Int,
         onsetDivisions: Int,
         durationDivisions: Int,
@@ -409,6 +411,7 @@ public struct VexNotePlan: Sendable {
         self.measureFrame = measureFrame
         self.isFirstMeasureInSystem = isFirstMeasureInSystem
         self.voice = voice
+        self.staff = staff
         self.entryIndexInVoice = entryIndexInVoice
         self.onsetDivisions = onsetDivisions
         self.durationDivisions = durationDivisions
@@ -1316,6 +1319,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 let events = onsetEvents
                     .sorted { lhs, rhs in lhs.offset < rhs.offset }
                     .map(\.element)
+                let resolvedStaff = events.compactMap(\.staff).first
                 let maxDuration = events.compactMap(\.durationDivisions).max() ?? effectiveDivisions
                 let pitchedTokens = events.compactMap(noteKeyToken(for:))
                 let isRest = pitchedTokens.isEmpty || events.allSatisfy { $0.kind == .rest }
@@ -1339,6 +1343,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     measureFrame: laidOutMeasure.frame,
                     isFirstMeasureInSystem: isFirstMeasureInSystem,
                     voice: key.voice,
+                    staff: resolvedStaff,
                     entryIndexInVoice: entryIndex,
                     onsetDivisions: key.onsetDivisions,
                     durationDivisions: max(1, maxDuration),
@@ -3341,9 +3346,16 @@ public struct VexFoundationRenderer: ScoreRenderer {
             guard let displayText = harmonyDisplayText(for: harmony) else {
                 continue
             }
+            let staffFilteredAnchors: [VexNotePlan]
+            if let harmonyStaff = harmony.staff {
+                let matchingStaffAnchors = anchorCandidates.filter { $0.staff == harmonyStaff }
+                staffFilteredAnchors = matchingStaffAnchors.isEmpty ? anchorCandidates : matchingStaffAnchors
+            } else {
+                staffFilteredAnchors = anchorCandidates
+            }
             let onset = max(0, harmony.onsetDivisions)
-            let anchor = anchorCandidates.first(where: { $0.onsetDivisions >= onset })
-                ?? anchorCandidates.last
+            let anchor = staffFilteredAnchors.first(where: { $0.onsetDivisions >= onset })
+                ?? staffFilteredAnchors.last
             guard let anchor else {
                 continue
             }
