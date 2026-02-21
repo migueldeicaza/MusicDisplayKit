@@ -472,6 +472,80 @@ private let crossMeasureLyricsXML = """
 </score-partwise>
 """
 
+private let lyricExtenderXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Voice</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <lyric number="1">
+          <text>A</text>
+          <extend/>
+        </lyric>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <lyric number="1">
+          <text>men</text>
+        </lyric>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let multiVoiceLyricsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Voice</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <lyric number="1">
+          <text>High</text>
+        </lyric>
+      </note>
+      <backup>
+        <duration>4</duration>
+      </backup>
+      <note>
+        <pitch><step>G</step><octave>3</octave></pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+        <lyric number="1">
+          <text>Low</text>
+        </lyric>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let crossMeasureSlurXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2462,6 +2536,8 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(plan.slurs.isEmpty)
     #expect(plan.articulations.isEmpty)
     #expect(plan.lyrics.isEmpty)
+    #expect(plan.chordSymbols.isEmpty)
+    #expect(plan.lyricConnectors.isEmpty)
     #expect(plan.partGroupConnectors.count == laidOut.partGroups.count)
     #expect(plan.barlineConnectors.count == 2)
 
@@ -2599,6 +2675,50 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(plan.lyrics.map(\.text) == ["Hel", "lo"])
     #expect(plan.lyrics.map(\.verse) == [1, 1])
     #expect(plan.lyrics.map(\.entryIndexInVoice) == [0, 1])
+    #expect(plan.lyricConnectors.count == 1)
+    let connector = try #require(plan.lyricConnectors.first)
+    #expect(connector.kind == .hyphen)
+    #expect(connector.verse == 1)
+    #expect(connector.startEntryIndexInVoice == 0)
+    #expect(connector.endEntryIndexInVoice == 1)
+}
+
+@Test func vexAdapterBuildsChordSymbolPlans() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.chordSymbols.count == 1)
+    let chordSymbol = try #require(plan.chordSymbols.first)
+    #expect(chordSymbol.displayText == "C#maj7(addb9)")
+    #expect(chordSymbol.voice == 1)
+    #expect(chordSymbol.entryIndexInVoice == 0)
+}
+
+@Test func vexAdapterBuildsLyricExtenderConnectorPlans() throws {
+    let score = try MusicXMLParser().parse(xml: lyricExtenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.lyricConnectors.count == 1)
+    let connector = try #require(plan.lyricConnectors.first)
+    #expect(connector.kind == .extender)
+    #expect(connector.verse == 1)
+    #expect(connector.startEntryIndexInVoice == 0)
+    #expect(connector.endEntryIndexInVoice == 2)
+}
+
+@Test func vexAdapterBuildsCrossMeasureLyricHyphenConnectorPlans() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureLyricsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    let hyphen = try #require(plan.lyricConnectors.first(where: { $0.kind == .hyphen }))
+    #expect(hyphen.startMeasureIndexInPart == 0)
+    #expect(hyphen.endMeasureIndexInPart == 1)
+    #expect(hyphen.startEntryIndexInVoice == 0)
+    #expect(hyphen.endEntryIndexInVoice == 0)
+    #expect(hyphen.verse == 1)
 }
 
 @Test func vexAdapterCarriesRepeatBarlineStylesIntoStavePlan() throws {
@@ -2627,6 +2747,8 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(execution.slurs.isEmpty)
     #expect(execution.articulations.isEmpty)
     #expect(execution.lyrics.isEmpty)
+    #expect(execution.chordSymbols.isEmpty)
+    #expect(execution.lyricConnectors.isEmpty)
     #expect(execution.measureBarlineConnectors.count == plan.measureBoundaries.count)
     #expect(execution.partGroupConnectors.count == plan.partGroupConnectors.count)
     #expect(execution.barlineConnectors.count == plan.barlineConnectors.count)
@@ -2784,7 +2906,58 @@ private struct TitleSuffixModule: AfterScoreReadingModule {
     #expect(execution.lyrics.allSatisfy { $0.verticalJustification == .bottom })
     #expect(execution.lyrics.allSatisfy { $0.getPosition() == .below })
     #expect(execution.lyrics.allSatisfy { $0.textLine == 0 })
-    #expect(execution.notes.map { $0.getModifiersByType("Annotation").count } == [1, 1])
+    #expect(execution.notes.map { $0.getModifiersByType("Annotation").count } == [2, 1])
+    #expect(execution.lyricConnectors.count == 1)
+    let connector = try #require(execution.lyricConnectors.first)
+    #expect(connector.text == "-")
+    #expect(connector.textLine == 0)
+    #expect(connector.getPosition() == .below)
+}
+
+@Test func vexAdapterExecutesLyricExtenderAnnotations() throws {
+    let score = try MusicXMLParser().parse(xml: lyricExtenderXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.lyricConnectors.count == 1)
+    let extender = try #require(execution.lyricConnectors.first)
+    #expect(extender.text.contains("_"))
+    #expect(extender.text.count >= 2)
+    #expect(extender.textLine == 0)
+    #expect(extender.getPosition() == .below)
+}
+
+@Test func vexAdapterExecutesChordSymbolModifiers() throws {
+    let score = try MusicXMLParser().parse(xml: harmonyXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.chordSymbols.count == 1)
+    let chordSymbol = try #require(execution.chordSymbols.first)
+    #expect(chordSymbol.getVertical() == .top)
+    #expect(chordSymbol.getHorizontal() == .center)
+    #expect(execution.notes.first?.getModifiersByType("ChordSymbol").count == 1)
+}
+
+@Test func vexAdapterSeparatesMultiVoiceLyricsByTextLine() throws {
+    let score = try MusicXMLParser().parse(xml: multiVoiceLyricsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.lyrics.count == 2)
+    #expect(execution.lyricConnectors.isEmpty)
+
+    let textLinesByText = Dictionary(uniqueKeysWithValues: execution.lyrics.map { ($0.text, $0.textLine) })
+    let highLine = try #require(textLinesByText["High"])
+    let lowLine = try #require(textLinesByText["Low"])
+    #expect(highLine == 0)
+    #expect(lowLine > highLine)
 }
 
 @Test func vexAdapterAppliesRepeatBarlineStylesDuringExecution() throws {

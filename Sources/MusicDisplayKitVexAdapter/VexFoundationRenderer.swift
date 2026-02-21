@@ -621,6 +621,85 @@ public struct VexLyricPlan: Sendable {
     }
 }
 
+public struct VexChordSymbolPlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let voice: Int
+    public let entryIndexInVoice: Int
+    public let displayText: String
+    public let sourceOrder: Int
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        entryIndexInVoice: Int,
+        displayText: String,
+        sourceOrder: Int
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.voice = voice
+        self.entryIndexInVoice = entryIndexInVoice
+        self.displayText = displayText
+        self.sourceOrder = sourceOrder
+    }
+}
+
+public enum VexLyricConnectorKind: Sendable {
+    case hyphen
+    case extender
+}
+
+public struct VexLyricConnectorPlan: Sendable {
+    public let startSystemIndex: Int
+    public let startPartIndex: Int
+    public let startMeasureIndexInPart: Int
+    public let startVoice: Int
+    public let startEntryIndexInVoice: Int
+    public let endSystemIndex: Int
+    public let endPartIndex: Int
+    public let endMeasureIndexInPart: Int
+    public let endVoice: Int
+    public let endEntryIndexInVoice: Int
+    public let verse: Int
+    public let kind: VexLyricConnectorKind
+    public let sourceOrder: Int
+
+    public init(
+        startSystemIndex: Int,
+        startPartIndex: Int,
+        startMeasureIndexInPart: Int,
+        startVoice: Int,
+        startEntryIndexInVoice: Int,
+        endSystemIndex: Int,
+        endPartIndex: Int,
+        endMeasureIndexInPart: Int,
+        endVoice: Int,
+        endEntryIndexInVoice: Int,
+        verse: Int,
+        kind: VexLyricConnectorKind,
+        sourceOrder: Int
+    ) {
+        self.startSystemIndex = startSystemIndex
+        self.startPartIndex = startPartIndex
+        self.startMeasureIndexInPart = startMeasureIndexInPart
+        self.startVoice = startVoice
+        self.startEntryIndexInVoice = startEntryIndexInVoice
+        self.endSystemIndex = endSystemIndex
+        self.endPartIndex = endPartIndex
+        self.endMeasureIndexInPart = endMeasureIndexInPart
+        self.endVoice = endVoice
+        self.endEntryIndexInVoice = endEntryIndexInVoice
+        self.verse = verse
+        self.kind = kind
+        self.sourceOrder = sourceOrder
+    }
+}
+
 public struct VexPartGroupConnectorPlan: Sendable {
     public let sourceGroupIndex: Int
     public let pageIndex: Int
@@ -706,6 +785,8 @@ public struct VexRenderPlan: Sendable {
     public let slurs: [VexSlurPlan]
     public let articulations: [VexArticulationPlan]
     public let lyrics: [VexLyricPlan]
+    public let chordSymbols: [VexChordSymbolPlan]
+    public let lyricConnectors: [VexLyricConnectorPlan]
     public let partGroupConnectors: [VexPartGroupConnectorPlan]
     public let barlineConnectors: [VexBarlineConnectorPlan]
 
@@ -723,6 +804,8 @@ public struct VexRenderPlan: Sendable {
         slurs: [VexSlurPlan],
         articulations: [VexArticulationPlan],
         lyrics: [VexLyricPlan],
+        chordSymbols: [VexChordSymbolPlan],
+        lyricConnectors: [VexLyricConnectorPlan],
         partGroupConnectors: [VexPartGroupConnectorPlan],
         barlineConnectors: [VexBarlineConnectorPlan]
     ) {
@@ -739,6 +822,8 @@ public struct VexRenderPlan: Sendable {
         self.slurs = slurs
         self.articulations = articulations
         self.lyrics = lyrics
+        self.chordSymbols = chordSymbols
+        self.lyricConnectors = lyricConnectors
         self.partGroupConnectors = partGroupConnectors
         self.barlineConnectors = barlineConnectors
     }
@@ -755,6 +840,8 @@ public struct VexFactoryExecution {
     public let slurs: [Curve]
     public let articulations: [VexFoundation.Articulation]
     public let lyrics: [VexFoundation.Annotation]
+    public let chordSymbols: [VexFoundation.ChordSymbol]
+    public let lyricConnectors: [VexFoundation.Annotation]
     public let measureBarlineConnectors: [StaveConnector]
     public let partGroupConnectors: [StaveConnector]
     public let barlineConnectors: [StaveConnector]
@@ -770,6 +857,8 @@ public struct VexFactoryExecution {
         slurs: [Curve],
         articulations: [VexFoundation.Articulation],
         lyrics: [VexFoundation.Annotation],
+        chordSymbols: [VexFoundation.ChordSymbol],
+        lyricConnectors: [VexFoundation.Annotation],
         measureBarlineConnectors: [StaveConnector],
         partGroupConnectors: [StaveConnector],
         barlineConnectors: [StaveConnector]
@@ -784,6 +873,8 @@ public struct VexFactoryExecution {
         self.slurs = slurs
         self.articulations = articulations
         self.lyrics = lyrics
+        self.chordSymbols = chordSymbols
+        self.lyricConnectors = lyricConnectors
         self.measureBarlineConnectors = measureBarlineConnectors
         self.partGroupConnectors = partGroupConnectors
         self.barlineConnectors = barlineConnectors
@@ -858,7 +949,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
             let slurs: [VexSlurPlan]
             let articulations: [VexArticulationPlan]
             let lyrics: [VexLyricPlan]
+            let chordSymbols: [VexChordSymbolPlan]
         }
+
+        var noteEntryReferenceBySourceKey: [SourceNoteKey: NoteEntryReference] = [:]
 
         let measureRenderPlans = score.measures.map { laidOutMeasure -> MeasureRenderPlans in
             guard laidOutMeasure.partIndex >= 0,
@@ -870,7 +964,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     ties: [],
                     slurs: [],
                     articulations: [],
-                    lyrics: []
+                    lyrics: [],
+                    chordSymbols: []
                 )
             }
             let part = score.score.parts[laidOutMeasure.partIndex]
@@ -883,7 +978,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     ties: [],
                     slurs: [],
                     articulations: [],
-                    lyrics: []
+                    lyrics: [],
+                    chordSymbols: []
                 )
             }
             let sourceMeasure = part.measures[laidOutMeasure.measureIndexInPart]
@@ -991,6 +1087,19 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     )
                     if let entryIndex = entryIndexByVoiceOnset[key] {
                         noteToEntryIndex[noteIndex] = entryIndex
+                        noteEntryReferenceBySourceKey[
+                            SourceNoteKey(
+                                partIndex: laidOutMeasure.partIndex,
+                                measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                                noteIndexInMeasure: noteIndex
+                            )
+                        ] = NoteEntryReference(
+                            systemIndex: laidOutMeasure.systemIndex,
+                            partIndex: laidOutMeasure.partIndex,
+                            measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                            voice: voice,
+                            entryIndexInVoice: entryIndex
+                        )
                     }
                 }
 
@@ -1048,6 +1157,14 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 ))
             }
 
+            let chordSymbolPlans = buildChordSymbolPlans(
+                systemIndex: laidOutMeasure.systemIndex,
+                partIndex: laidOutMeasure.partIndex,
+                measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                harmonyEvents: sourceMeasure.harmonyEvents,
+                notePlans: notePlans
+            )
+
             return MeasureRenderPlans(
                 notes: notePlans,
                 beams: beamPlans,
@@ -1055,7 +1172,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 ties: tiePlans,
                 slurs: slurPlans,
                 articulations: articulationPlans,
-                lyrics: lyricPlans
+                lyrics: lyricPlans,
+                chordSymbols: chordSymbolPlans
             )
         }
         let notes = measureRenderPlans.flatMap(\.notes)
@@ -1065,6 +1183,11 @@ public struct VexFoundationRenderer: ScoreRenderer {
         let slurs = measureRenderPlans.flatMap(\.slurs)
         let articulations = measureRenderPlans.flatMap(\.articulations)
         let lyrics = measureRenderPlans.flatMap(\.lyrics)
+        let chordSymbols = measureRenderPlans.flatMap(\.chordSymbols)
+        let lyricConnectors = buildLyricConnectorPlans(
+            score: score.score,
+            noteEntryReferenceBySourceKey: noteEntryReferenceBySourceKey
+        )
 
         let partGroupConnectors = score.partGroups
             .sorted { lhs, rhs in
@@ -1145,6 +1268,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
             slurs: slurs,
             articulations: articulations,
             lyrics: lyrics,
+            chordSymbols: chordSymbols,
+            lyricConnectors: lyricConnectors,
             partGroupConnectors: partGroupConnectors,
             barlineConnectors: barlineConnectors
         )
@@ -1221,6 +1346,12 @@ public struct VexFoundationRenderer: ScoreRenderer {
             let voice: Int
             let entryIndexInVoice: Int
         }
+        struct GroupVoiceKey: Hashable {
+            let systemIndex: Int
+            let partIndex: Int
+            let measureIndexInPart: Int
+            let voice: Int
+        }
 
         var createdVoices: [Voice] = []
         var createdNotes: [StaveNote] = []
@@ -1230,6 +1361,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
         var createdSlurs: [Curve] = []
         var createdArticulations: [VexFoundation.Articulation] = []
         var createdLyrics: [VexFoundation.Annotation] = []
+        var createdChordSymbols: [VexFoundation.ChordSymbol] = []
+        var createdLyricConnectors: [VexFoundation.Annotation] = []
         let quarterTickThreshold = Tables.durationToTicks("4").map(Double.init)
         let stavePadding = (Glyph.MUSIC_FONT_STACK.first?.lookupMetric("stave.padding") as? Double) ?? 0
         let groupedNotes = Dictionary(grouping: plan.notes) { notePlan in
@@ -1281,6 +1414,13 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 measureIndexInPart: lyricPlan.measureIndexInPart
             )
         }
+        let groupedChordSymbols = Dictionary(grouping: plan.chordSymbols) { chordPlan in
+            NoteGroupKey(
+                systemIndex: chordPlan.systemIndex,
+                partIndex: chordPlan.partIndex,
+                measureIndexInPart: chordPlan.measureIndexInPart
+            )
+        }
         let sortedNoteGroups = groupedNotes.keys.sorted { lhs, rhs in
             if lhs.systemIndex != rhs.systemIndex {
                 return lhs.systemIndex < rhs.systemIndex
@@ -1291,6 +1431,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return lhs.measureIndexInPart < rhs.measureIndexInPart
         }
 
+        var allNotesByEntryKey: [NoteEntryKey: StaveNote] = [:]
+        var lyricVoiceOffsetByGroupVoice: [GroupVoiceKey: Int] = [:]
         for groupKey in sortedNoteGroups {
             guard let stave = stavesBySystemIndex[groupKey.systemIndex],
                   let groupPlans = groupedNotes[groupKey],
@@ -1309,6 +1451,21 @@ public struct VexFoundationRenderer: ScoreRenderer {
 
             let groupedByVoice = Dictionary(grouping: sortedPlans, by: \.voice)
             let sortedVoices = groupedByVoice.keys.sorted()
+            let voiceLineOffsetByVoice: [Int: Int] = Dictionary(
+                uniqueKeysWithValues: sortedVoices.enumerated().map { index, voice in
+                    (voice, sortedVoices.count > 1 ? index : 0)
+                }
+            )
+            for voice in sortedVoices {
+                lyricVoiceOffsetByGroupVoice[
+                    GroupVoiceKey(
+                        systemIndex: groupKey.systemIndex,
+                        partIndex: groupKey.partIndex,
+                        measureIndexInPart: groupKey.measureIndexInPart,
+                        voice: voice
+                    )
+                ] = voiceLineOffsetByVoice[voice, default: 0]
+            }
             var measureVoices: [Voice] = []
             var measureNotes: [StaveNote] = []
             var notesByEntryKey: [NoteEntryKey: StaveNote] = [:]
@@ -1340,6 +1497,15 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     }
                     voiceNotes.append(note)
                     notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: notePlan.systemIndex,
+                            partIndex: notePlan.partIndex,
+                            measureIndexInPart: notePlan.measureIndexInPart,
+                            voice: notePlan.voice,
+                            entryIndexInVoice: notePlan.entryIndexInVoice
+                        )
+                    ] = note
+                    allNotesByEntryKey[
                         NoteEntryKey(
                             systemIndex: notePlan.systemIndex,
                             partIndex: notePlan.partIndex,
@@ -1428,10 +1594,50 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         hJustify: .center,
                         vJustify: .bottom
                     )
+                    let voiceOffset = lyricVoiceOffsetByGroupVoice[
+                        GroupVoiceKey(
+                            systemIndex: lyricPlan.systemIndex,
+                            partIndex: lyricPlan.partIndex,
+                            measureIndexInPart: lyricPlan.measureIndexInPart,
+                            voice: lyricPlan.voice
+                        )
+                    ] ?? 0
                     _ = annotation.setPosition(.below)
-                    _ = annotation.setTextLine(Double(max(0, lyricPlan.verse - 1)))
+                    _ = annotation.setTextLine(
+                        lyricTextLine(verse: lyricPlan.verse, voiceOffset: voiceOffset)
+                    )
                     _ = note.addModifier(annotation, index: 0)
                     createdLyrics.append(annotation)
+                }
+            }
+
+            if let chordSymbolPlans = groupedChordSymbols[groupKey] {
+                let sortedChordSymbolPlans = chordSymbolPlans.sorted { lhs, rhs in
+                    if lhs.voice != rhs.voice {
+                        return lhs.voice < rhs.voice
+                    }
+                    if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                        return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+                    }
+                    return lhs.sourceOrder < rhs.sourceOrder
+                }
+                for chordSymbolPlan in sortedChordSymbolPlans {
+                    guard let note = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: chordSymbolPlan.systemIndex,
+                            partIndex: chordSymbolPlan.partIndex,
+                            measureIndexInPart: chordSymbolPlan.measureIndexInPart,
+                            voice: chordSymbolPlan.voice,
+                            entryIndexInVoice: chordSymbolPlan.entryIndexInVoice
+                        )
+                    ] else {
+                        continue
+                    }
+                    let chordSymbol = factory.ChordSymbol(vJustify: .top, hJustify: .center)
+                    _ = chordSymbol.addGlyphOrText(chordSymbolPlan.displayText)
+                    _ = chordSymbol.setPosition(.above)
+                    _ = note.addModifier(chordSymbol, index: 0)
+                    createdChordSymbols.append(chordSymbol)
                 }
             }
 
@@ -1640,6 +1846,95 @@ public struct VexFoundationRenderer: ScoreRenderer {
             createdNotes.append(contentsOf: measureNotes)
         }
 
+        let sortedLyricConnectors = plan.lyricConnectors.sorted { lhs, rhs in
+            if lhs.startSystemIndex != rhs.startSystemIndex {
+                return lhs.startSystemIndex < rhs.startSystemIndex
+            }
+            if lhs.startPartIndex != rhs.startPartIndex {
+                return lhs.startPartIndex < rhs.startPartIndex
+            }
+            if lhs.startMeasureIndexInPart != rhs.startMeasureIndexInPart {
+                return lhs.startMeasureIndexInPart < rhs.startMeasureIndexInPart
+            }
+            if lhs.startVoice != rhs.startVoice {
+                return lhs.startVoice < rhs.startVoice
+            }
+            if lhs.startEntryIndexInVoice != rhs.startEntryIndexInVoice {
+                return lhs.startEntryIndexInVoice < rhs.startEntryIndexInVoice
+            }
+            if lhs.verse != rhs.verse {
+                return lhs.verse < rhs.verse
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+        for connectorPlan in sortedLyricConnectors {
+            let startKey = NoteEntryKey(
+                systemIndex: connectorPlan.startSystemIndex,
+                partIndex: connectorPlan.startPartIndex,
+                measureIndexInPart: connectorPlan.startMeasureIndexInPart,
+                voice: connectorPlan.startVoice,
+                entryIndexInVoice: connectorPlan.startEntryIndexInVoice
+            )
+            let endKey = NoteEntryKey(
+                systemIndex: connectorPlan.endSystemIndex,
+                partIndex: connectorPlan.endPartIndex,
+                measureIndexInPart: connectorPlan.endMeasureIndexInPart,
+                voice: connectorPlan.endVoice,
+                entryIndexInVoice: connectorPlan.endEntryIndexInVoice
+            )
+            guard let startNote = allNotesByEntryKey[startKey],
+                  let endNote = allNotesByEntryKey[endKey],
+                  !startNote.isRest(),
+                  !endNote.isRest() else {
+                continue
+            }
+
+            let startX = startNote.getNoteHeadEndX()
+            let endX = endNote.getNoteHeadBeginX()
+            let spanWidth = max(0, endX - startX)
+            guard spanWidth >= 8 else {
+                continue
+            }
+
+            let annotationText: String
+            let hJustify: AnnotationHorizontalJustify
+            let xShift: Double
+            switch connectorPlan.kind {
+            case .hyphen:
+                annotationText = "-"
+                hJustify = .center
+                xShift = spanWidth / 2
+            case .extender:
+                annotationText = lyricExtenderText(forSpanWidth: spanWidth)
+                hJustify = .left
+                xShift = 4
+            }
+            guard !annotationText.isEmpty else {
+                continue
+            }
+
+            let annotation = factory.Annotation(
+                text: annotationText,
+                hJustify: hJustify,
+                vJustify: .bottom
+            )
+            let voiceOffset = lyricVoiceOffsetByGroupVoice[
+                GroupVoiceKey(
+                    systemIndex: connectorPlan.startSystemIndex,
+                    partIndex: connectorPlan.startPartIndex,
+                    measureIndexInPart: connectorPlan.startMeasureIndexInPart,
+                    voice: connectorPlan.startVoice
+                )
+            ] ?? 0
+            _ = annotation.setPosition(.below)
+            _ = annotation.setTextLine(
+                lyricTextLine(verse: connectorPlan.verse, voiceOffset: voiceOffset)
+            )
+            _ = annotation.setXShift(xShift)
+            _ = startNote.addModifier(annotation, index: 0)
+            createdLyricConnectors.append(annotation)
+        }
+
         let measureBarlineConnectors: [StaveConnector] = plan.measureBoundaries.compactMap { boundaryPlan in
             guard let stave = stavesBySystemIndex[boundaryPlan.systemIndex] else {
                 return nil
@@ -1728,6 +2023,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
             slurs: createdSlurs,
             articulations: createdArticulations,
             lyrics: createdLyrics,
+            chordSymbols: createdChordSymbols,
+            lyricConnectors: createdLyricConnectors,
             measureBarlineConnectors: measureBarlineConnectors,
             partGroupConnectors: partGroupConnectors,
             barlineConnectors: barlineConnectors
@@ -1789,6 +2086,20 @@ public struct VexFoundationRenderer: ScoreRenderer {
         let key: MusicDisplayKitModel.KeySignature?
         let time: MusicDisplayKitModel.TimeSignature?
         let clef: MusicDisplayKitModel.ClefSetting?
+    }
+
+    private struct SourceNoteKey: Hashable {
+        let partIndex: Int
+        let measureIndexInPart: Int
+        let noteIndexInMeasure: Int
+    }
+
+    private struct NoteEntryReference: Hashable {
+        let systemIndex: Int
+        let partIndex: Int
+        let measureIndexInPart: Int
+        let voice: Int
+        let entryIndexInVoice: Int
     }
 
     private func initialStaveState(
@@ -2325,6 +2636,280 @@ public struct VexFoundationRenderer: ScoreRenderer {
         }
     }
 
+    private func buildChordSymbolPlans(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        harmonyEvents: [MusicDisplayKitModel.HarmonyEvent],
+        notePlans: [VexNotePlan]
+    ) -> [VexChordSymbolPlan] {
+        let anchorCandidates = notePlans
+            .filter { !$0.isRest }
+            .sorted { lhs, rhs in
+                if lhs.onsetDivisions != rhs.onsetDivisions {
+                    return lhs.onsetDivisions < rhs.onsetDivisions
+                }
+                if lhs.voice != rhs.voice {
+                    return lhs.voice < rhs.voice
+                }
+                return lhs.sourceOrder < rhs.sourceOrder
+            }
+
+        guard !anchorCandidates.isEmpty else {
+            return []
+        }
+
+        var plans: [VexChordSymbolPlan] = []
+        for (sourceOrder, harmony) in harmonyEvents.enumerated() {
+            guard let displayText = harmonyDisplayText(for: harmony) else {
+                continue
+            }
+            let onset = max(0, harmony.onsetDivisions)
+            let anchor = anchorCandidates.first(where: { $0.onsetDivisions >= onset })
+                ?? anchorCandidates.last
+            guard let anchor else {
+                continue
+            }
+            plans.append(
+                VexChordSymbolPlan(
+                    systemIndex: systemIndex,
+                    partIndex: partIndex,
+                    measureIndexInPart: measureIndexInPart,
+                    voice: anchor.voice,
+                    entryIndexInVoice: anchor.entryIndexInVoice,
+                    displayText: displayText,
+                    sourceOrder: sourceOrder
+                )
+            )
+        }
+
+        return plans.sorted { lhs, rhs in
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+    }
+
+    private func buildLyricConnectorPlans(
+        score: MusicDisplayKitModel.Score,
+        noteEntryReferenceBySourceKey: [SourceNoteKey: NoteEntryReference]
+    ) -> [VexLyricConnectorPlan] {
+        struct TimelineNote {
+            let measureIndexInPart: Int
+            let noteIndexInMeasure: Int
+            let voice: Int
+            let onsetDivisions: Int
+            let sourceOrder: Int
+            let note: MusicDisplayKitModel.NoteEvent
+        }
+        struct ConnectorKey: Hashable {
+            let start: NoteEntryReference
+            let end: NoteEntryReference
+            let verse: Int
+            let kind: VexLyricConnectorKind
+        }
+
+        var plans: [VexLyricConnectorPlan] = []
+        var seen: Set<ConnectorKey> = []
+        var sourceOrder = 0
+
+        for (partIndex, part) in score.parts.enumerated() {
+            var timelineByVoice: [Int: [TimelineNote]] = [:]
+            for (measureIndexInPart, measure) in part.measures.enumerated() {
+                for (noteIndex, note) in measure.noteEvents.enumerated() where !note.isGrace {
+                    let voice = max(1, note.voice)
+                    timelineByVoice[voice, default: []].append(
+                        TimelineNote(
+                            measureIndexInPart: measureIndexInPart,
+                            noteIndexInMeasure: noteIndex,
+                            voice: voice,
+                            onsetDivisions: max(0, note.onsetDivisions),
+                            sourceOrder: noteIndex,
+                            note: note
+                        )
+                    )
+                }
+            }
+
+            for voice in timelineByVoice.keys.sorted() {
+                guard var timeline = timelineByVoice[voice], !timeline.isEmpty else {
+                    continue
+                }
+                timeline.sort { lhs, rhs in
+                    if lhs.measureIndexInPart != rhs.measureIndexInPart {
+                        return lhs.measureIndexInPart < rhs.measureIndexInPart
+                    }
+                    if lhs.onsetDivisions != rhs.onsetDivisions {
+                        return lhs.onsetDivisions < rhs.onsetDivisions
+                    }
+                    return lhs.sourceOrder < rhs.sourceOrder
+                }
+
+                for (timelineIndex, item) in timeline.enumerated() {
+                    let startKey = SourceNoteKey(
+                        partIndex: partIndex,
+                        measureIndexInPart: item.measureIndexInPart,
+                        noteIndexInMeasure: item.noteIndexInMeasure
+                    )
+                    guard let startRef = noteEntryReferenceBySourceKey[startKey] else {
+                        continue
+                    }
+
+                    for lyric in item.note.lyrics {
+                        let verse = max(1, lyric.number)
+                        let normalizedSyllabic = lyric.syllabic?
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .lowercased()
+
+                        if lyricText(for: lyric) != nil,
+                           normalizedSyllabic == "begin" || normalizedSyllabic == "middle" {
+                            let nextLyric = timeline[(timelineIndex + 1)...].first { candidate in
+                                candidate.note.lyrics.contains(where: { candidateLyric in
+                                    max(1, candidateLyric.number) == verse
+                                        && lyricText(for: candidateLyric) != nil
+                                })
+                            }
+                            if let nextLyric {
+                            let endKey = SourceNoteKey(
+                                partIndex: partIndex,
+                                measureIndexInPart: nextLyric.measureIndexInPart,
+                                noteIndexInMeasure: nextLyric.noteIndexInMeasure
+                            )
+                            if let endRef = noteEntryReferenceBySourceKey[endKey],
+                               startRef != endRef {
+                                let connectorKey = ConnectorKey(
+                                    start: startRef,
+                                    end: endRef,
+                                    verse: verse,
+                                    kind: .hyphen
+                                )
+                                if !seen.contains(connectorKey) {
+                                    seen.insert(connectorKey)
+                                    plans.append(
+                                        VexLyricConnectorPlan(
+                                            startSystemIndex: startRef.systemIndex,
+                                            startPartIndex: startRef.partIndex,
+                                            startMeasureIndexInPart: startRef.measureIndexInPart,
+                                            startVoice: startRef.voice,
+                                            startEntryIndexInVoice: startRef.entryIndexInVoice,
+                                            endSystemIndex: endRef.systemIndex,
+                                            endPartIndex: endRef.partIndex,
+                                            endMeasureIndexInPart: endRef.measureIndexInPart,
+                                            endVoice: endRef.voice,
+                                            endEntryIndexInVoice: endRef.entryIndexInVoice,
+                                            verse: verse,
+                                            kind: .hyphen,
+                                            sourceOrder: sourceOrder
+                                        )
+                                    )
+                                    sourceOrder += 1
+                                }
+                            }
+                        }
+                        }
+
+                        guard lyric.extend else {
+                            continue
+                        }
+                        var nextLyricIndex: Int?
+                        if timelineIndex + 1 < timeline.count {
+                            for searchIndex in (timelineIndex + 1)..<timeline.count {
+                                let candidate = timeline[searchIndex]
+                                if candidate.note.lyrics.contains(where: { candidateLyric in
+                                    max(1, candidateLyric.number) == verse
+                                        && lyricText(for: candidateLyric) != nil
+                                }) {
+                                    nextLyricIndex = searchIndex
+                                    break
+                                }
+                            }
+                        }
+                        let endTimelineIndex: Int?
+                        if let nextLyricIndex {
+                            if nextLyricIndex - 1 >= timelineIndex + 1 {
+                                endTimelineIndex = nextLyricIndex - 1
+                            } else {
+                                endTimelineIndex = nextLyricIndex
+                            }
+                        } else if timelineIndex + 1 < timeline.count {
+                            endTimelineIndex = timeline.count - 1
+                        } else {
+                            endTimelineIndex = nil
+                        }
+                        guard let endTimelineIndex,
+                              endTimelineIndex != timelineIndex else {
+                            continue
+                        }
+                        let endItem = timeline[endTimelineIndex]
+                        let endKey = SourceNoteKey(
+                            partIndex: partIndex,
+                            measureIndexInPart: endItem.measureIndexInPart,
+                            noteIndexInMeasure: endItem.noteIndexInMeasure
+                        )
+                        guard let endRef = noteEntryReferenceBySourceKey[endKey],
+                              startRef != endRef else {
+                            continue
+                        }
+                        let connectorKey = ConnectorKey(
+                            start: startRef,
+                            end: endRef,
+                            verse: verse,
+                            kind: .extender
+                        )
+                        if seen.contains(connectorKey) {
+                            continue
+                        }
+                        seen.insert(connectorKey)
+                        plans.append(
+                            VexLyricConnectorPlan(
+                                startSystemIndex: startRef.systemIndex,
+                                startPartIndex: startRef.partIndex,
+                                startMeasureIndexInPart: startRef.measureIndexInPart,
+                                startVoice: startRef.voice,
+                                startEntryIndexInVoice: startRef.entryIndexInVoice,
+                                endSystemIndex: endRef.systemIndex,
+                                endPartIndex: endRef.partIndex,
+                                endMeasureIndexInPart: endRef.measureIndexInPart,
+                                endVoice: endRef.voice,
+                                endEntryIndexInVoice: endRef.entryIndexInVoice,
+                                verse: verse,
+                                kind: .extender,
+                                sourceOrder: sourceOrder
+                            )
+                        )
+                        sourceOrder += 1
+                    }
+                }
+            }
+        }
+
+        return plans.sorted { lhs, rhs in
+            if lhs.startSystemIndex != rhs.startSystemIndex {
+                return lhs.startSystemIndex < rhs.startSystemIndex
+            }
+            if lhs.startPartIndex != rhs.startPartIndex {
+                return lhs.startPartIndex < rhs.startPartIndex
+            }
+            if lhs.startMeasureIndexInPart != rhs.startMeasureIndexInPart {
+                return lhs.startMeasureIndexInPart < rhs.startMeasureIndexInPart
+            }
+            if lhs.startVoice != rhs.startVoice {
+                return lhs.startVoice < rhs.startVoice
+            }
+            if lhs.startEntryIndexInVoice != rhs.startEntryIndexInVoice {
+                return lhs.startEntryIndexInVoice < rhs.startEntryIndexInVoice
+            }
+            if lhs.verse != rhs.verse {
+                return lhs.verse < rhs.verse
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+    }
+
     private func optionalNumberSortValue(_ number: Int?) -> Int {
         number ?? Int.min
     }
@@ -2421,6 +3006,119 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return nil
         }
         return text
+    }
+
+    private func lyricExtenderText(forSpanWidth spanWidth: Double) -> String {
+        // Approximate underline width in headless mode to avoid overextending.
+        let count = max(2, min(24, Int(spanWidth / 5)))
+        return String(repeating: "_", count: count)
+    }
+
+    private func lyricTextLine(verse: Int, voiceOffset: Int) -> Double {
+        let line = max(0, verse - 1 + voiceOffset)
+        return Double(line)
+    }
+
+    private func harmonyDisplayText(
+        for harmony: MusicDisplayKitModel.HarmonyEvent
+    ) -> String? {
+        guard let root = harmonyFormatPitch(step: harmony.rootStep, alter: harmony.rootAlter) else {
+            return nil
+        }
+
+        let kindSuffix = harmonyKindSuffix(kind: harmony.kind, explicitText: harmony.kindText)
+        let degreesSuffix = harmonyDegreesSuffix(harmony.degrees)
+
+        var text = root + kindSuffix + degreesSuffix
+
+        if let bass = harmonyFormatPitch(step: harmony.bassStep, alter: harmony.bassAlter) {
+            text += "/\(bass)"
+        }
+
+        return text
+    }
+
+    private func harmonyFormatPitch(step: String?, alter: Int) -> String? {
+        guard let step = step?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased(),
+              !step.isEmpty else {
+            return nil
+        }
+        return step + harmonyAccidentalString(alter: alter)
+    }
+
+    private func harmonyAccidentalString(alter: Int) -> String {
+        guard alter != 0 else {
+            return ""
+        }
+        if alter > 0 {
+            return String(repeating: "#", count: alter)
+        }
+        return String(repeating: "b", count: abs(alter))
+    }
+
+    private func harmonyKindSuffix(kind: String?, explicitText: String?) -> String {
+        if let explicitText = explicitText?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !explicitText.isEmpty {
+            return explicitText
+        }
+
+        let normalizedKind = kind?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? ""
+
+        switch normalizedKind {
+        case "", "major":
+            return ""
+        case "minor":
+            return "m"
+        case "major-seventh":
+            return "maj7"
+        case "minor-seventh":
+            return "m7"
+        case "dominant":
+            return "7"
+        case "augmented":
+            return "+"
+        case "diminished":
+            return "dim"
+        case "half-diminished":
+            return "m7b5"
+        default:
+            return normalizedKind.isEmpty ? "" : "(\(normalizedKind))"
+        }
+    }
+
+    private func harmonyDegreesSuffix(
+        _ degrees: [MusicDisplayKitModel.HarmonyDegree]
+    ) -> String {
+        let tokens = degrees.compactMap { degree -> String? in
+            guard let value = degree.value else {
+                return nil
+            }
+            let accidental = harmonyAccidentalString(alter: degree.alter ?? 0)
+            switch degree.type {
+            case .add:
+                return "add\(accidental)\(value)"
+            case .subtract:
+                return "no\(value)"
+            case .alter:
+                return "\(accidental)\(value)"
+            case .unknown(let raw):
+                let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                return cleaned.isEmpty ? "\(accidental)\(value)" : "\(cleaned)\(accidental)\(value)"
+            case .none:
+                return "\(accidental)\(value)"
+            }
+        }
+
+        guard !tokens.isEmpty else {
+            return ""
+        }
+
+        return "(\(tokens.joined(separator: ",")))"
     }
 
     private func noteKeyToken(for note: MusicDisplayKitModel.NoteEvent) -> String? {
