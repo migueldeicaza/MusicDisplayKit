@@ -1581,32 +1581,65 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     }
 
     private func explicitTempoEvents(from directions: [DirectionEvent]) -> [TempoEvent] {
-        let ordered = directions.sorted { lhs, rhs in
-            lhs.onsetDivisions < rhs.onsetDivisions
+        let ordered = directions.enumerated().sorted { lhs, rhs in
+            let lhsOnset = lhs.element.onsetDivisions
+            let rhsOnset = rhs.element.onsetDivisions
+            if lhsOnset != rhsOnset {
+                return lhsOnset < rhsOnset
+            }
+            return lhs.offset < rhs.offset
         }
 
-        var events: [TempoEvent] = []
-        for direction in ordered {
+        var eventByOnset: [Int: TempoEvent] = [:]
+
+        for (_, direction) in ordered {
+            let onset = max(0, direction.onsetDivisions)
+            var candidates: [TempoEvent] = []
+
             if let bpm = direction.soundTempo, bpm > 0 {
-                events.append(
-                    TempoEvent(onsetDivisions: max(0, direction.onsetDivisions), bpm: bpm, source: .sound)
+                candidates.append(
+                    TempoEvent(onsetDivisions: onset, bpm: bpm, source: .sound)
                 )
-                continue
             }
 
             if let perMinute = direction.metronome?.perMinute,
                let bpm = parseBPM(perMinute),
                bpm > 0 {
-                events.append(
-                    TempoEvent(
-                        onsetDivisions: max(0, direction.onsetDivisions),
-                        bpm: bpm,
-                        source: .metronome
-                    )
+                candidates.append(
+                    TempoEvent(onsetDivisions: onset, bpm: bpm, source: .metronome)
                 )
             }
+
+            for candidate in candidates {
+                guard let existing = eventByOnset[onset] else {
+                    eventByOnset[onset] = candidate
+                    continue
+                }
+
+                if explicitTempoSourcePriority(candidate.source) <
+                    explicitTempoSourcePriority(existing.source) {
+                    eventByOnset[onset] = candidate
+                }
+            }
         }
-        return events
+
+        return eventByOnset.values.sorted { lhs, rhs in
+            if lhs.onsetDivisions != rhs.onsetDivisions {
+                return lhs.onsetDivisions < rhs.onsetDivisions
+            }
+            return explicitTempoSourcePriority(lhs.source) < explicitTempoSourcePriority(rhs.source)
+        }
+    }
+
+    private func explicitTempoSourcePriority(_ source: TempoEventSource) -> Int {
+        switch source {
+        case .metronome:
+            return 0
+        case .sound:
+            return 1
+        case .carryForward:
+            return 2
+        }
     }
 
     private func parseBPM(_ value: String) -> Double? {
