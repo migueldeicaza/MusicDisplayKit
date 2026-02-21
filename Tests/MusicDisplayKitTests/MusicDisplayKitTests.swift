@@ -2094,6 +2094,23 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(texts.contains("NC"))
 }
 
+@Test func chordSymbolGeneratorMapsSuspendedAliasesFromOSMDFixture() throws {
+    let fixtureURL = try osmdFixtureURL(named: "OSMD_function_test_chord_tests_various.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: fixtureURL)
+    let events = ChordSymbolGenerator().generate(from: score)
+    let texts = Set(events.map(\.displayText))
+
+    #expect(texts.contains("C7sus4"))
+    #expect(texts.contains("C9sus4"))
+    #expect(texts.contains("C11sus4"))
+    #expect(texts.contains("C13sus4"))
+    #expect(texts.contains("C7sus2"))
+    #expect(texts.contains("C9sus2"))
+    #expect(texts.contains("C11sus2"))
+    #expect(texts.contains("C13sus2"))
+    #expect(!texts.contains("C9(add4,no3)"))
+}
+
 @Test func articulationGeneratorBuildsEventsFromNotes() throws {
     let score = try MusicXMLParser().parse(xml: articulationsXML)
     let events = ArticulationGenerator().generate(from: score)
@@ -3262,9 +3279,17 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let displayTexts = Set(plan.chordSymbols.map(\.displayText))
     #expect(displayTexts.contains("Csus4"))
     #expect(displayTexts.contains("C#sus4"))
-    #expect(displayTexts.contains("C9(add4,no3)"))
+    #expect(displayTexts.contains("C7sus4"))
+    #expect(displayTexts.contains("C9sus4"))
+    #expect(displayTexts.contains("C11sus4"))
+    #expect(displayTexts.contains("C13sus4"))
+    #expect(displayTexts.contains("C7sus2"))
+    #expect(displayTexts.contains("C9sus2"))
+    #expect(displayTexts.contains("C11sus2"))
+    #expect(displayTexts.contains("C13sus2"))
     #expect(displayTexts.contains("N.C."))
     #expect(displayTexts.contains("NC"))
+    #expect(!displayTexts.contains("C9(add4,no3)"))
     #expect(!displayTexts.contains("CN.C."))
     #expect(!displayTexts.contains("CNC"))
     #expect(!displayTexts.contains("(suspended-fourth)"))

@@ -76,8 +76,13 @@ public struct ChordSymbolGenerator: Sendable {
             return nil
         }
 
-        let kindSuffix = formatKind(kind: harmony.kind, explicitText: harmony.kindText)
-        let degreesSuffix = formatDegrees(harmony.degrees)
+        let kindAndDegrees = resolveKindAndDegrees(
+            kind: harmony.kind,
+            explicitText: harmony.kindText,
+            degrees: harmony.degrees
+        )
+        let kindSuffix = kindAndDegrees.kindSuffix
+        let degreesSuffix = formatDegrees(kindAndDegrees.degrees)
 
         var text = root + kindSuffix + degreesSuffix
 
@@ -86,6 +91,140 @@ public struct ChordSymbolGenerator: Sendable {
         }
 
         return text
+    }
+
+    private func resolveKindAndDegrees(
+        kind: String?,
+        explicitText: String?,
+        degrees: [HarmonyDegree]
+    ) -> (kindSuffix: String, degrees: [HarmonyDegree]) {
+        if let explicit = explicitText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !explicit.isEmpty {
+            return (kindSuffix: explicit, degrees: degrees)
+        }
+
+        let normalized = normalizedKind(kind)
+        var remainingDegrees = degrees
+        var kindSuffix = formatKind(kind: kind, explicitText: nil)
+
+        switch normalized {
+        case "suspended-fourth":
+            for (degreeValue, alias) in [(7, "7sus4"), (9, "9sus4"), (11, "11sus4"), (13, "13sus4")] {
+                if consumeDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                    kindSuffix = alias
+                }
+            }
+        case "suspended-second":
+            for (degreeValue, alias) in [(7, "7sus2"), (9, "9sus2"), (11, "11sus2"), (13, "13sus2")] {
+                if consumeDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                    kindSuffix = alias
+                }
+            }
+        case "dominant":
+            if hasDegree(remainingDegrees, type: .add, value: 4),
+               hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
+                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "7sus4"
+            } else if hasDegree(remainingDegrees, type: .add, value: 2),
+                      hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
+                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "7sus2"
+            }
+        case "dominant-ninth":
+            if hasDegree(remainingDegrees, type: .add, value: 4),
+               hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
+                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "9sus4"
+            } else if hasDegree(remainingDegrees, type: .add, value: 2),
+                      hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
+                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "9sus2"
+            }
+        case "dominant-11th":
+            if hasDegree(remainingDegrees, type: .add, value: 4),
+               hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
+                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "11sus4"
+            } else if hasDegree(remainingDegrees, type: .add, value: 2),
+                      hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
+                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "11sus2"
+            }
+        case "dominant-13th":
+            if hasDegree(remainingDegrees, type: .add, value: 4),
+               hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
+                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "13sus4"
+            } else if hasDegree(remainingDegrees, type: .add, value: 2),
+                      hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
+                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "13sus2"
+            }
+        default:
+            break
+        }
+
+        return (kindSuffix: kindSuffix, degrees: remainingDegrees)
+    }
+
+    private enum DegreeTypeMatch {
+        case add
+        case subtract
+    }
+
+    private func hasDegree(
+        _ degrees: [HarmonyDegree],
+        type: DegreeTypeMatch,
+        value: Int,
+        alter: Int = 0
+    ) -> Bool {
+        degrees.contains { degree in
+            guard degree.value == value,
+                  (degree.alter ?? 0) == alter else {
+                return false
+            }
+            return harmonyDegreeTypeMatches(degree.type, match: type)
+        }
+    }
+
+    @discardableResult
+    private func consumeDegree(
+        _ degrees: inout [HarmonyDegree],
+        type: DegreeTypeMatch,
+        value: Int,
+        alter: Int = 0
+    ) -> Bool {
+        guard let index = degrees.firstIndex(where: { degree in
+            degree.value == value &&
+            (degree.alter ?? 0) == alter &&
+            harmonyDegreeTypeMatches(degree.type, match: type)
+        }) else {
+            return false
+        }
+        degrees.remove(at: index)
+        return true
+    }
+
+    private func harmonyDegreeTypeMatches(
+        _ degreeType: HarmonyDegreeType?,
+        match: DegreeTypeMatch
+    ) -> Bool {
+        switch (match, degreeType) {
+        case (.add, .add):
+            return true
+        case (.subtract, .subtract):
+            return true
+        default:
+            return false
+        }
     }
 
     private func formatNoChord(kind: String?, explicitText: String?) -> String? {

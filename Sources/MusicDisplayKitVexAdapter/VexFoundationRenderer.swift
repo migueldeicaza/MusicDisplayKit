@@ -4943,8 +4943,13 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return nil
         }
 
-        let kindSuffix = harmonyKindSuffix(kind: harmony.kind, explicitText: harmony.kindText)
-        let degreesSuffix = harmonyDegreesSuffix(harmony.degrees)
+        let kindAndDegrees = resolveHarmonyKindAndDegrees(
+            kind: harmony.kind,
+            explicitText: harmony.kindText,
+            degrees: harmony.degrees
+        )
+        let kindSuffix = kindAndDegrees.kindSuffix
+        let degreesSuffix = harmonyDegreesSuffix(kindAndDegrees.degrees)
 
         var text = root + kindSuffix + degreesSuffix
 
@@ -4953,6 +4958,141 @@ public struct VexFoundationRenderer: ScoreRenderer {
         }
 
         return text
+    }
+
+    private func resolveHarmonyKindAndDegrees(
+        kind: String?,
+        explicitText: String?,
+        degrees: [MusicDisplayKitModel.HarmonyDegree]
+    ) -> (kindSuffix: String, degrees: [MusicDisplayKitModel.HarmonyDegree]) {
+        if let explicitText = explicitText?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !explicitText.isEmpty {
+            return (kindSuffix: explicitText, degrees: degrees)
+        }
+
+        let normalizedKind = normalizedHarmonyKind(kind)
+        var remainingDegrees = degrees
+        var kindSuffix = harmonyKindSuffix(kind: kind, explicitText: nil)
+
+        switch normalizedKind {
+        case "suspended-fourth":
+            for (degreeValue, alias) in [(7, "7sus4"), (9, "9sus4"), (11, "11sus4"), (13, "13sus4")] {
+                if consumeHarmonyDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                    kindSuffix = alias
+                }
+            }
+        case "suspended-second":
+            for (degreeValue, alias) in [(7, "7sus2"), (9, "9sus2"), (11, "11sus2"), (13, "13sus2")] {
+                if consumeHarmonyDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                    kindSuffix = alias
+                }
+            }
+        case "dominant":
+            if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
+               hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "7sus4"
+            } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
+                      hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "7sus2"
+            }
+        case "dominant-ninth":
+            if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
+               hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "9sus4"
+            } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
+                      hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "9sus2"
+            }
+        case "dominant-11th":
+            if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
+               hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "11sus4"
+            } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
+                      hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "11sus2"
+            }
+        case "dominant-13th":
+            if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
+               hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "13sus4"
+            } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
+                      hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
+                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                kindSuffix = "13sus2"
+            }
+        default:
+            break
+        }
+
+        return (kindSuffix: kindSuffix, degrees: remainingDegrees)
+    }
+
+    private enum HarmonyDegreeTypeMatch {
+        case add
+        case subtract
+    }
+
+    private func hasHarmonyDegree(
+        _ degrees: [MusicDisplayKitModel.HarmonyDegree],
+        type: HarmonyDegreeTypeMatch,
+        value: Int,
+        alter: Int = 0
+    ) -> Bool {
+        degrees.contains { degree in
+            guard degree.value == value,
+                  (degree.alter ?? 0) == alter else {
+                return false
+            }
+            return harmonyDegreeTypeMatches(degree.type, match: type)
+        }
+    }
+
+    @discardableResult
+    private func consumeHarmonyDegree(
+        _ degrees: inout [MusicDisplayKitModel.HarmonyDegree],
+        type: HarmonyDegreeTypeMatch,
+        value: Int,
+        alter: Int = 0
+    ) -> Bool {
+        guard let index = degrees.firstIndex(where: { degree in
+            degree.value == value &&
+            (degree.alter ?? 0) == alter &&
+            harmonyDegreeTypeMatches(degree.type, match: type)
+        }) else {
+            return false
+        }
+        degrees.remove(at: index)
+        return true
+    }
+
+    private func harmonyDegreeTypeMatches(
+        _ degreeType: MusicDisplayKitModel.HarmonyDegreeType?,
+        match: HarmonyDegreeTypeMatch
+    ) -> Bool {
+        switch (match, degreeType) {
+        case (.add, .add):
+            return true
+        case (.subtract, .subtract):
+            return true
+        default:
+            return false
+        }
     }
 
     private func harmonyNoChordText(kind: String?, explicitText: String?) -> String? {
