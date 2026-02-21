@@ -1937,7 +1937,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     }
 
                     let articulation = factory.Articulation(type: articulationPlan.articulationCode)
-                    if let position = articulationModifierPosition(for: articulationPlan.position) {
+                    if let position = articulationModifierPosition(for: articulationPlan.position)
+                        ?? defaultArticulationModifierPosition(for: note) {
                         _ = articulation.setPosition(position)
                     }
                     _ = note.addModifier(articulation, index: 0)
@@ -5041,6 +5042,17 @@ public struct VexFoundationRenderer: ScoreRenderer {
         case .none:
             return nil
         }
+    }
+
+    private func defaultArticulationModifierPosition(
+        for note: StaveNote
+    ) -> ModifierPosition? {
+        let topLine = note.getLineNumber(isTopNote: true)
+        let bottomLine = note.getLineNumber(isTopNote: false)
+        let centerLine = (topLine + bottomLine) / 2
+        // Staff-center heuristic for unspecified articulations:
+        // lower notes default below, higher notes default above.
+        return centerLine >= 3 ? .above : .below
     }
 
     private func makeStaveNote(

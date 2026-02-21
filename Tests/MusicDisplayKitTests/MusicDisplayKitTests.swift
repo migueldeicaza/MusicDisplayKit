@@ -645,6 +645,38 @@ private let articulationsXML = """
 </score-partwise>
 """
 
+private let articulationsDefaultPlacementXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>C</step><octave>6</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <articulations>
+            <accent/>
+          </articulations>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let directionExpressionsXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2868,6 +2900,15 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(plan.articulations.allSatisfy { $0.position == .above })
 }
 
+@Test func vexAdapterBuildsArticulationPlansWithoutPlacementAsNil() throws {
+    let score = try MusicXMLParser().parse(xml: articulationsDefaultPlacementXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.articulations.count == 2)
+    #expect(plan.articulations.allSatisfy { $0.position == nil })
+}
+
 @Test func vexAdapterBuildsLyricPlans() throws {
     let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -3190,6 +3231,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
     let firstNote = try #require(execution.notes.first)
     #expect(firstNote.getModifiersByType("Articulation").count == 2)
+}
+
+@Test func vexAdapterDefaultsArticulationPlacementFromNotePosition() throws {
+    let score = try MusicXMLParser().parse(xml: articulationsDefaultPlacementXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.articulations.count == 2)
+    let positions = execution.articulations.map { $0.getPosition() }
+    #expect(positions.contains(.below))
+    #expect(positions.contains(.above))
+
+    let first = try #require(execution.articulations.first)
+    #expect(first.getPosition() == .below)
 }
 
 @Test func vexAdapterExecutesLyricAnnotations() throws {
