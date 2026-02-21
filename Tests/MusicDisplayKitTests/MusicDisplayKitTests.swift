@@ -2108,7 +2108,11 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(texts.contains("C9sus2"))
     #expect(texts.contains("C11sus2"))
     #expect(texts.contains("C13sus2"))
+    #expect(texts.contains("Calt"))
+    #expect(texts.contains("C7alt"))
     #expect(!texts.contains("C9(add4,no3)"))
+    #expect(!texts.contains("C(b5,add#5,addb9,add#9)"))
+    #expect(!texts.contains("C7(b5,add#5,addb9,add#9)"))
 }
 
 @Test func articulationGeneratorBuildsEventsFromNotes() throws {
@@ -3287,9 +3291,13 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(displayTexts.contains("C9sus2"))
     #expect(displayTexts.contains("C11sus2"))
     #expect(displayTexts.contains("C13sus2"))
+    #expect(displayTexts.contains("Calt"))
+    #expect(displayTexts.contains("C7alt"))
     #expect(displayTexts.contains("N.C."))
     #expect(displayTexts.contains("NC"))
     #expect(!displayTexts.contains("C9(add4,no3)"))
+    #expect(!displayTexts.contains("C(b5,add#5,addb9,add#9)"))
+    #expect(!displayTexts.contains("C7(b5,add#5,addb9,add#9)"))
     #expect(!displayTexts.contains("CN.C."))
     #expect(!displayTexts.contains("CNC"))
     #expect(!displayTexts.contains("(suspended-fourth)"))

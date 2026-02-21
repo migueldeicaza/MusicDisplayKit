@@ -98,78 +98,116 @@ public struct ChordSymbolGenerator: Sendable {
         explicitText: String?,
         degrees: [HarmonyDegree]
     ) -> (kindSuffix: String, degrees: [HarmonyDegree]) {
-        if let explicit = explicitText?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !explicit.isEmpty {
-            return (kindSuffix: explicit, degrees: degrees)
-        }
-
+        let explicit = explicitText?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalized = normalizedKind(kind)
+        let defaultKindSuffix = formatKind(kind: kind, explicitText: nil)
         var remainingDegrees = degrees
-        var kindSuffix = formatKind(kind: kind, explicitText: nil)
+        var kindSuffix = (explicit?.isEmpty == false) ? explicit! : defaultKindSuffix
+        let allowsAliasReduction = explicit == nil || explicit?.isEmpty == true || explicit == defaultKindSuffix
 
-        switch normalized {
-        case "suspended-fourth":
-            for (degreeValue, alias) in [(7, "7sus4"), (9, "9sus4"), (11, "11sus4"), (13, "13sus4")] {
-                if consumeDegree(&remainingDegrees, type: .add, value: degreeValue) {
-                    kindSuffix = alias
+        if allowsAliasReduction {
+            switch normalized {
+            case "major":
+                if hasDegree(remainingDegrees, type: .add, value: 5, alter: 1),
+                   hasDegree(remainingDegrees, type: .add, value: 9, alter: -1),
+                   hasDegree(remainingDegrees, type: .add, value: 9, alter: 1),
+                   hasDegree(remainingDegrees, type: .alter, value: 5, alter: -1) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 5, alter: 1)
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 9, alter: -1)
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 9, alter: 1)
+                    _ = consumeDegree(&remainingDegrees, type: .alter, value: 5, alter: -1)
+                    kindSuffix = "alt"
                 }
-            }
-        case "suspended-second":
-            for (degreeValue, alias) in [(7, "7sus2"), (9, "9sus2"), (11, "11sus2"), (13, "13sus2")] {
-                if consumeDegree(&remainingDegrees, type: .add, value: degreeValue) {
-                    kindSuffix = alias
+            case "suspended-fourth":
+                for (degreeValue, alias) in [(7, "7sus4"), (9, "9sus4"), (11, "11sus4"), (13, "13sus4")] {
+                    if consumeDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                        kindSuffix = alias
+                    }
                 }
+            case "suspended-second":
+                for (degreeValue, alias) in [(7, "7sus2"), (9, "9sus2"), (11, "11sus2"), (13, "13sus2")] {
+                    if consumeDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                        kindSuffix = alias
+                    }
+                }
+            case "dominant":
+                if hasDegree(remainingDegrees, type: .add, value: 5, alter: 1),
+                   hasDegree(remainingDegrees, type: .add, value: 9, alter: -1),
+                   hasDegree(remainingDegrees, type: .add, value: 9, alter: 1),
+                   hasDegree(remainingDegrees, type: .alter, value: 5, alter: -1) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 5, alter: 1)
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 9, alter: -1)
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 9, alter: 1)
+                    _ = consumeDegree(&remainingDegrees, type: .alter, value: 5, alter: -1)
+                    kindSuffix = "7alt"
+                } else if hasDegree(remainingDegrees, type: .add, value: 4),
+                          hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
+                    _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "7sus4"
+                } else if hasDegree(remainingDegrees, type: .add, value: 2),
+                          hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
+                    _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "7sus2"
+                }
+            case "dominant-ninth":
+                if hasDegree(remainingDegrees, type: .add, value: 4),
+                   hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
+                    _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "9sus4"
+                } else if hasDegree(remainingDegrees, type: .add, value: 2),
+                          hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
+                    _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "9sus2"
+                }
+            case "dominant-11th":
+                if hasDegree(remainingDegrees, type: .add, value: 4),
+                   hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
+                    _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "11sus4"
+                } else if hasDegree(remainingDegrees, type: .add, value: 2),
+                          hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
+                    _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "11sus2"
+                }
+            case "dominant-13th":
+                if hasDegree(remainingDegrees, type: .add, value: 4),
+                   hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
+                    _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "13sus4"
+                } else if hasDegree(remainingDegrees, type: .add, value: 2),
+                          hasDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
+                    _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "13sus2"
+                }
+            case "major-minor":
+                for (degreeValue, alias) in [(9, "m(maj9)"), (11, "m(maj11)"), (13, "m(maj13)")] {
+                    if consumeDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                        kindSuffix = alias
+                    }
+                }
+            case "major-sixth":
+                if consumeDegree(&remainingDegrees, type: .add, value: 9) {
+                    kindSuffix = "69"
+                }
+            case "minor-sixth":
+                if consumeDegree(&remainingDegrees, type: .add, value: 9) {
+                    kindSuffix = "mi69"
+                }
+            case "minor-seventh":
+                if consumeDegree(&remainingDegrees, type: .alter, value: 5, alter: -1) {
+                    kindSuffix = "m7b5"
+                }
+            default:
+                break
             }
-        case "dominant":
-            if hasDegree(remainingDegrees, type: .add, value: 4),
-               hasDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
-                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "7sus4"
-            } else if hasDegree(remainingDegrees, type: .add, value: 2),
-                      hasDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
-                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "7sus2"
-            }
-        case "dominant-ninth":
-            if hasDegree(remainingDegrees, type: .add, value: 4),
-               hasDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
-                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "9sus4"
-            } else if hasDegree(remainingDegrees, type: .add, value: 2),
-                      hasDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
-                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "9sus2"
-            }
-        case "dominant-11th":
-            if hasDegree(remainingDegrees, type: .add, value: 4),
-               hasDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
-                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "11sus4"
-            } else if hasDegree(remainingDegrees, type: .add, value: 2),
-                      hasDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
-                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "11sus2"
-            }
-        case "dominant-13th":
-            if hasDegree(remainingDegrees, type: .add, value: 4),
-               hasDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeDegree(&remainingDegrees, type: .add, value: 4)
-                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "13sus4"
-            } else if hasDegree(remainingDegrees, type: .add, value: 2),
-                      hasDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeDegree(&remainingDegrees, type: .add, value: 2)
-                _ = consumeDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "13sus2"
-            }
-        default:
-            break
         }
 
         return (kindSuffix: kindSuffix, degrees: remainingDegrees)
@@ -177,6 +215,7 @@ public struct ChordSymbolGenerator: Sendable {
 
     private enum DegreeTypeMatch {
         case add
+        case alter
         case subtract
     }
 
@@ -219,6 +258,8 @@ public struct ChordSymbolGenerator: Sendable {
     ) -> Bool {
         switch (match, degreeType) {
         case (.add, .add):
+            return true
+        case (.alter, .alter):
             return true
         case (.subtract, .subtract):
             return true

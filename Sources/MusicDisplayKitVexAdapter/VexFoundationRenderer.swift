@@ -4965,79 +4965,117 @@ public struct VexFoundationRenderer: ScoreRenderer {
         explicitText: String?,
         degrees: [MusicDisplayKitModel.HarmonyDegree]
     ) -> (kindSuffix: String, degrees: [MusicDisplayKitModel.HarmonyDegree]) {
-        if let explicitText = explicitText?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !explicitText.isEmpty {
-            return (kindSuffix: explicitText, degrees: degrees)
-        }
-
+        let explicitText = explicitText?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedKind = normalizedHarmonyKind(kind)
+        let defaultKindSuffix = harmonyKindSuffix(kind: kind, explicitText: nil)
         var remainingDegrees = degrees
-        var kindSuffix = harmonyKindSuffix(kind: kind, explicitText: nil)
+        var kindSuffix = (explicitText?.isEmpty == false) ? explicitText! : defaultKindSuffix
+        let allowsAliasReduction = explicitText == nil || explicitText?.isEmpty == true || explicitText == defaultKindSuffix
 
-        switch normalizedKind {
-        case "suspended-fourth":
-            for (degreeValue, alias) in [(7, "7sus4"), (9, "9sus4"), (11, "11sus4"), (13, "13sus4")] {
-                if consumeHarmonyDegree(&remainingDegrees, type: .add, value: degreeValue) {
-                    kindSuffix = alias
+        if allowsAliasReduction {
+            switch normalizedKind {
+            case "major":
+                if hasHarmonyDegree(remainingDegrees, type: .add, value: 5, alter: 1),
+                   hasHarmonyDegree(remainingDegrees, type: .add, value: 9, alter: -1),
+                   hasHarmonyDegree(remainingDegrees, type: .add, value: 9, alter: 1),
+                   hasHarmonyDegree(remainingDegrees, type: .alter, value: 5, alter: -1) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 5, alter: 1)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 9, alter: -1)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 9, alter: 1)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .alter, value: 5, alter: -1)
+                    kindSuffix = "alt"
                 }
-            }
-        case "suspended-second":
-            for (degreeValue, alias) in [(7, "7sus2"), (9, "9sus2"), (11, "11sus2"), (13, "13sus2")] {
-                if consumeHarmonyDegree(&remainingDegrees, type: .add, value: degreeValue) {
-                    kindSuffix = alias
+            case "suspended-fourth":
+                for (degreeValue, alias) in [(7, "7sus4"), (9, "9sus4"), (11, "11sus4"), (13, "13sus4")] {
+                    if consumeHarmonyDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                        kindSuffix = alias
+                    }
                 }
+            case "suspended-second":
+                for (degreeValue, alias) in [(7, "7sus2"), (9, "9sus2"), (11, "11sus2"), (13, "13sus2")] {
+                    if consumeHarmonyDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                        kindSuffix = alias
+                    }
+                }
+            case "dominant":
+                if hasHarmonyDegree(remainingDegrees, type: .add, value: 5, alter: 1),
+                   hasHarmonyDegree(remainingDegrees, type: .add, value: 9, alter: -1),
+                   hasHarmonyDegree(remainingDegrees, type: .add, value: 9, alter: 1),
+                   hasHarmonyDegree(remainingDegrees, type: .alter, value: 5, alter: -1) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 5, alter: 1)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 9, alter: -1)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 9, alter: 1)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .alter, value: 5, alter: -1)
+                    kindSuffix = "7alt"
+                } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
+                          hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "7sus4"
+                } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
+                          hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "7sus2"
+                }
+            case "dominant-ninth":
+                if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
+                   hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "9sus4"
+                } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
+                          hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "9sus2"
+                }
+            case "dominant-11th":
+                if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
+                   hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "11sus4"
+                } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
+                          hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "11sus2"
+                }
+            case "dominant-13th":
+                if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
+                   hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "13sus4"
+                } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
+                          hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
+                    _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
+                    kindSuffix = "13sus2"
+                }
+            case "major-minor":
+                for (degreeValue, alias) in [(9, "m(maj9)"), (11, "m(maj11)"), (13, "m(maj13)")] {
+                    if consumeHarmonyDegree(&remainingDegrees, type: .add, value: degreeValue) {
+                        kindSuffix = alias
+                    }
+                }
+            case "major-sixth":
+                if consumeHarmonyDegree(&remainingDegrees, type: .add, value: 9) {
+                    kindSuffix = "69"
+                }
+            case "minor-sixth":
+                if consumeHarmonyDegree(&remainingDegrees, type: .add, value: 9) {
+                    kindSuffix = "mi69"
+                }
+            case "minor-seventh":
+                if consumeHarmonyDegree(&remainingDegrees, type: .alter, value: 5, alter: -1) {
+                    kindSuffix = "m7b5"
+                }
+            default:
+                break
             }
-        case "dominant":
-            if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
-               hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "7sus4"
-            } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
-                      hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "7sus2"
-            }
-        case "dominant-ninth":
-            if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
-               hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "9sus4"
-            } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
-                      hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "9sus2"
-            }
-        case "dominant-11th":
-            if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
-               hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "11sus4"
-            } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
-                      hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "11sus2"
-            }
-        case "dominant-13th":
-            if hasHarmonyDegree(remainingDegrees, type: .add, value: 4),
-               hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 4)
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "13sus4"
-            } else if hasHarmonyDegree(remainingDegrees, type: .add, value: 2),
-                      hasHarmonyDegree(remainingDegrees, type: .subtract, value: 3) {
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .add, value: 2)
-                _ = consumeHarmonyDegree(&remainingDegrees, type: .subtract, value: 3)
-                kindSuffix = "13sus2"
-            }
-        default:
-            break
         }
 
         return (kindSuffix: kindSuffix, degrees: remainingDegrees)
@@ -5045,6 +5083,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
 
     private enum HarmonyDegreeTypeMatch {
         case add
+        case alter
         case subtract
     }
 
@@ -5087,6 +5126,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
     ) -> Bool {
         switch (match, degreeType) {
         case (.add, .add):
+            return true
+        case (.alter, .alter):
             return true
         case (.subtract, .subtract):
             return true
