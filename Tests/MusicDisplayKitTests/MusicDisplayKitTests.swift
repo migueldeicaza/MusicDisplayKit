@@ -737,6 +737,52 @@ private let slurNumberedStartImplicitContinueStopXML = """
 </score-partwise>
 """
 
+private let slurOrientationFallbackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="1" orientation="over"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop" number="1"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="2" orientation="under"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop" number="2"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let beamTupletXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2472,6 +2518,13 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slurs.allSatisfy { !$0.isOpenEnded })
 }
 
+@Test func slurGeneratorMapsOrientationFallbackToPlacement() throws {
+    let score = try MusicXMLParser().parse(xml: slurOrientationFallbackXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 2)
+    #expect(slurs.map(\.placement) == ["above", "below"])
+}
+
 @Test func lyricsGeneratorBuildsInMeasureWords() throws {
     let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
     let words = LyricsGenerator().generate(from: score)
@@ -2879,6 +2932,13 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.slurEvents.allSatisfy { !$0.isOpenEnded })
 }
 
+@Test func musicSheetReaderReadWithTraversalMapsSlurOrientationFallbackToPlacement() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(slurOrientationFallbackXML))
+    #expect(result.slurEvents.count == 2)
+    #expect(result.slurEvents.map(\.placement) == ["above", "below"])
+}
+
 @Test func musicSheetReaderReadWithTraversalIncludesTempoTimelineEvents() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(repeatsAndTempoXML))
@@ -2989,6 +3049,14 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         SlurSpan(number: 6, startNoteIndex: 0, endNoteIndex: 1, voice: 1, staff: nil, placement: "above"),
         SlurSpan(number: 6, startNoteIndex: 1, endNoteIndex: 2, voice: 1, staff: nil, placement: "above")
     ])
+}
+
+@Test func parserMapsSlurOrientationFallbackToPlacement() throws {
+    let score = try MusicXMLParser().parse(xml: slurOrientationFallbackXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.noteEvents[0].slurs.first?.placement == "above")
+    #expect(measure.noteEvents[2].slurs.first?.placement == "below")
+    #expect(measure.slurSpans.map(\.placement) == ["above", "below"])
 }
 
 @Test func parserReadsBeamTupletAndTimeModificationMarkers() throws {
@@ -3445,6 +3513,7 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let fixtures = [
         "test_slur_double.musicxml",
         "test_slurs_highNotes.musicxml",
+        "test_slurs_long_steep_arc_flattening_chopin.musicxml",
     ]
     let reader = MusicSheetReader()
 
@@ -3452,6 +3521,9 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         let url = try osmdFixtureURL(named: fixture)
         let result = try reader.readWithTraversal(from: .fileURL(url))
         #expect(!result.slurEvents.isEmpty)
+        if fixture == "test_slurs_long_steep_arc_flattening_chopin.musicxml" {
+            #expect(result.slurEvents.contains { $0.placement == "above" })
+        }
     }
 }
 

@@ -870,7 +870,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 let slur = SlurMarker(
                     type: notationSpanType(from: attributeDict["type"]),
                     number: attributeDict["number"].flatMap(Int.init),
-                    placement: attributeDict["placement"]?.trimmedNonEmpty?.lowercased()
+                    placement: parseSlurPlacement(from: attributeDict)
                 )
                 currentNote.slurs.append(slur)
                 self.currentNote = currentNote
@@ -2333,6 +2333,20 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             return .`continue`
         default:
             return .unknown
+        }
+    }
+
+    private func parseSlurPlacement(from attributes: [String: String]) -> String? {
+        if let placement = attributes["placement"]?.trimmedNonEmpty?.lowercased() {
+            return placement
+        }
+        switch attributes["orientation"]?.trimmedNonEmpty?.lowercased() {
+        case "over", "top":
+            return "above"
+        case "under", "bottom":
+            return "below"
+        default:
+            return nil
         }
     }
 
