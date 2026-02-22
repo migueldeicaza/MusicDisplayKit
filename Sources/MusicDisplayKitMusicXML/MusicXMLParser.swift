@@ -2751,10 +2751,12 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             var rawNumber: Int?
             var startIndex: Int
             var placement: String?
+            var sequence: Int
         }
 
         var openByKey: [SlurOpenKey: [SlurOpenValue]] = [:]
         var spans: [SlurSpan] = []
+        var nextOpenSequence: Int = 0
 
         func mostRecentKey(
             from candidates: [SlurOpenKey: [SlurOpenValue]],
@@ -2768,6 +2770,11 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             }
             let prioritized = preferredCandidates.isEmpty ? candidates : preferredCandidates
             return prioritized.max(by: { lhs, rhs in
+                let lhsSequence = lhs.value.last?.sequence ?? Int.min
+                let rhsSequence = rhs.value.last?.sequence ?? Int.min
+                if lhsSequence != rhsSequence {
+                    return lhsSequence < rhsSequence
+                }
                 let lhsStart = lhs.value.last?.startIndex ?? Int.min
                 let rhsStart = rhs.value.last?.startIndex ?? Int.min
                 if lhsStart != rhsStart {
@@ -2826,8 +2833,10 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     let open = SlurOpenValue(
                         rawNumber: marker.number,
                         startIndex: index,
-                        placement: marker.placement
+                        placement: marker.placement,
+                        sequence: nextOpenSequence
                     )
+                    nextOpenSequence += 1
                     openByKey[key, default: []].append(open)
 
                 case .stop:
@@ -2886,15 +2895,19 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                         let continuation = SlurOpenValue(
                             rawNumber: continuationRawNumber,
                             startIndex: index,
-                            placement: marker.placement ?? open.placement
+                            placement: marker.placement ?? open.placement,
+                            sequence: nextOpenSequence
                         )
+                        nextOpenSequence += 1
                         openByKey[continuationKey, default: []].append(continuation)
                     } else {
                         let open = SlurOpenValue(
                             rawNumber: marker.number,
                             startIndex: index,
-                            placement: marker.placement
+                            placement: marker.placement,
+                            sequence: nextOpenSequence
                         )
+                        nextOpenSequence += 1
                         openByKey[key, default: []].append(open)
                     }
 

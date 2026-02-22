@@ -74,6 +74,7 @@ public struct SlurGenerator: Sendable {
         var rawNumber: Int?
         var start: NotePosition
         var placement: String?
+        var sequence: Int
     }
 
     public init() {}
@@ -82,7 +83,8 @@ public struct SlurGenerator: Sendable {
         var output: [SlurEvent] = []
 
         for (partIndex, part) in score.parts.enumerated() {
-            var openByKey: [SlurKey: OpenSlur] = [:]
+            var openByKey: [SlurKey: [OpenSlur]] = [:]
+            var nextOpenSequence: Int = 0
 
             for (measureIndex, measure) in part.measures.enumerated() {
                 for noteIndex in measure.noteEvents.indices {
@@ -102,25 +104,14 @@ public struct SlurGenerator: Sendable {
                         )
                         switch marker.type {
                         case .start:
-                            if let existing = openByKey.removeValue(forKey: key) {
-                                output.append(
-                                    buildEvent(
-                                        partIndex: partIndex,
-                                        partID: part.id,
-                                        openSlur: existing,
-                                        endPosition: existing.start,
-                                        endNumber: nil,
-                                        endPlacement: marker.placement,
-                                        isOpenEnded: true
-                                    )
-                                )
-                            }
-                            openByKey[key] = OpenSlur(
+                            openByKey[key, default: []].append(OpenSlur(
                                 key: key,
                                 rawNumber: marker.number,
                                 start: notePosition,
-                                placement: marker.placement
-                            )
+                                placement: marker.placement,
+                                sequence: nextOpenSequence
+                            ))
+                            nextOpenSequence += 1
 
                         case .stop:
                             let resolvedKey = resolveStopKey(
@@ -129,7 +120,8 @@ public struct SlurGenerator: Sendable {
                                 openByKey: openByKey
                             )
                             guard let resolvedKey,
-                                  let open = openByKey.removeValue(forKey: resolvedKey) else {
+                                  var stack = openByKey[resolvedKey],
+                                  let open = stack.popLast() else {
                                 continue
                             }
                             output.append(
@@ -143,6 +135,11 @@ public struct SlurGenerator: Sendable {
                                     isOpenEnded: false
                                 )
                             )
+                            if stack.isEmpty {
+                                openByKey.removeValue(forKey: resolvedKey)
+                            } else {
+                                openByKey[resolvedKey] = stack
+                            }
 
                         case .`continue`:
                             let resolvedKey = resolveStopKey(
@@ -151,7 +148,8 @@ public struct SlurGenerator: Sendable {
                                 openByKey: openByKey
                             )
                             if let resolvedKey,
-                               let open = openByKey.removeValue(forKey: resolvedKey) {
+                               var stack = openByKey[resolvedKey],
+                               let open = stack.popLast() {
                                 output.append(
                                     buildEvent(
                                         partIndex: partIndex,
@@ -163,25 +161,34 @@ public struct SlurGenerator: Sendable {
                                         isOpenEnded: false
                                     )
                                 )
+                                if stack.isEmpty {
+                                    openByKey.removeValue(forKey: resolvedKey)
+                                } else {
+                                    openByKey[resolvedKey] = stack
+                                }
                                 let continuationRawNumber = marker.number ?? open.rawNumber
                                 let continuationKey = SlurKey(
                                     voice: note.voice,
                                     staff: note.staff,
                                     number: normalizedSlurNumber(continuationRawNumber)
                                 )
-                                openByKey[continuationKey] = OpenSlur(
+                                openByKey[continuationKey, default: []].append(OpenSlur(
                                     key: continuationKey,
                                     rawNumber: continuationRawNumber,
                                     start: notePosition,
-                                    placement: marker.placement ?? open.placement
-                                )
+                                    placement: marker.placement ?? open.placement,
+                                    sequence: nextOpenSequence
+                                ))
+                                nextOpenSequence += 1
                             } else {
-                                openByKey[key] = OpenSlur(
+                                openByKey[key, default: []].append(OpenSlur(
                                     key: key,
                                     rawNumber: marker.number,
                                     start: notePosition,
-                                    placement: marker.placement
-                                )
+                                    placement: marker.placement,
+                                    sequence: nextOpenSequence
+                                ))
+                                nextOpenSequence += 1
                             }
 
                         case .unknown:
@@ -191,7 +198,7 @@ public struct SlurGenerator: Sendable {
                 }
             }
 
-            for open in openByKey.values {
+            for open in openByKey.values.flatMap({ $0 }) {
                 output.append(
                     buildEvent(
                         partIndex: partIndex,
@@ -262,9 +269,9 @@ public struct SlurGenerator: Sendable {
     private func resolveStopKey(
         requestedKey: SlurKey,
         requestedRawNumber: Int?,
-        openByKey: [SlurKey: OpenSlur]
+        openByKey: [SlurKey: [OpenSlur]]
     ) -> SlurKey? {
-        if openByKey[requestedKey] != nil {
+        if let stack = openByKey[requestedKey], !stack.isEmpty {
             return requestedKey
         }
 
@@ -273,7 +280,8 @@ public struct SlurGenerator: Sendable {
         // close the most recent open slur in the same voice/staff.
         if requestedRawNumber == nil {
             let sameVoiceCandidates = openByKey.filter { candidate in
-                candidate.key.voice == requestedKey.voice
+                candidate.key.voice == requestedKey.voice &&
+                !candidate.value.isEmpty
             }
             if let match = mostRecentKey(
                 from: sameVoiceCandidates,
@@ -288,14 +296,15 @@ public struct SlurGenerator: Sendable {
         let candidates = openByKey
             .filter { candidate in
                 candidate.key.voice == requestedKey.voice &&
-                candidate.key.number == requestedKey.number
+                candidate.key.number == requestedKey.number &&
+                !candidate.value.isEmpty
             }
 
         return mostRecentKey(from: candidates, preferredStaff: requestedKey.staff)
     }
 
     private func mostRecentKey(
-        from candidates: [SlurKey: OpenSlur],
+        from candidates: [SlurKey: [OpenSlur]],
         preferredStaff: Int?
     ) -> SlurKey? {
         guard !candidates.isEmpty else {
@@ -306,14 +315,25 @@ public struct SlurGenerator: Sendable {
         }
         let prioritized = preferredCandidates.isEmpty ? candidates : preferredCandidates
         return prioritized.max(by: { lhs, rhs in
-            if lhs.value.start.measureIndex != rhs.value.start.measureIndex {
-                return lhs.value.start.measureIndex < rhs.value.start.measureIndex
+            let lhsSequence = lhs.value.last?.sequence ?? Int.min
+            let rhsSequence = rhs.value.last?.sequence ?? Int.min
+            if lhsSequence != rhsSequence {
+                return lhsSequence < rhsSequence
             }
-            if lhs.value.start.onsetDivisions != rhs.value.start.onsetDivisions {
-                return lhs.value.start.onsetDivisions < rhs.value.start.onsetDivisions
+            let lhsStartMeasure = lhs.value.last?.start.measureIndex ?? Int.min
+            let rhsStartMeasure = rhs.value.last?.start.measureIndex ?? Int.min
+            if lhsStartMeasure != rhsStartMeasure {
+                return lhsStartMeasure < rhsStartMeasure
             }
-            if lhs.value.start.noteIndex != rhs.value.start.noteIndex {
-                return lhs.value.start.noteIndex < rhs.value.start.noteIndex
+            let lhsStartOnset = lhs.value.last?.start.onsetDivisions ?? Int.min
+            let rhsStartOnset = rhs.value.last?.start.onsetDivisions ?? Int.min
+            if lhsStartOnset != rhsStartOnset {
+                return lhsStartOnset < rhsStartOnset
+            }
+            let lhsStartNote = lhs.value.last?.start.noteIndex ?? Int.min
+            let rhsStartNote = rhs.value.last?.start.noteIndex ?? Int.min
+            if lhsStartNote != rhsStartNote {
+                return lhsStartNote < rhsStartNote
             }
             return staffSortValue(lhs.key.staff) < staffSortValue(rhs.key.staff)
         })?.key
