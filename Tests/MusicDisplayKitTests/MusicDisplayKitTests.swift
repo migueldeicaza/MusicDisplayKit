@@ -868,6 +868,54 @@ private let slurNestedSameNumberXML = """
 </score-partwise>
 """
 
+private let slurCrossVoiceImplicitStopIsolationXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="2" placement="above"/>
+        </notations>
+      </note>
+      <backup><duration>2</duration></backup>
+      <note>
+        <pitch><step>G</step><octave>3</octave></pitch>
+        <duration>1</duration>
+        <voice>2</voice>
+        <notations>
+          <slur type="start" number="4" placement="below"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>A</step><octave>3</octave></pitch>
+        <duration>1</duration>
+        <voice>2</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+      <forward><duration>1</duration></forward>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let beamTupletXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2638,6 +2686,21 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(byEnd.map(\.endNoteIndex) == [2, 3])
 }
 
+@Test func slurGeneratorKeepsImplicitStopFallbackIsolatedPerVoice() throws {
+    let score = try MusicXMLParser().parse(xml: slurCrossVoiceImplicitStopIsolationXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 2)
+
+    let byEnd = slurs.sorted { lhs, rhs in
+        lhs.endNoteIndex < rhs.endNoteIndex
+    }
+    #expect(byEnd.map(\.voice) == [2, 1])
+    #expect(byEnd.map(\.number) == [4, 2])
+    #expect(byEnd.map(\.placement) == ["below", "above"])
+    #expect(byEnd.map(\.startNoteIndex) == [1, 0])
+    #expect(byEnd.map(\.endNoteIndex) == [2, 3])
+}
+
 @Test func lyricsGeneratorBuildsInMeasureWords() throws {
     let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
     let words = LyricsGenerator().generate(from: score)
@@ -3080,6 +3143,21 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(byEnd.map(\.endNoteIndex) == [2, 3])
 }
 
+@Test func musicSheetReaderReadWithTraversalKeepsImplicitStopFallbackIsolatedPerVoice() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(slurCrossVoiceImplicitStopIsolationXML))
+    #expect(result.slurEvents.count == 2)
+
+    let byEnd = result.slurEvents.sorted { lhs, rhs in
+        lhs.endNoteIndex < rhs.endNoteIndex
+    }
+    #expect(byEnd.map(\.voice) == [2, 1])
+    #expect(byEnd.map(\.number) == [4, 2])
+    #expect(byEnd.map(\.placement) == ["below", "above"])
+    #expect(byEnd.map(\.startNoteIndex) == [1, 0])
+    #expect(byEnd.map(\.endNoteIndex) == [2, 3])
+}
+
 @Test func musicSheetReaderReadWithTraversalIncludesTempoTimelineEvents() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(repeatsAndTempoXML))
@@ -3214,6 +3292,15 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let measure = try #require(score.parts.first?.measures.first)
     #expect(measure.slurSpans == [
         SlurSpan(number: 2, startNoteIndex: 1, endNoteIndex: 2, voice: 1, staff: nil, placement: "below"),
+        SlurSpan(number: 2, startNoteIndex: 0, endNoteIndex: 3, voice: 1, staff: nil, placement: "above")
+    ])
+}
+
+@Test func parserKeepsImplicitStopFallbackIsolatedPerVoice() throws {
+    let score = try MusicXMLParser().parse(xml: slurCrossVoiceImplicitStopIsolationXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.slurSpans == [
+        SlurSpan(number: 4, startNoteIndex: 1, endNoteIndex: 2, voice: 2, staff: nil, placement: "below"),
         SlurSpan(number: 2, startNoteIndex: 0, endNoteIndex: 3, voice: 1, staff: nil, placement: "above")
     ])
 }
