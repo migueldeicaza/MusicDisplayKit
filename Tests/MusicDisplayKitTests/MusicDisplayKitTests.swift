@@ -4693,6 +4693,23 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.placement == "above")
 }
 
+@Test func vexAdapterBuildsCrossSystemSlurPlanAnchors() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
+    #expect(laidOut.measures.count == 2)
+    #expect(laidOut.measures.map(\.systemIndex) == [0, 1])
+
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    #expect(plan.slurs.count == 1)
+    let slur = try #require(plan.slurs.first)
+    #expect(slur.systemIndex == 0)
+    #expect(slur.endSystemIndex == 1)
+    #expect(slur.measureIndexInPart == 0)
+    #expect(slur.endMeasureIndexInPart == 1)
+    #expect(slur.startEntryIndex == 0)
+    #expect(slur.endEntryIndex == 0)
+}
+
 @Test func vexAdapterBuildsCrossMeasureCrossStaffContinuedSlurPlans() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureCrossStaffContinueSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -5155,6 +5172,26 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let execution = renderer.executeRenderPlan(plan)
 
     #expect(plan.slurs.count == 1)
+    #expect(execution.slurs.count == 1)
+    let slur = try #require(execution.slurs.first)
+    #expect(slur.from != nil)
+    #expect(slur.to != nil)
+}
+
+@Test func vexAdapterExecutesCrossSystemSlurObjects() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
+    #expect(laidOut.measures.count == 2)
+    #expect(laidOut.measures.map(\.systemIndex) == [0, 1])
+
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    #expect(plan.slurs.count == 1)
+    let planned = try #require(plan.slurs.first)
+    #expect(planned.systemIndex == 0)
+    #expect(planned.endSystemIndex == 1)
+
+    let execution = renderer.executeRenderPlan(plan)
     #expect(execution.slurs.count == 1)
     let slur = try #require(execution.slurs.first)
     #expect(slur.from != nil)
