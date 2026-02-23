@@ -4632,6 +4632,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.placement == "above")
 }
 
+@Test func vexAdapterBuildsCrossMeasureSlurPlans() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.slurs.count == 1)
+    let slur = try #require(plan.slurs.first)
+    #expect(slur.voice == 1)
+    #expect(slur.number == 3)
+    #expect(slur.measureIndexInPart == 0)
+    #expect(slur.endMeasureIndexInPart == 1)
+    #expect(slur.startEntryIndex == 0)
+    #expect(slur.endEntryIndex == 0)
+    #expect(slur.placement == "above")
+}
+
 @Test func vexAdapterBuildsArticulationPlans() throws {
     let score = try MusicXMLParser().parse(xml: articulationsXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -5064,6 +5080,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.from != nil)
     #expect(slur.to != nil)
     #expect(slur.renderOptions.invert == true)
+}
+
+@Test func vexAdapterExecutesCrossMeasureSlurObjects() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.slurs.count == 1)
+    #expect(execution.slurs.count == 1)
+    let slur = try #require(execution.slurs.first)
+    #expect(slur.from != nil)
+    #expect(slur.to != nil)
 }
 
 @Test func vexAdapterExecutesArticulationObjects() throws {

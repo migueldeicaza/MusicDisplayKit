@@ -530,6 +530,9 @@ public struct VexSlurPlan: Sendable {
     public let systemIndex: Int
     public let partIndex: Int
     public let measureIndexInPart: Int
+    public let endSystemIndex: Int
+    public let endPartIndex: Int
+    public let endMeasureIndexInPart: Int
     public let voice: Int
     public let number: Int?
     public let startEntryIndex: Int
@@ -540,6 +543,9 @@ public struct VexSlurPlan: Sendable {
         systemIndex: Int,
         partIndex: Int,
         measureIndexInPart: Int,
+        endSystemIndex: Int? = nil,
+        endPartIndex: Int? = nil,
+        endMeasureIndexInPart: Int? = nil,
         voice: Int,
         number: Int?,
         startEntryIndex: Int,
@@ -549,6 +555,9 @@ public struct VexSlurPlan: Sendable {
         self.systemIndex = systemIndex
         self.partIndex = partIndex
         self.measureIndexInPart = measureIndexInPart
+        self.endSystemIndex = endSystemIndex ?? systemIndex
+        self.endPartIndex = endPartIndex ?? partIndex
+        self.endMeasureIndexInPart = endMeasureIndexInPart ?? measureIndexInPart
         self.voice = voice
         self.number = number
         self.startEntryIndex = startEntryIndex
@@ -1515,7 +1524,35 @@ public struct VexFoundationRenderer: ScoreRenderer {
         let beams = measureRenderPlans.flatMap(\.beams)
         let tuplets = measureRenderPlans.flatMap(\.tuplets)
         let ties = measureRenderPlans.flatMap(\.ties)
-        let slurs = measureRenderPlans.flatMap(\.slurs)
+        let inMeasureSlurs = measureRenderPlans.flatMap(\.slurs)
+        let crossMeasureSlurs = buildCrossMeasureSlurPlans(
+            score: score.score,
+            noteEntryReferenceBySourceKey: noteEntryReferenceBySourceKey
+        )
+        let slurs = (inMeasureSlurs + crossMeasureSlurs).sorted { lhs, rhs in
+            if lhs.systemIndex != rhs.systemIndex {
+                return lhs.systemIndex < rhs.systemIndex
+            }
+            if lhs.partIndex != rhs.partIndex {
+                return lhs.partIndex < rhs.partIndex
+            }
+            if lhs.measureIndexInPart != rhs.measureIndexInPart {
+                return lhs.measureIndexInPart < rhs.measureIndexInPart
+            }
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            if lhs.startEntryIndex != rhs.startEntryIndex {
+                return lhs.startEntryIndex < rhs.startEntryIndex
+            }
+            if lhs.endMeasureIndexInPart != rhs.endMeasureIndexInPart {
+                return lhs.endMeasureIndexInPart < rhs.endMeasureIndexInPart
+            }
+            if lhs.endEntryIndex != rhs.endEntryIndex {
+                return lhs.endEntryIndex < rhs.endEntryIndex
+            }
+            return optionalNumberSortValue(lhs.number) < optionalNumberSortValue(rhs.number)
+        }
         let articulations = measureRenderPlans.flatMap(\.articulations)
         let lyrics = measureRenderPlans.flatMap(\.lyrics)
         let chordSymbols = measureRenderPlans.flatMap(\.chordSymbols)
@@ -1744,13 +1781,6 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 systemIndex: tiePlan.systemIndex,
                 partIndex: tiePlan.partIndex,
                 measureIndexInPart: tiePlan.measureIndexInPart
-            )
-        }
-        let groupedSlurs = Dictionary(grouping: plan.slurs) { slurPlan in
-            NoteGroupKey(
-                systemIndex: slurPlan.systemIndex,
-                partIndex: slurPlan.partIndex,
-                measureIndexInPart: slurPlan.measureIndexInPart
             )
         }
         let groupedArticulations = Dictionary(grouping: plan.articulations) { articulationPlan in
@@ -2451,53 +2481,69 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 }
             }
 
-            if let slurPlans = groupedSlurs[groupKey] {
-                let sortedSlurPlans = slurPlans.sorted { lhs, rhs in
-                    if lhs.voice != rhs.voice {
-                        return lhs.voice < rhs.voice
-                    }
-                    if lhs.startEntryIndex != rhs.startEntryIndex {
-                        return lhs.startEntryIndex < rhs.startEntryIndex
-                    }
-                    return lhs.endEntryIndex < rhs.endEntryIndex
-                }
-                for slurPlan in sortedSlurPlans {
-                    let startNote = notesByEntryKey[
-                        NoteEntryKey(
-                            systemIndex: slurPlan.systemIndex,
-                            partIndex: slurPlan.partIndex,
-                            measureIndexInPart: slurPlan.measureIndexInPart,
-                            voice: slurPlan.voice,
-                            entryIndexInVoice: slurPlan.startEntryIndex
-                        )
-                    ]
-                    let endNote = notesByEntryKey[
-                        NoteEntryKey(
-                            systemIndex: slurPlan.systemIndex,
-                            partIndex: slurPlan.partIndex,
-                            measureIndexInPart: slurPlan.measureIndexInPart,
-                            voice: slurPlan.voice,
-                            entryIndexInVoice: slurPlan.endEntryIndex
-                        )
-                    ]
-                    guard let startNote, let endNote else {
-                        continue
-                    }
-                    var options = CurveOptions()
-                    if let invert = slurCurveInvert(
-                        placement: slurPlan.placement,
-                        startNote: startNote,
-                        endNote: endNote
-                    ) {
-                        options.invert = invert
-                    }
-                    let slur = factory.Curve(from: startNote, to: endNote, options: options)
-                    createdSlurs.append(slur)
-                }
-            }
-
             createdVoices.append(contentsOf: measureVoices)
             createdNotes.append(contentsOf: measureNotes)
+        }
+
+        let sortedSlurPlans = plan.slurs.sorted { lhs, rhs in
+            if lhs.systemIndex != rhs.systemIndex {
+                return lhs.systemIndex < rhs.systemIndex
+            }
+            if lhs.partIndex != rhs.partIndex {
+                return lhs.partIndex < rhs.partIndex
+            }
+            if lhs.measureIndexInPart != rhs.measureIndexInPart {
+                return lhs.measureIndexInPart < rhs.measureIndexInPart
+            }
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            if lhs.startEntryIndex != rhs.startEntryIndex {
+                return lhs.startEntryIndex < rhs.startEntryIndex
+            }
+            if lhs.endSystemIndex != rhs.endSystemIndex {
+                return lhs.endSystemIndex < rhs.endSystemIndex
+            }
+            if lhs.endPartIndex != rhs.endPartIndex {
+                return lhs.endPartIndex < rhs.endPartIndex
+            }
+            if lhs.endMeasureIndexInPart != rhs.endMeasureIndexInPart {
+                return lhs.endMeasureIndexInPart < rhs.endMeasureIndexInPart
+            }
+            if lhs.endEntryIndex != rhs.endEntryIndex {
+                return lhs.endEntryIndex < rhs.endEntryIndex
+            }
+            return optionalNumberSortValue(lhs.number) < optionalNumberSortValue(rhs.number)
+        }
+        for slurPlan in sortedSlurPlans {
+            let startKey = NoteEntryKey(
+                systemIndex: slurPlan.systemIndex,
+                partIndex: slurPlan.partIndex,
+                measureIndexInPart: slurPlan.measureIndexInPart,
+                voice: slurPlan.voice,
+                entryIndexInVoice: slurPlan.startEntryIndex
+            )
+            let endKey = NoteEntryKey(
+                systemIndex: slurPlan.endSystemIndex,
+                partIndex: slurPlan.endPartIndex,
+                measureIndexInPart: slurPlan.endMeasureIndexInPart,
+                voice: slurPlan.voice,
+                entryIndexInVoice: slurPlan.endEntryIndex
+            )
+            guard let startNote = allNotesByEntryKey[startKey],
+                  let endNote = allNotesByEntryKey[endKey] else {
+                continue
+            }
+            var options = CurveOptions()
+            if let invert = slurCurveInvert(
+                placement: slurPlan.placement,
+                startNote: startNote,
+                endNote: endNote
+            ) {
+                options.invert = invert
+            }
+            let slur = factory.Curve(from: startNote, to: endNote, options: options)
+            createdSlurs.append(slur)
         }
 
         let sortedLyricConnectors = plan.lyricConnectors.sorted { lhs, rhs in
@@ -3186,6 +3232,273 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 }
                 return optionalNumberSortValue(lhs.number) < optionalNumberSortValue(rhs.number)
             }
+    }
+
+    private func buildCrossMeasureSlurPlans(
+        score: MusicDisplayKitModel.Score,
+        noteEntryReferenceBySourceKey: [SourceNoteKey: NoteEntryReference]
+    ) -> [VexSlurPlan] {
+        struct SlurOpenKey: Hashable {
+            var number: Int
+            var voice: Int
+            var staff: Int?
+        }
+        struct SlurOpenValue {
+            var rawNumber: Int?
+            var startSourceKey: SourceNoteKey
+            var placement: String?
+            var sequence: Int
+        }
+
+        func normalizedNumber(_ raw: Int?) -> Int {
+            raw ?? 1
+        }
+
+        func staffSortValue(_ staff: Int?) -> Int {
+            staff ?? Int.max
+        }
+
+        var plans: [VexSlurPlan] = []
+
+        for (partIndex, part) in score.parts.enumerated() {
+            var openByKey: [SlurOpenKey: [SlurOpenValue]] = [:]
+            var nextSequence = 0
+
+            func mostRecentKey(
+                from candidates: [SlurOpenKey: [SlurOpenValue]],
+                preferredStaff: Int?
+            ) -> SlurOpenKey? {
+                guard !candidates.isEmpty else {
+                    return nil
+                }
+                let preferredCandidates = candidates.filter { candidate in
+                    candidate.key.staff == preferredStaff
+                }
+                let prioritized = preferredCandidates.isEmpty ? candidates : preferredCandidates
+                return prioritized.max(by: { lhs, rhs in
+                    let lhsSequence = lhs.value.last?.sequence ?? Int.min
+                    let rhsSequence = rhs.value.last?.sequence ?? Int.min
+                    if lhsSequence != rhsSequence {
+                        return lhsSequence < rhsSequence
+                    }
+                    let lhsStartMeasure = lhs.value.last?.startSourceKey.measureIndexInPart ?? Int.min
+                    let rhsStartMeasure = rhs.value.last?.startSourceKey.measureIndexInPart ?? Int.min
+                    if lhsStartMeasure != rhsStartMeasure {
+                        return lhsStartMeasure < rhsStartMeasure
+                    }
+                    let lhsStartNote = lhs.value.last?.startSourceKey.noteIndexInMeasure ?? Int.min
+                    let rhsStartNote = rhs.value.last?.startSourceKey.noteIndexInMeasure ?? Int.min
+                    if lhsStartNote != rhsStartNote {
+                        return lhsStartNote < rhsStartNote
+                    }
+                    return staffSortValue(lhs.key.staff) < staffSortValue(rhs.key.staff)
+                })?.key
+            }
+
+            func resolveStopKey(
+                requestedKey: SlurOpenKey,
+                requestedRawNumber: Int?
+            ) -> SlurOpenKey? {
+                if requestedRawNumber != nil {
+                    let voiceNumberCandidates = openByKey.filter { candidate in
+                        candidate.key.voice == requestedKey.voice &&
+                        candidate.key.number == requestedKey.number &&
+                        !candidate.value.isEmpty
+                    }
+                    if let match = mostRecentKey(
+                        from: voiceNumberCandidates,
+                        preferredStaff: nil
+                    ) {
+                        return match
+                    }
+                    return nil
+                }
+
+                if let stack = openByKey[requestedKey], !stack.isEmpty {
+                    return requestedKey
+                }
+
+                let sameVoiceCandidates = openByKey.filter { candidate in
+                    candidate.key.voice == requestedKey.voice &&
+                    !candidate.value.isEmpty
+                }
+                if let match = mostRecentKey(
+                    from: sameVoiceCandidates,
+                    preferredStaff: requestedKey.staff
+                ) {
+                    return match
+                }
+
+                let voiceNumberCandidates = openByKey.filter { candidate in
+                    candidate.key.voice == requestedKey.voice &&
+                    candidate.key.number == requestedKey.number &&
+                    !candidate.value.isEmpty
+                }
+                return mostRecentKey(
+                    from: voiceNumberCandidates,
+                    preferredStaff: requestedKey.staff
+                )
+            }
+
+            func appendPlan(
+                open: SlurOpenValue,
+                endSourceKey: SourceNoteKey,
+                endNumber: Int?,
+                endPlacement: String?
+            ) {
+                guard let startRef = noteEntryReferenceBySourceKey[open.startSourceKey],
+                      let endRef = noteEntryReferenceBySourceKey[endSourceKey],
+                      startRef.partIndex == endRef.partIndex,
+                      startRef.voice == endRef.voice,
+                      startRef.measureIndexInPart != endRef.measureIndexInPart else {
+                    return
+                }
+                plans.append(
+                    VexSlurPlan(
+                        systemIndex: startRef.systemIndex,
+                        partIndex: startRef.partIndex,
+                        measureIndexInPart: startRef.measureIndexInPart,
+                        endSystemIndex: endRef.systemIndex,
+                        endPartIndex: endRef.partIndex,
+                        endMeasureIndexInPart: endRef.measureIndexInPart,
+                        voice: startRef.voice,
+                        number: open.rawNumber ?? endNumber,
+                        startEntryIndex: startRef.entryIndexInVoice,
+                        endEntryIndex: endRef.entryIndexInVoice,
+                        placement: open.placement ?? endPlacement
+                    )
+                )
+            }
+
+            for measureIndex in part.measures.indices {
+                let measure = part.measures[measureIndex]
+                for noteIndex in measure.noteEvents.indices {
+                    let note = measure.noteEvents[noteIndex]
+                    let sourceKey = SourceNoteKey(
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndex,
+                        noteIndexInMeasure: noteIndex
+                    )
+                    for marker in note.slurs {
+                        let key = SlurOpenKey(
+                            number: normalizedNumber(marker.number),
+                            voice: max(1, note.voice),
+                            staff: note.staff
+                        )
+
+                        switch marker.type {
+                        case .start:
+                            openByKey[key, default: []].append(
+                                SlurOpenValue(
+                                    rawNumber: marker.number,
+                                    startSourceKey: sourceKey,
+                                    placement: marker.placement,
+                                    sequence: nextSequence
+                                )
+                            )
+                            nextSequence += 1
+
+                        case .stop:
+                            guard let resolvedKey = resolveStopKey(
+                                requestedKey: key,
+                                requestedRawNumber: marker.number
+                            ),
+                            var stack = openByKey[resolvedKey],
+                            let open = stack.popLast() else {
+                                continue
+                            }
+                            appendPlan(
+                                open: open,
+                                endSourceKey: sourceKey,
+                                endNumber: marker.number,
+                                endPlacement: marker.placement
+                            )
+                            if stack.isEmpty {
+                                openByKey.removeValue(forKey: resolvedKey)
+                            } else {
+                                openByKey[resolvedKey] = stack
+                            }
+
+                        case .continue:
+                            if let resolvedKey = resolveStopKey(
+                                requestedKey: key,
+                                requestedRawNumber: marker.number
+                            ),
+                            var stack = openByKey[resolvedKey],
+                            let open = stack.popLast() {
+                                appendPlan(
+                                    open: open,
+                                    endSourceKey: sourceKey,
+                                    endNumber: marker.number,
+                                    endPlacement: marker.placement
+                                )
+                                if stack.isEmpty {
+                                    openByKey.removeValue(forKey: resolvedKey)
+                                } else {
+                                    openByKey[resolvedKey] = stack
+                                }
+                                let continuationRawNumber = marker.number ?? open.rawNumber
+                                let continuationKey = SlurOpenKey(
+                                    number: normalizedNumber(continuationRawNumber),
+                                    voice: max(1, note.voice),
+                                    staff: note.staff
+                                )
+                                openByKey[continuationKey, default: []].append(
+                                    SlurOpenValue(
+                                        rawNumber: continuationRawNumber,
+                                        startSourceKey: sourceKey,
+                                        placement: marker.placement ?? open.placement,
+                                        sequence: nextSequence
+                                    )
+                                )
+                                nextSequence += 1
+                            } else {
+                                openByKey[key, default: []].append(
+                                    SlurOpenValue(
+                                        rawNumber: marker.number,
+                                        startSourceKey: sourceKey,
+                                        placement: marker.placement,
+                                        sequence: nextSequence
+                                    )
+                                )
+                                nextSequence += 1
+                            }
+
+                        case .unknown:
+                            continue
+                        }
+                    }
+                }
+            }
+        }
+
+        return plans.sorted { lhs, rhs in
+            if lhs.systemIndex != rhs.systemIndex {
+                return lhs.systemIndex < rhs.systemIndex
+            }
+            if lhs.partIndex != rhs.partIndex {
+                return lhs.partIndex < rhs.partIndex
+            }
+            if lhs.measureIndexInPart != rhs.measureIndexInPart {
+                return lhs.measureIndexInPart < rhs.measureIndexInPart
+            }
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            if lhs.startEntryIndex != rhs.startEntryIndex {
+                return lhs.startEntryIndex < rhs.startEntryIndex
+            }
+            if lhs.endSystemIndex != rhs.endSystemIndex {
+                return lhs.endSystemIndex < rhs.endSystemIndex
+            }
+            if lhs.endMeasureIndexInPart != rhs.endMeasureIndexInPart {
+                return lhs.endMeasureIndexInPart < rhs.endMeasureIndexInPart
+            }
+            if lhs.endEntryIndex != rhs.endEntryIndex {
+                return lhs.endEntryIndex < rhs.endEntryIndex
+            }
+            return optionalNumberSortValue(lhs.number) < optionalNumberSortValue(rhs.number)
+        }
     }
 
     private func buildArticulationPlans(
