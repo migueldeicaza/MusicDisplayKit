@@ -643,6 +643,35 @@ private let crossMeasureImplicitNumberOmittedSlurXML = """
 </score-partwise>
 """
 
+private let crossMeasureOpenEndedSlurXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>G</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="8" placement="above"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>A</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let crossStaffSlurXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -3040,6 +3069,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.isOpenEnded == false)
 }
 
+@Test func slurGeneratorEmitsOpenEndedEventForUnterminatedCrossMeasureStart() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureOpenEndedSlurXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 1)
+
+    let slur = try #require(slurs.first)
+    #expect(slur.number == 8)
+    #expect(slur.voice == 1)
+    #expect(slur.startMeasureNumber == 1)
+    #expect(slur.endMeasureNumber == 1)
+    #expect(slur.startNoteIndex == 0)
+    #expect(slur.endNoteIndex == 0)
+    #expect(slur.spansMultipleMeasures == false)
+    #expect(slur.isOpenEnded == true)
+}
+
 @Test func slurGeneratorNormalizesCrossMeasureImplicitSlurNumberToOne() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureImplicitNumberOmittedSlurXML)
     let slurs = SlurGenerator().generate(from: score)
@@ -3644,6 +3689,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.tempoTimelineEvents.count == 2)
 }
 
+@Test func musicSheetReaderReadWithTraversalIncludesOpenEndedSlurEventsForUnterminatedStarts() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossMeasureOpenEndedSlurXML))
+    #expect(result.slurEvents.count == 1)
+
+    let slur = try #require(result.slurEvents.first)
+    #expect(slur.number == 8)
+    #expect(slur.voice == 1)
+    #expect(slur.startMeasureNumber == 1)
+    #expect(slur.endMeasureNumber == 1)
+    #expect(slur.startNoteIndex == 0)
+    #expect(slur.endNoteIndex == 0)
+    #expect(slur.spansMultipleMeasures == false)
+    #expect(slur.isOpenEnded == true)
+}
+
 @Test func musicSheetReaderReadWithTraversalNormalizesCrossMeasureImplicitSlurNumberToOne() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(crossMeasureImplicitNumberOmittedSlurXML))
@@ -3983,6 +4044,21 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(measure.slurSpans == [
         SlurSpan(number: 1, startNoteIndex: 0, endNoteIndex: 1, voice: 1, staff: nil, placement: "above")
     ])
+}
+
+@Test func parserLeavesUnterminatedCrossMeasureSlursUnlinked() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureOpenEndedSlurXML)
+    #expect(score.parts.count == 1)
+    let part = try #require(score.parts.first)
+    #expect(part.measures.count == 2)
+
+    let first = part.measures[0]
+    let second = part.measures[1]
+
+    #expect(first.noteEvents.count == 1)
+    #expect(first.noteEvents[0].slurs == [SlurMarker(type: .start, number: 8, placement: "above")])
+    #expect(first.slurSpans.isEmpty)
+    #expect(second.slurSpans.isEmpty)
 }
 
 @Test func parserMapsSlurOrientationFallbackToPlacement() throws {
@@ -4950,6 +5026,14 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.placement == "above")
 }
 
+@Test func vexAdapterSkipsOpenEndedCrossMeasureSlurPlans() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureOpenEndedSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.slurs.isEmpty)
+}
+
 @Test func vexAdapterBuildsCrossMeasureSlurPlansNormalizingImplicitNumberToOne() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureImplicitNumberOmittedSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -5503,6 +5587,17 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let slur = try #require(execution.slurs.first)
     #expect(slur.from != nil)
     #expect(slur.to != nil)
+}
+
+@Test func vexAdapterExecutesNoOpenEndedCrossMeasureSlurObjects() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureOpenEndedSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.slurs.isEmpty)
+    #expect(execution.slurs.isEmpty)
 }
 
 @Test func vexAdapterExecutesCrossMeasureSlurObjectsNormalizingImplicitNumberToOne() throws {
