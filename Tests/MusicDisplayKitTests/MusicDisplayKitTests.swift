@@ -672,6 +672,78 @@ private let crossMeasureOpenEndedSlurXML = """
 </score-partwise>
 """
 
+private let crossMeasureMultipleOpenEndedSlursXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>G</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="5" placement="below"/>
+          <slur type="start" number="2" placement="above"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>A</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let crossMeasureImplicitStopFallbackDisambiguationXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="2" placement="above"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="3" placement="below"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="3">
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let crossStaffSlurXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -3085,6 +3157,41 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.isOpenEnded == true)
 }
 
+@Test func slurGeneratorOrdersSimultaneousOpenEndedSlursDeterministically() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureMultipleOpenEndedSlursXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 2)
+
+    #expect(slurs.map(\.number) == [2, 5])
+    #expect(slurs.map(\.placement) == ["above", "below"])
+    #expect(slurs.map(\.startMeasureNumber) == [1, 1])
+    #expect(slurs.map(\.startNoteIndex) == [0, 0])
+    #expect(slurs.allSatisfy { $0.isOpenEnded })
+}
+
+@Test func slurGeneratorCrossMeasureImplicitStopFallbackClosesMostRecentOpenSlur() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureImplicitStopFallbackDisambiguationXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 2)
+
+    let closed = slurs.filter { !$0.isOpenEnded }
+    #expect(closed.count == 1)
+    let closedSlur = try #require(closed.first)
+    #expect(closedSlur.number == 3)
+    #expect(closedSlur.placement == "below")
+    #expect(closedSlur.startMeasureNumber == 2)
+    #expect(closedSlur.endMeasureNumber == 3)
+    #expect(closedSlur.spansMultipleMeasures == true)
+
+    let open = slurs.filter(\.isOpenEnded)
+    #expect(open.count == 1)
+    let openSlur = try #require(open.first)
+    #expect(openSlur.number == 2)
+    #expect(openSlur.placement == "above")
+    #expect(openSlur.startMeasureNumber == 1)
+    #expect(openSlur.endMeasureNumber == 1)
+}
+
 @Test func slurGeneratorNormalizesCrossMeasureImplicitSlurNumberToOne() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureImplicitNumberOmittedSlurXML)
     let slurs = SlurGenerator().generate(from: score)
@@ -3703,6 +3810,41 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.endNoteIndex == 0)
     #expect(slur.spansMultipleMeasures == false)
     #expect(slur.isOpenEnded == true)
+}
+
+@Test func musicSheetReaderReadWithTraversalOrdersSimultaneousOpenEndedSlursDeterministically() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossMeasureMultipleOpenEndedSlursXML))
+    #expect(result.slurEvents.count == 2)
+
+    #expect(result.slurEvents.map(\.number) == [2, 5])
+    #expect(result.slurEvents.map(\.placement) == ["above", "below"])
+    #expect(result.slurEvents.map(\.startMeasureNumber) == [1, 1])
+    #expect(result.slurEvents.map(\.startNoteIndex) == [0, 0])
+    #expect(result.slurEvents.allSatisfy { $0.isOpenEnded })
+}
+
+@Test func musicSheetReaderReadWithTraversalCrossMeasureImplicitStopFallbackClosesMostRecentOpenSlur() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossMeasureImplicitStopFallbackDisambiguationXML))
+    #expect(result.slurEvents.count == 2)
+
+    let closed = result.slurEvents.filter { !$0.isOpenEnded }
+    #expect(closed.count == 1)
+    let closedSlur = try #require(closed.first)
+    #expect(closedSlur.number == 3)
+    #expect(closedSlur.placement == "below")
+    #expect(closedSlur.startMeasureNumber == 2)
+    #expect(closedSlur.endMeasureNumber == 3)
+    #expect(closedSlur.spansMultipleMeasures == true)
+
+    let open = result.slurEvents.filter(\.isOpenEnded)
+    #expect(open.count == 1)
+    let openSlur = try #require(open.first)
+    #expect(openSlur.number == 2)
+    #expect(openSlur.placement == "above")
+    #expect(openSlur.startMeasureNumber == 1)
+    #expect(openSlur.endMeasureNumber == 1)
 }
 
 @Test func musicSheetReaderReadWithTraversalNormalizesCrossMeasureImplicitSlurNumberToOne() throws {
@@ -5034,6 +5176,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(plan.slurs.isEmpty)
 }
 
+@Test func vexAdapterCrossMeasureImplicitStopFallbackPlansMostRecentOpenSlur() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureImplicitStopFallbackDisambiguationXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.slurs.count == 1)
+    let slur = try #require(plan.slurs.first)
+    #expect(slur.voice == 1)
+    #expect(slur.number == 3)
+    #expect(slur.measureIndexInPart == 1)
+    #expect(slur.endMeasureIndexInPart == 2)
+    #expect(slur.startEntryIndex == 0)
+    #expect(slur.endEntryIndex == 0)
+    #expect(slur.placement == "below")
+}
+
 @Test func vexAdapterBuildsCrossMeasureSlurPlansNormalizingImplicitNumberToOne() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureImplicitNumberOmittedSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -5598,6 +5756,25 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
     #expect(plan.slurs.isEmpty)
     #expect(execution.slurs.isEmpty)
+}
+
+@Test func vexAdapterExecutesCrossMeasureImplicitStopFallbackOnMostRecentOpenSlur() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureImplicitStopFallbackDisambiguationXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.slurs.count == 1)
+    let planned = try #require(plan.slurs.first)
+    #expect(planned.number == 3)
+    #expect(planned.measureIndexInPart == 1)
+    #expect(planned.endMeasureIndexInPart == 2)
+
+    #expect(execution.slurs.count == 1)
+    let slur = try #require(execution.slurs.first)
+    #expect(slur.from != nil)
+    #expect(slur.to != nil)
 }
 
 @Test func vexAdapterExecutesCrossMeasureSlurObjectsNormalizingImplicitNumberToOne() throws {

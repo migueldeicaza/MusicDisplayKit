@@ -229,7 +229,25 @@ public struct SlurGenerator: Sendable {
             if lhs.voice != rhs.voice {
                 return lhs.voice < rhs.voice
             }
-            return staffSortValue(lhs.staff) < staffSortValue(rhs.staff)
+            if staffSortValue(lhs.staff) != staffSortValue(rhs.staff) {
+                return staffSortValue(lhs.staff) < staffSortValue(rhs.staff)
+            }
+            if optionalNumberSortValue(lhs.number) != optionalNumberSortValue(rhs.number) {
+                return optionalNumberSortValue(lhs.number) < optionalNumberSortValue(rhs.number)
+            }
+            if lhs.isOpenEnded != rhs.isOpenEnded {
+                return lhs.isOpenEnded == false
+            }
+            if lhs.endMeasureIndex != rhs.endMeasureIndex {
+                return lhs.endMeasureIndex < rhs.endMeasureIndex
+            }
+            if lhs.endOnsetDivisions != rhs.endOnsetDivisions {
+                return lhs.endOnsetDivisions < rhs.endOnsetDivisions
+            }
+            if lhs.endNoteIndex != rhs.endNoteIndex {
+                return lhs.endNoteIndex < rhs.endNoteIndex
+            }
+            return placementSortValue(lhs.placement) < placementSortValue(rhs.placement)
         }
     }
 
@@ -264,6 +282,14 @@ public struct SlurGenerator: Sendable {
 
     private func staffSortValue(_ staff: Int?) -> Int {
         staff ?? Int.max
+    }
+
+    private func optionalNumberSortValue(_ number: Int?) -> Int {
+        number ?? Int.max
+    }
+
+    private func placementSortValue(_ value: String?) -> String {
+        value ?? ""
     }
 
     private func resolveStopKey(
