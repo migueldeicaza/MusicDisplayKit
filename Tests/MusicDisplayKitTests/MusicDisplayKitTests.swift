@@ -5388,6 +5388,28 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(sorted.map(\.placement) == ["above", "above"])
 }
 
+@Test func vexAdapterBuildsCrossSystemImplicitContinueFallbackSlurPlanAnchors() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureImplicitContinueFallbackDisambiguationXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
+    #expect(laidOut.measures.count == 4)
+    #expect(laidOut.measures.map(\.systemIndex) == [0, 1, 2, 3])
+
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    #expect(plan.slurs.count == 2)
+    let sorted = plan.slurs.sorted { lhs, rhs in
+        if lhs.systemIndex != rhs.systemIndex {
+            return lhs.systemIndex < rhs.systemIndex
+        }
+        return lhs.endSystemIndex < rhs.endSystemIndex
+    }
+    #expect(sorted.map(\.number) == [3, 3])
+    #expect(sorted.map(\.systemIndex) == [1, 2])
+    #expect(sorted.map(\.endSystemIndex) == [2, 3])
+    #expect(sorted.map(\.measureIndexInPart) == [1, 2])
+    #expect(sorted.map(\.endMeasureIndexInPart) == [2, 3])
+    #expect(sorted.map(\.placement) == ["below", "below"])
+}
+
 @Test func vexAdapterBuildsCrossMeasureCrossStaffContinuedSlurPlans() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureCrossStaffContinueSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -5999,6 +6021,30 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     }
     #expect(sorted.map(\.systemIndex) == [0, 1])
     #expect(sorted.map(\.endSystemIndex) == [1, 2])
+
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(execution.slurs.count == 2)
+    #expect(execution.slurs.allSatisfy { $0.from != nil && $0.to != nil })
+}
+
+@Test func vexAdapterExecutesCrossSystemImplicitContinueFallbackSlurObjects() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureImplicitContinueFallbackDisambiguationXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
+    #expect(laidOut.measures.count == 4)
+    #expect(laidOut.measures.map(\.systemIndex) == [0, 1, 2, 3])
+
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    #expect(plan.slurs.count == 2)
+    let sorted = plan.slurs.sorted { lhs, rhs in
+        if lhs.systemIndex != rhs.systemIndex {
+            return lhs.systemIndex < rhs.systemIndex
+        }
+        return lhs.endSystemIndex < rhs.endSystemIndex
+    }
+    #expect(sorted.map(\.number) == [3, 3])
+    #expect(sorted.map(\.systemIndex) == [1, 2])
+    #expect(sorted.map(\.endSystemIndex) == [2, 3])
 
     let execution = renderer.executeRenderPlan(plan)
     #expect(execution.slurs.count == 2)
