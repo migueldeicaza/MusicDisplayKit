@@ -271,6 +271,21 @@ public struct SlurGenerator: Sendable {
         requestedRawNumber: Int?,
         openByKey: [SlurKey: [OpenSlur]]
     ) -> SlurKey? {
+        if requestedRawNumber != nil {
+            let voiceNumberCandidates = openByKey.filter { candidate in
+                candidate.key.voice == requestedKey.voice &&
+                candidate.key.number == requestedKey.number &&
+                !candidate.value.isEmpty
+            }
+            if let match = mostRecentKey(
+                from: voiceNumberCandidates,
+                preferredStaff: nil
+            ) {
+                return match
+            }
+            return nil
+        }
+
         if let stack = openByKey[requestedKey], !stack.isEmpty {
             return requestedKey
         }
@@ -291,7 +306,7 @@ public struct SlurGenerator: Sendable {
             }
         }
 
-        // Cross-staff fallback: if a numbered slur stop changes staff,
+        // Cross-staff fallback: if an implicit slur stop maps to normalized "1",
         // allow closing the most recent matching voice+number open slur.
         let candidates = openByKey
             .filter { candidate in

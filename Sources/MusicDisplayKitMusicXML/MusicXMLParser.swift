@@ -2790,6 +2790,21 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             requestedKey: SlurOpenKey,
             requestedRawNumber: Int?
         ) -> SlurOpenKey? {
+            if requestedRawNumber != nil {
+                let voiceNumberCandidates = openByKey.filter { candidate in
+                    candidate.key.voice == requestedKey.voice &&
+                    candidate.key.number == requestedKey.number &&
+                    !candidate.value.isEmpty
+                }
+                if let match = mostRecentKey(
+                    from: voiceNumberCandidates,
+                    preferredStaff: nil
+                ) {
+                    return match
+                }
+                return nil
+            }
+
             if let stack = openByKey[requestedKey], !stack.isEmpty {
                 return requestedKey
             }
@@ -2810,7 +2825,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 }
             }
 
-            // Cross-staff fallback for numbered slurs:
+            // Cross-staff fallback for implicit number-one slurs:
             // allow voice+number pairing when staff changes.
             let voiceNumberCandidates = openByKey.filter { candidate in
                 candidate.key.voice == requestedKey.voice &&
