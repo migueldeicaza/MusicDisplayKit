@@ -660,6 +660,49 @@ private let crossMeasureCrossStaffContinueSlurXML = """
 </score-partwise>
 """
 
+private let crossMeasureCrossVoiceExplicitStopIsolationXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>5</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="5" placement="above"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>F</step><octave>3</octave></pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+        <notations>
+          <slur type="stop" number="5"/>
+        </notations>
+      </note>
+      <backup>
+        <duration>4</duration>
+      </backup>
+      <note>
+        <pitch><step>D</step><octave>5</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop" number="5"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let slurContinueXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2950,6 +2993,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.isOpenEnded == false)
 }
 
+@Test func slurGeneratorMatchesExplicitCrossMeasureStopsByVoice() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossVoiceExplicitStopIsolationXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 1)
+
+    let slur = try #require(slurs.first)
+    #expect(slur.number == 5)
+    #expect(slur.voice == 1)
+    #expect(slur.startMeasureNumber == 1)
+    #expect(slur.endMeasureNumber == 2)
+    #expect(slur.startNoteIndex == 0)
+    #expect(slur.endNoteIndex == 1)
+    #expect(slur.spansMultipleMeasures == true)
+    #expect(slur.isOpenEnded == false)
+}
+
 @Test func slurGeneratorSegmentsContinuedSlurs() throws {
     let score = try MusicXMLParser().parse(xml: slurContinueXML)
     let slurs = SlurGenerator().generate(from: score)
@@ -3104,6 +3163,29 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(byEnd.map(\.startNoteIndex) == [1, 2, 0])
     #expect(byEnd.map(\.endNoteIndex) == [2, 3, 4])
     #expect(byEnd.map(\.staff) == [2, 1, 1])
+}
+
+@Test func slurGeneratorSegmentsCrossMeasureCrossStaffContinuedSlurs() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossStaffContinueSlurXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 2)
+
+    let byStart = slurs.sorted { lhs, rhs in
+        if lhs.startMeasureIndex != rhs.startMeasureIndex {
+            return lhs.startMeasureIndex < rhs.startMeasureIndex
+        }
+        return lhs.endMeasureIndex < rhs.endMeasureIndex
+    }
+    #expect(byStart.map(\.number) == [4, 4])
+    #expect(byStart.map(\.voice) == [1, 1])
+    #expect(byStart.map(\.staff) == [1, 2])
+    #expect(byStart.map(\.startMeasureNumber) == [1, 2])
+    #expect(byStart.map(\.endMeasureNumber) == [2, 3])
+    #expect(byStart.map(\.startNoteIndex) == [0, 0])
+    #expect(byStart.map(\.endNoteIndex) == [0, 0])
+    #expect(byStart.map(\.placement) == ["above", "above"])
+    #expect(byStart.allSatisfy { $0.spansMultipleMeasures })
+    #expect(byStart.allSatisfy { !$0.isOpenEnded })
 }
 
 @Test func lyricsGeneratorBuildsInMeasureWords() throws {
@@ -3484,6 +3566,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.tempoTimelineEvents.count == 2)
 }
 
+@Test func musicSheetReaderReadWithTraversalMatchesExplicitCrossMeasureStopsByVoice() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossMeasureCrossVoiceExplicitStopIsolationXML))
+    #expect(result.slurEvents.count == 1)
+
+    let slur = try #require(result.slurEvents.first)
+    #expect(slur.number == 5)
+    #expect(slur.voice == 1)
+    #expect(slur.startMeasureNumber == 1)
+    #expect(slur.endMeasureNumber == 2)
+    #expect(slur.startNoteIndex == 0)
+    #expect(slur.endNoteIndex == 1)
+    #expect(slur.spansMultipleMeasures == true)
+    #expect(slur.isOpenEnded == false)
+}
+
 @Test func musicSheetReaderReadWithTraversalSegmentsContinuedSlurs() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(slurContinueXML))
@@ -3628,6 +3726,29 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(byEnd.map(\.startNoteIndex) == [1, 2, 0])
     #expect(byEnd.map(\.endNoteIndex) == [2, 3, 4])
     #expect(byEnd.map(\.staff) == [2, 1, 1])
+}
+
+@Test func musicSheetReaderReadWithTraversalSegmentsCrossMeasureCrossStaffContinuedSlurs() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossMeasureCrossStaffContinueSlurXML))
+    #expect(result.slurEvents.count == 2)
+
+    let byStart = result.slurEvents.sorted { lhs, rhs in
+        if lhs.startMeasureIndex != rhs.startMeasureIndex {
+            return lhs.startMeasureIndex < rhs.startMeasureIndex
+        }
+        return lhs.endMeasureIndex < rhs.endMeasureIndex
+    }
+    #expect(byStart.map(\.number) == [4, 4])
+    #expect(byStart.map(\.voice) == [1, 1])
+    #expect(byStart.map(\.staff) == [1, 2])
+    #expect(byStart.map(\.startMeasureNumber) == [1, 2])
+    #expect(byStart.map(\.endMeasureNumber) == [2, 3])
+    #expect(byStart.map(\.startNoteIndex) == [0, 0])
+    #expect(byStart.map(\.endNoteIndex) == [0, 0])
+    #expect(byStart.map(\.placement) == ["above", "above"])
+    #expect(byStart.allSatisfy { $0.spansMultipleMeasures })
+    #expect(byStart.allSatisfy { !$0.isOpenEnded })
 }
 
 @Test func musicSheetReaderReadWithTraversalIncludesTempoTimelineEvents() throws {
@@ -4693,6 +4814,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.placement == "above")
 }
 
+@Test func vexAdapterBuildsCrossMeasureSlurPlansMatchingExplicitStopsByVoice() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossVoiceExplicitStopIsolationXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.slurs.count == 1)
+    let slur = try #require(plan.slurs.first)
+    #expect(slur.voice == 1)
+    #expect(slur.number == 5)
+    #expect(slur.measureIndexInPart == 0)
+    #expect(slur.endMeasureIndexInPart == 1)
+    #expect(slur.startEntryIndex == 0)
+    #expect(slur.endEntryIndex == 0)
+    #expect(slur.placement == "above")
+}
+
 @Test func vexAdapterBuildsCrossSystemSlurPlanAnchors() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
@@ -4708,6 +4845,27 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.endMeasureIndexInPart == 1)
     #expect(slur.startEntryIndex == 0)
     #expect(slur.endEntryIndex == 0)
+}
+
+@Test func vexAdapterBuildsCrossSystemContinuedSlurPlanAnchors() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossStaffContinueSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
+    #expect(laidOut.measures.count == 3)
+    #expect(laidOut.measures.map(\.systemIndex) == [0, 1, 2])
+
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    #expect(plan.slurs.count == 2)
+    let sorted = plan.slurs.sorted { lhs, rhs in
+        if lhs.systemIndex != rhs.systemIndex {
+            return lhs.systemIndex < rhs.systemIndex
+        }
+        return lhs.endSystemIndex < rhs.endSystemIndex
+    }
+    #expect(sorted.map(\.systemIndex) == [0, 1])
+    #expect(sorted.map(\.endSystemIndex) == [1, 2])
+    #expect(sorted.map(\.measureIndexInPart) == [0, 1])
+    #expect(sorted.map(\.endMeasureIndexInPart) == [1, 2])
+    #expect(sorted.map(\.placement) == ["above", "above"])
 }
 
 @Test func vexAdapterBuildsCrossMeasureCrossStaffContinuedSlurPlans() throws {
@@ -5178,6 +5336,26 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.to != nil)
 }
 
+@Test func vexAdapterExecutesCrossMeasureSlurObjectsMatchingExplicitStopsByVoice() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossVoiceExplicitStopIsolationXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.slurs.count == 1)
+    let planned = try #require(plan.slurs.first)
+    #expect(planned.voice == 1)
+    #expect(planned.number == 5)
+    #expect(planned.measureIndexInPart == 0)
+    #expect(planned.endMeasureIndexInPart == 1)
+
+    #expect(execution.slurs.count == 1)
+    let slur = try #require(execution.slurs.first)
+    #expect(slur.from != nil)
+    #expect(slur.to != nil)
+}
+
 @Test func vexAdapterExecutesCrossSystemSlurObjects() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
@@ -5196,6 +5374,29 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let slur = try #require(execution.slurs.first)
     #expect(slur.from != nil)
     #expect(slur.to != nil)
+}
+
+@Test func vexAdapterExecutesCrossSystemContinuedSlurObjects() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossStaffContinueSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
+    #expect(laidOut.measures.count == 3)
+    #expect(laidOut.measures.map(\.systemIndex) == [0, 1, 2])
+
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    #expect(plan.slurs.count == 2)
+    let sorted = plan.slurs.sorted { lhs, rhs in
+        if lhs.systemIndex != rhs.systemIndex {
+            return lhs.systemIndex < rhs.systemIndex
+        }
+        return lhs.endSystemIndex < rhs.endSystemIndex
+    }
+    #expect(sorted.map(\.systemIndex) == [0, 1])
+    #expect(sorted.map(\.endSystemIndex) == [1, 2])
+
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(execution.slurs.count == 2)
+    #expect(execution.slurs.allSatisfy { $0.from != nil && $0.to != nil })
 }
 
 @Test func vexAdapterExecutesCrossMeasureCrossStaffContinuedSlurObjects() throws {
