@@ -3362,7 +3362,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         endPartIndex: endRef.partIndex,
                         endMeasureIndexInPart: endRef.measureIndexInPart,
                         voice: startRef.voice,
-                        number: open.rawNumber ?? endNumber,
+                        number: open.rawNumber ?? endNumber ?? 1,
                         startEntryIndex: startRef.entryIndexInVoice,
                         endEntryIndex: endRef.entryIndexInVoice,
                         placement: open.placement ?? endPlacement

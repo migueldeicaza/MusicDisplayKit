@@ -2872,7 +2872,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     }
                     spans.append(
                         SlurSpan(
-                            number: open.rawNumber ?? marker.number,
+                            number: open.rawNumber ?? marker.number ?? 1,
                             startNoteIndex: open.startIndex,
                             endNoteIndex: index,
                             voice: note.voice,
@@ -2895,7 +2895,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     let open = stack.popLast() {
                         spans.append(
                             SlurSpan(
-                                number: open.rawNumber ?? marker.number,
+                                number: open.rawNumber ?? marker.number ?? 1,
                                 startNoteIndex: open.startIndex,
                                 endNoteIndex: index,
                                 voice: note.voice,

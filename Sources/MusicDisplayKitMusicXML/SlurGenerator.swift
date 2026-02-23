@@ -247,7 +247,7 @@ public struct SlurGenerator: Sendable {
             partID: partID,
             voice: openSlur.key.voice,
             staff: openSlur.key.staff,
-            number: openSlur.rawNumber ?? endNumber,
+            number: openSlur.rawNumber ?? endNumber ?? 1,
             placement: openSlur.placement ?? endPlacement,
             startMeasureIndex: openSlur.start.measureIndex,
             startMeasureNumber: openSlur.start.measureNumber,

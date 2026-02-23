@@ -581,6 +581,68 @@ private let crossMeasureSlurXML = """
 </score-partwise>
 """
 
+private let slurImplicitNumberOmittedXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" placement="above"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let crossMeasureImplicitNumberOmittedSlurXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>G</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" placement="above"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>A</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let crossStaffSlurXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2978,6 +3040,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.isOpenEnded == false)
 }
 
+@Test func slurGeneratorNormalizesCrossMeasureImplicitSlurNumberToOne() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureImplicitNumberOmittedSlurXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 1)
+
+    let slur = try #require(slurs.first)
+    #expect(slur.number == 1)
+    #expect(slur.voice == 1)
+    #expect(slur.startMeasureNumber == 1)
+    #expect(slur.endMeasureNumber == 2)
+    #expect(slur.spansMultipleMeasures == true)
+    #expect(slur.isOpenEnded == false)
+}
+
 @Test func slurGeneratorClosesNumberedCrossStaffSlurs() throws {
     let score = try MusicXMLParser().parse(xml: crossStaffSlurXML)
     let slurs = SlurGenerator().generate(from: score)
@@ -3035,6 +3111,18 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slurs[1].startNoteIndex == 2)
     #expect(slurs[1].endNoteIndex == 3)
     #expect(slurs.allSatisfy { !$0.isOpenEnded })
+}
+
+@Test func slurGeneratorNormalizesImplicitSlurStartStopNumberToOne() throws {
+    let score = try MusicXMLParser().parse(xml: slurImplicitNumberOmittedXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 1)
+
+    let slur = try #require(slurs.first)
+    #expect(slur.number == 1)
+    #expect(slur.startNoteIndex == 0)
+    #expect(slur.endNoteIndex == 1)
+    #expect(slur.isOpenEnded == false)
 }
 
 @Test func slurGeneratorFallsBackForImplicitContinueAndStopNumbering() throws {
@@ -3556,6 +3644,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.tempoTimelineEvents.count == 2)
 }
 
+@Test func musicSheetReaderReadWithTraversalNormalizesCrossMeasureImplicitSlurNumberToOne() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossMeasureImplicitNumberOmittedSlurXML))
+    #expect(result.slurEvents.count == 1)
+
+    let slur = try #require(result.slurEvents.first)
+    #expect(slur.number == 1)
+    #expect(slur.voice == 1)
+    #expect(slur.startMeasureNumber == 1)
+    #expect(slur.endMeasureNumber == 2)
+    #expect(slur.spansMultipleMeasures == true)
+    #expect(slur.isOpenEnded == false)
+}
+
 @Test func musicSheetReaderReadWithTraversalIncludesCrossStaffSlurEvents() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(crossStaffSlurXML))
@@ -3599,6 +3701,18 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.slurEvents.map(\.number) == [1, 1])
     #expect(result.slurEvents.map(\.startNoteIndex) == [0, 2])
     #expect(result.slurEvents.map(\.endNoteIndex) == [1, 3])
+}
+
+@Test func musicSheetReaderReadWithTraversalNormalizesImplicitSlurStartStopNumberToOne() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(slurImplicitNumberOmittedXML))
+    #expect(result.slurEvents.count == 1)
+
+    let slur = try #require(result.slurEvents.first)
+    #expect(slur.number == 1)
+    #expect(slur.startNoteIndex == 0)
+    #expect(slur.endNoteIndex == 1)
+    #expect(slur.isOpenEnded == false)
 }
 
 @Test func musicSheetReaderReadWithTraversalFallsBackForImplicitContinueAndStopNumbering() throws {
@@ -3860,6 +3974,14 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(measure.slurSpans == [
         SlurSpan(number: 6, startNoteIndex: 0, endNoteIndex: 1, voice: 1, staff: nil, placement: "above"),
         SlurSpan(number: 6, startNoteIndex: 1, endNoteIndex: 2, voice: 1, staff: nil, placement: "above")
+    ])
+}
+
+@Test func parserNormalizesImplicitSlurStartStopNumberToOne() throws {
+    let score = try MusicXMLParser().parse(xml: slurImplicitNumberOmittedXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.slurSpans == [
+        SlurSpan(number: 1, startNoteIndex: 0, endNoteIndex: 1, voice: 1, staff: nil, placement: "above")
     ])
 }
 
@@ -4798,6 +4920,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.placement == "above")
 }
 
+@Test func vexAdapterBuildsInMeasureSlurPlansNormalizingImplicitNumberToOne() throws {
+    let score = try MusicXMLParser().parse(xml: slurImplicitNumberOmittedXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.slurs.count == 1)
+    let slur = try #require(plan.slurs.first)
+    #expect(slur.voice == 1)
+    #expect(slur.number == 1)
+    #expect(slur.startEntryIndex == 0)
+    #expect(slur.endEntryIndex == 1)
+    #expect(slur.placement == "above")
+}
+
 @Test func vexAdapterBuildsCrossMeasureSlurPlans() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -4807,6 +4943,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let slur = try #require(plan.slurs.first)
     #expect(slur.voice == 1)
     #expect(slur.number == 3)
+    #expect(slur.measureIndexInPart == 0)
+    #expect(slur.endMeasureIndexInPart == 1)
+    #expect(slur.startEntryIndex == 0)
+    #expect(slur.endEntryIndex == 0)
+    #expect(slur.placement == "above")
+}
+
+@Test func vexAdapterBuildsCrossMeasureSlurPlansNormalizingImplicitNumberToOne() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureImplicitNumberOmittedSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.slurs.count == 1)
+    let slur = try #require(plan.slurs.first)
+    #expect(slur.voice == 1)
+    #expect(slur.number == 1)
     #expect(slur.measureIndexInPart == 0)
     #expect(slur.endMeasureIndexInPart == 1)
     #expect(slur.startEntryIndex == 0)
@@ -5322,6 +5474,23 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.renderOptions.invert == true)
 }
 
+@Test func vexAdapterExecutesInMeasureSlurObjectsNormalizingImplicitNumberToOne() throws {
+    let score = try MusicXMLParser().parse(xml: slurImplicitNumberOmittedXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.slurs.count == 1)
+    let planned = try #require(plan.slurs.first)
+    #expect(planned.number == 1)
+
+    #expect(execution.slurs.count == 1)
+    let slur = try #require(execution.slurs.first)
+    #expect(slur.from != nil)
+    #expect(slur.to != nil)
+}
+
 @Test func vexAdapterExecutesCrossMeasureSlurObjects() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -5330,6 +5499,23 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let execution = renderer.executeRenderPlan(plan)
 
     #expect(plan.slurs.count == 1)
+    #expect(execution.slurs.count == 1)
+    let slur = try #require(execution.slurs.first)
+    #expect(slur.from != nil)
+    #expect(slur.to != nil)
+}
+
+@Test func vexAdapterExecutesCrossMeasureSlurObjectsNormalizingImplicitNumberToOne() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureImplicitNumberOmittedSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.slurs.count == 1)
+    let planned = try #require(plan.slurs.first)
+    #expect(planned.number == 1)
+
     #expect(execution.slurs.count == 1)
     let slur = try #require(execution.slurs.first)
     #expect(slur.from != nil)
