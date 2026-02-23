@@ -1104,6 +1104,65 @@ private let slurNestedSameNumberCrossStaffXML = """
 </score-partwise>
 """
 
+private let slurNestedSameNumberCrossStaffContinueXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>5</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <staff>1</staff>
+        <notations>
+          <slur type="start" number="5" placement="above"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <staff>2</staff>
+        <notations>
+          <slur type="start" number="5" placement="below"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>5</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <staff>1</staff>
+        <notations>
+          <slur type="continue" number="5"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <staff>2</staff>
+        <notations>
+          <slur type="stop" number="5"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>G</step><octave>5</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <staff>1</staff>
+        <notations>
+          <slur type="stop" number="5"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let beamTupletXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2934,6 +2993,21 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(byEnd.map(\.staff) == [2, 1])
 }
 
+@Test func slurGeneratorSupportsNestedSameNumberCrossStaffContinueSegmentation() throws {
+    let score = try MusicXMLParser().parse(xml: slurNestedSameNumberCrossStaffContinueXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 3)
+
+    let byEnd = slurs.sorted { lhs, rhs in
+        lhs.endNoteIndex < rhs.endNoteIndex
+    }
+    #expect(byEnd.map(\.number) == [5, 5, 5])
+    #expect(byEnd.map(\.placement) == ["below", "below", "above"])
+    #expect(byEnd.map(\.startNoteIndex) == [1, 2, 0])
+    #expect(byEnd.map(\.endNoteIndex) == [2, 3, 4])
+    #expect(byEnd.map(\.staff) == [2, 1, 1])
+}
+
 @Test func lyricsGeneratorBuildsInMeasureWords() throws {
     let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
     let words = LyricsGenerator().generate(from: score)
@@ -3436,6 +3510,21 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(byEnd.map(\.staff) == [2, 1])
 }
 
+@Test func musicSheetReaderReadWithTraversalSupportsNestedSameNumberCrossStaffContinueSegmentation() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(slurNestedSameNumberCrossStaffContinueXML))
+    #expect(result.slurEvents.count == 3)
+
+    let byEnd = result.slurEvents.sorted { lhs, rhs in
+        lhs.endNoteIndex < rhs.endNoteIndex
+    }
+    #expect(byEnd.map(\.number) == [5, 5, 5])
+    #expect(byEnd.map(\.placement) == ["below", "below", "above"])
+    #expect(byEnd.map(\.startNoteIndex) == [1, 2, 0])
+    #expect(byEnd.map(\.endNoteIndex) == [2, 3, 4])
+    #expect(byEnd.map(\.staff) == [2, 1, 1])
+}
+
 @Test func musicSheetReaderReadWithTraversalIncludesTempoTimelineEvents() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(repeatsAndTempoXML))
@@ -3611,6 +3700,16 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(measure.slurSpans == [
         SlurSpan(number: 5, startNoteIndex: 1, endNoteIndex: 2, voice: 1, staff: 1, placement: "below"),
         SlurSpan(number: 5, startNoteIndex: 0, endNoteIndex: 3, voice: 1, staff: 2, placement: "above")
+    ])
+}
+
+@Test func parserSupportsNestedSameNumberCrossStaffContinueSegmentation() throws {
+    let score = try MusicXMLParser().parse(xml: slurNestedSameNumberCrossStaffContinueXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.slurSpans == [
+        SlurSpan(number: 5, startNoteIndex: 1, endNoteIndex: 2, voice: 1, staff: 1, placement: "below"),
+        SlurSpan(number: 5, startNoteIndex: 2, endNoteIndex: 3, voice: 1, staff: 2, placement: "below"),
+        SlurSpan(number: 5, startNoteIndex: 0, endNoteIndex: 4, voice: 1, staff: 1, placement: "above")
     ])
 }
 
