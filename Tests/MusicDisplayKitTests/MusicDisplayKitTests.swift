@@ -783,6 +783,52 @@ private let slurOrientationFallbackXML = """
 </score-partwise>
 """
 
+private let slurPlacementSynonymFallbackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="1" placement="over"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop" number="1"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="2" placement="under"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop" number="2"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let slurImplicitStopDisambiguationXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -2905,6 +2951,13 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slurs.map(\.placement) == ["above", "below"])
 }
 
+@Test func slurGeneratorMapsPlacementSynonymsToPlacementSemantics() throws {
+    let score = try MusicXMLParser().parse(xml: slurPlacementSynonymFallbackXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 2)
+    #expect(slurs.map(\.placement) == ["above", "below"])
+}
+
 @Test func slurGeneratorDisambiguatesImplicitStopsByMostRecentOpenSlur() throws {
     let score = try MusicXMLParser().parse(xml: slurImplicitStopDisambiguationXML)
     let slurs = SlurGenerator().generate(from: score)
@@ -3422,6 +3475,13 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(result.slurEvents.map(\.placement) == ["above", "below"])
 }
 
+@Test func musicSheetReaderReadWithTraversalMapsSlurPlacementSynonymsToPlacementSemantics() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(slurPlacementSynonymFallbackXML))
+    #expect(result.slurEvents.count == 2)
+    #expect(result.slurEvents.map(\.placement) == ["above", "below"])
+}
+
 @Test func musicSheetReaderReadWithTraversalDisambiguatesImplicitStopsByMostRecentOpenSlur() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(slurImplicitStopDisambiguationXML))
@@ -3639,6 +3699,14 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
 @Test func parserMapsSlurOrientationFallbackToPlacement() throws {
     let score = try MusicXMLParser().parse(xml: slurOrientationFallbackXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.noteEvents[0].slurs.first?.placement == "above")
+    #expect(measure.noteEvents[2].slurs.first?.placement == "below")
+    #expect(measure.slurSpans.map(\.placement) == ["above", "below"])
+}
+
+@Test func parserMapsSlurPlacementSynonymsToPlacementSemantics() throws {
+    let score = try MusicXMLParser().parse(xml: slurPlacementSynonymFallbackXML)
     let measure = try #require(score.parts.first?.measures.first)
     #expect(measure.noteEvents[0].slurs.first?.placement == "above")
     #expect(measure.noteEvents[2].slurs.first?.placement == "below")

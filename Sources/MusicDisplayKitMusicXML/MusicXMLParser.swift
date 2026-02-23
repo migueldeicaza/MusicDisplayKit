@@ -2338,7 +2338,14 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
     private func parseSlurPlacement(from attributes: [String: String]) -> String? {
         if let placement = attributes["placement"]?.trimmedNonEmpty?.lowercased() {
-            return placement
+            switch placement {
+            case "above", "top", "over":
+                return "above"
+            case "below", "bottom", "under":
+                return "below"
+            default:
+                return placement
+            }
         }
         switch attributes["orientation"]?.trimmedNonEmpty?.lowercased() {
         case "over", "top":
