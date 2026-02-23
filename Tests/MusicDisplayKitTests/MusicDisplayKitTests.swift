@@ -988,6 +988,136 @@ private let crossMeasureImplicitStopFallbackTwoPartsXML = """
 </score-partwise>
 """
 
+private let crossMeasureCrossVoiceImplicitContinueStopFallbackTwoPartsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Violin I</part-name></score-part>
+    <score-part id="P2"><part-name>Violin II</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="2" placement="above"/>
+        </notations>
+      </note>
+      <backup><duration>4</duration></backup>
+      <note>
+        <pitch><step>G</step><octave>3</octave></pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+        <notations>
+          <slur type="start" number="4" placement="below"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="continue"/>
+        </notations>
+      </note>
+      <backup><duration>4</duration></backup>
+      <note>
+        <pitch><step>A</step><octave>3</octave></pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+        <notations>
+          <slur type="continue"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="3">
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+      <backup><duration>4</duration></backup>
+      <note>
+        <pitch><step>B</step><octave>3</octave></pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="start" number="2" placement="below"/>
+        </notations>
+      </note>
+      <backup><duration>4</duration></backup>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+        <notations>
+          <slur type="start" number="4" placement="above"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>G</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="continue"/>
+        </notations>
+      </note>
+      <backup><duration>4</duration></backup>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+        <notations>
+          <slur type="continue"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="3">
+      <note>
+        <pitch><step>A</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+      <backup><duration>4</duration></backup>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>2</voice>
+        <notations>
+          <slur type="stop"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let crossStaffSlurXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -3514,6 +3644,44 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     }
 }
 
+@Test func slurGeneratorCrossMeasureCrossVoiceImplicitContinueStopFallbackChainsPerPart() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossVoiceImplicitContinueStopFallbackTwoPartsXML)
+    let slurs = SlurGenerator().generate(from: score)
+    #expect(slurs.count == 8)
+
+    let grouped = Dictionary(grouping: slurs, by: \.partIndex)
+    #expect(Set(grouped.keys) == Set([0, 1]))
+    for partIndex in [0, 1] {
+        let partSlurs = try #require(grouped[partIndex])
+        #expect(partSlurs.count == 4)
+        #expect(partSlurs.allSatisfy { !$0.isOpenEnded })
+
+        for voice in [1, 2] {
+            let voiceSlurs = partSlurs
+                .filter { $0.voice == voice }
+                .sorted { lhs, rhs in
+                    if lhs.startMeasureIndex != rhs.startMeasureIndex {
+                        return lhs.startMeasureIndex < rhs.startMeasureIndex
+                    }
+                    return lhs.endMeasureIndex < rhs.endMeasureIndex
+                }
+            #expect(voiceSlurs.count == 2)
+
+            let expectedNumber = voice == 1 ? 2 : 4
+            let expectedPlacement = if partIndex == 0 {
+                voice == 1 ? "above" : "below"
+            } else {
+                voice == 1 ? "below" : "above"
+            }
+            #expect(voiceSlurs.map(\.number) == [expectedNumber, expectedNumber])
+            #expect(voiceSlurs.map(\.placement) == [expectedPlacement, expectedPlacement])
+            #expect(voiceSlurs.map(\.startMeasureNumber) == [1, 2])
+            #expect(voiceSlurs.map(\.endMeasureNumber) == [2, 3])
+            #expect(voiceSlurs.allSatisfy { $0.spansMultipleMeasures })
+        }
+    }
+}
+
 @Test func slurGeneratorNormalizesCrossMeasureImplicitSlurNumberToOne() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureImplicitNumberOmittedSlurXML)
     let slurs = SlurGenerator().generate(from: score)
@@ -4244,6 +4412,44 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         #expect(partSlurs.map(\.startMeasureNumber) == [2, 1])
         #expect(partSlurs.map(\.endMeasureNumber) == [3, 4])
         #expect(partSlurs.allSatisfy { $0.spansMultipleMeasures })
+    }
+}
+
+@Test func musicSheetReaderReadWithTraversalCrossMeasureCrossVoiceImplicitContinueStopFallbackChainsPerPart() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(crossMeasureCrossVoiceImplicitContinueStopFallbackTwoPartsXML))
+    #expect(result.slurEvents.count == 8)
+
+    let grouped = Dictionary(grouping: result.slurEvents, by: \.partIndex)
+    #expect(Set(grouped.keys) == Set([0, 1]))
+    for partIndex in [0, 1] {
+        let partSlurs = try #require(grouped[partIndex])
+        #expect(partSlurs.count == 4)
+        #expect(partSlurs.allSatisfy { !$0.isOpenEnded })
+
+        for voice in [1, 2] {
+            let voiceSlurs = partSlurs
+                .filter { $0.voice == voice }
+                .sorted { lhs, rhs in
+                    if lhs.startMeasureIndex != rhs.startMeasureIndex {
+                        return lhs.startMeasureIndex < rhs.startMeasureIndex
+                    }
+                    return lhs.endMeasureIndex < rhs.endMeasureIndex
+                }
+            #expect(voiceSlurs.count == 2)
+
+            let expectedNumber = voice == 1 ? 2 : 4
+            let expectedPlacement = if partIndex == 0 {
+                voice == 1 ? "above" : "below"
+            } else {
+                voice == 1 ? "below" : "above"
+            }
+            #expect(voiceSlurs.map(\.number) == [expectedNumber, expectedNumber])
+            #expect(voiceSlurs.map(\.placement) == [expectedPlacement, expectedPlacement])
+            #expect(voiceSlurs.map(\.startMeasureNumber) == [1, 2])
+            #expect(voiceSlurs.map(\.endMeasureNumber) == [2, 3])
+            #expect(voiceSlurs.allSatisfy { $0.spansMultipleMeasures })
+        }
     }
 }
 
@@ -5758,6 +5964,49 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     }
 }
 
+@Test func vexAdapterBuildsCrossSystemCrossVoiceImplicitContinueStopFallbackSlurPlanAnchorsPerPart() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossVoiceImplicitContinueStopFallbackTwoPartsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
+    #expect(laidOut.measures.count == 6)
+
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    #expect(plan.slurs.count == 8)
+
+    let grouped = Dictionary(grouping: plan.slurs, by: \.partIndex)
+    #expect(Set(grouped.keys) == Set([0, 1]))
+    for partIndex in [0, 1] {
+        let partSlurs = try #require(grouped[partIndex])
+        #expect(partSlurs.count == 4)
+
+        for voice in [1, 2] {
+            let voiceSlurs = partSlurs
+                .filter { $0.voice == voice }
+                .sorted { lhs, rhs in
+                    if lhs.measureIndexInPart != rhs.measureIndexInPart {
+                        return lhs.measureIndexInPart < rhs.measureIndexInPart
+                    }
+                    return lhs.endMeasureIndexInPart < rhs.endMeasureIndexInPart
+                }
+            #expect(voiceSlurs.count == 2)
+
+            let expectedNumber = voice == 1 ? 2 : 4
+            let expectedPlacement = if partIndex == 0 {
+                voice == 1 ? "above" : "below"
+            } else {
+                voice == 1 ? "below" : "above"
+            }
+            #expect(voiceSlurs.map(\.number) == [expectedNumber, expectedNumber])
+            #expect(voiceSlurs.map(\.placement) == [expectedPlacement, expectedPlacement])
+            #expect(voiceSlurs.map(\.measureIndexInPart) == [0, 1])
+            #expect(voiceSlurs.map(\.endMeasureIndexInPart) == [1, 2])
+            #expect(voiceSlurs.allSatisfy { $0.endSystemIndex > $0.systemIndex })
+            #expect(voiceSlurs[0].systemIndex <= voiceSlurs[1].systemIndex)
+            #expect(voiceSlurs[0].endSystemIndex <= voiceSlurs[1].endSystemIndex)
+        }
+    }
+}
+
 @Test func vexAdapterBuildsCrossMeasureCrossStaffContinuedSlurPlans() throws {
     let score = try MusicXMLParser().parse(xml: crossMeasureCrossStaffContinueSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -6452,6 +6701,51 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
     let execution = renderer.executeRenderPlan(plan)
     #expect(execution.slurs.count == 4)
+    #expect(execution.slurs.allSatisfy { $0.from != nil && $0.to != nil })
+}
+
+@Test func vexAdapterExecutesCrossSystemCrossVoiceImplicitContinueStopFallbackSlurObjectsPerPart() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossVoiceImplicitContinueStopFallbackTwoPartsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 120))
+    #expect(laidOut.measures.count == 6)
+
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    #expect(plan.slurs.count == 8)
+
+    let grouped = Dictionary(grouping: plan.slurs, by: \.partIndex)
+    #expect(Set(grouped.keys) == Set([0, 1]))
+    for partIndex in [0, 1] {
+        let partSlurs = try #require(grouped[partIndex])
+        #expect(partSlurs.count == 4)
+
+        for voice in [1, 2] {
+            let voiceSlurs = partSlurs
+                .filter { $0.voice == voice }
+                .sorted { lhs, rhs in
+                    if lhs.measureIndexInPart != rhs.measureIndexInPart {
+                        return lhs.measureIndexInPart < rhs.measureIndexInPart
+                    }
+                    return lhs.endMeasureIndexInPart < rhs.endMeasureIndexInPart
+                }
+            #expect(voiceSlurs.count == 2)
+
+            let expectedNumber = voice == 1 ? 2 : 4
+            let expectedPlacement = if partIndex == 0 {
+                voice == 1 ? "above" : "below"
+            } else {
+                voice == 1 ? "below" : "above"
+            }
+            #expect(voiceSlurs.map(\.number) == [expectedNumber, expectedNumber])
+            #expect(voiceSlurs.map(\.placement) == [expectedPlacement, expectedPlacement])
+            #expect(voiceSlurs.map(\.measureIndexInPart) == [0, 1])
+            #expect(voiceSlurs.map(\.endMeasureIndexInPart) == [1, 2])
+            #expect(voiceSlurs.allSatisfy { $0.endSystemIndex > $0.systemIndex })
+        }
+    }
+
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(execution.slurs.count == 8)
     #expect(execution.slurs.allSatisfy { $0.from != nil && $0.to != nil })
 }
 
