@@ -615,6 +615,51 @@ private let crossStaffSlurXML = """
 </score-partwise>
 """
 
+private let crossMeasureCrossStaffContinueSlurXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>5</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <staff>1</staff>
+        <notations>
+          <slur type="start" number="4" placement="above"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>D</step><octave>5</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <staff>2</staff>
+        <notations>
+          <slur type="continue" number="4"/>
+        </notations>
+      </note>
+    </measure>
+    <measure number="3">
+      <note>
+        <pitch><step>E</step><octave>5</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <staff>2</staff>
+        <notations>
+          <slur type="stop" number="4"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let slurContinueXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -4648,6 +4693,26 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(slur.placement == "above")
 }
 
+@Test func vexAdapterBuildsCrossMeasureCrossStaffContinuedSlurPlans() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossStaffContinueSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.slurs.count == 2)
+    let sorted = plan.slurs.sorted { lhs, rhs in
+        if lhs.measureIndexInPart != rhs.measureIndexInPart {
+            return lhs.measureIndexInPart < rhs.measureIndexInPart
+        }
+        return lhs.endMeasureIndexInPart < rhs.endMeasureIndexInPart
+    }
+    #expect(sorted.map(\.number) == [4, 4])
+    #expect(sorted.map(\.measureIndexInPart) == [0, 1])
+    #expect(sorted.map(\.endMeasureIndexInPart) == [1, 2])
+    #expect(sorted.map(\.startEntryIndex) == [0, 0])
+    #expect(sorted.map(\.endEntryIndex) == [0, 0])
+    #expect(sorted.map(\.placement) == ["above", "above"])
+}
+
 @Test func vexAdapterBuildsArticulationPlans() throws {
     let score = try MusicXMLParser().parse(xml: articulationsXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -5094,6 +5159,18 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let slur = try #require(execution.slurs.first)
     #expect(slur.from != nil)
     #expect(slur.to != nil)
+}
+
+@Test func vexAdapterExecutesCrossMeasureCrossStaffContinuedSlurObjects() throws {
+    let score = try MusicXMLParser().parse(xml: crossMeasureCrossStaffContinueSlurXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.slurs.count == 2)
+    #expect(execution.slurs.count == 2)
+    #expect(execution.slurs.allSatisfy { $0.from != nil && $0.to != nil })
 }
 
 @Test func vexAdapterExecutesArticulationObjects() throws {
