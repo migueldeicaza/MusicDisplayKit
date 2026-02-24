@@ -1558,14 +1558,31 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private func postProcessPart(_ part: Part) -> Part {
         var part = part
         var runningTempoBPM = 120.0
+        var effectiveDivisions = 4
+        var effectiveTimeSignature: TimeSignature?
 
         for index in part.measures.indices {
             var measure = part.measures[index]
+            if let divisions = measure.divisions, divisions > 0 {
+                effectiveDivisions = divisions
+            }
+            if let time = measure.attributes?.time {
+                effectiveTimeSignature = time
+            }
+
             var tempoEvents: [TempoEvent] = [
                 TempoEvent(onsetDivisions: 0, bpm: runningTempoBPM, source: .carryForward)
             ]
 
-            let explicitEvents = explicitTempoEvents(from: measure.directionEvents)
+            let maxOnsetDivisions = maximumTempoOffsetOnsetDivisions(
+                in: measure,
+                effectiveDivisions: effectiveDivisions,
+                effectiveTimeSignature: effectiveTimeSignature
+            )
+            let explicitEvents = explicitTempoEvents(
+                from: measure.directionEvents,
+                maxOnsetDivisions: maxOnsetDivisions
+            )
             for event in explicitEvents {
                 runningTempoBPM = event.bpm
                 tempoEvents.append(event)
@@ -1580,7 +1597,10 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         return part
     }
 
-    private func explicitTempoEvents(from directions: [DirectionEvent]) -> [TempoEvent] {
+    private func explicitTempoEvents(
+        from directions: [DirectionEvent],
+        maxOnsetDivisions: Int
+    ) -> [TempoEvent] {
         let ordered = directions.enumerated().sorted { lhs, rhs in
             let lhsOnset = lhs.element.onsetDivisions
             let rhsOnset = rhs.element.onsetDivisions
@@ -1591,9 +1611,10 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         }
 
         var eventByOnset: [Int: TempoEvent] = [:]
+        let clampedMaxOnset = max(0, maxOnsetDivisions)
 
         for (_, direction) in ordered {
-            let onset = max(0, direction.onsetDivisions)
+            let onset = min(max(0, direction.onsetDivisions), clampedMaxOnset)
             var candidates: [TempoEvent] = []
 
             if let bpm = direction.soundTempo, bpm > 0 {
@@ -1617,8 +1638,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     continue
                 }
 
-                if explicitTempoSourcePriority(candidate.source) <
-                    explicitTempoSourcePriority(existing.source) {
+                let candidatePriority = explicitTempoSourcePriority(candidate.source)
+                let existingPriority = explicitTempoSourcePriority(existing.source)
+                if candidatePriority < existingPriority || candidatePriority == existingPriority {
                     eventByOnset[onset] = candidate
                 }
             }
@@ -1630,6 +1652,42 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             }
             return explicitTempoSourcePriority(lhs.source) < explicitTempoSourcePriority(rhs.source)
         }
+    }
+
+    private func maximumTempoOffsetOnsetDivisions(
+        in measure: Measure,
+        effectiveDivisions: Int,
+        effectiveTimeSignature: TimeSignature?
+    ) -> Int {
+        let safeDivisions = max(1, effectiveDivisions)
+        var maxOnset = 0
+
+        if let time = effectiveTimeSignature,
+           time.beats > 0,
+           time.beatType > 0 {
+            let byTime = Int(
+                (
+                    Double(time.beats) *
+                    Double(safeDivisions) *
+                    4.0 /
+                    Double(time.beatType)
+                ).rounded()
+            )
+            maxOnset = max(maxOnset, byTime)
+        }
+
+        for note in measure.noteEvents {
+            let onset = max(0, note.onsetDivisions)
+            let duration = max(0, note.durationDivisions ?? 0)
+            maxOnset = max(maxOnset, onset + duration)
+        }
+
+        if maxOnset == 0 {
+            // Keep a conservative fallback window for under-specified measures.
+            maxOnset = safeDivisions
+        }
+
+        return maxOnset
     }
 
     private func explicitTempoSourcePriority(_ source: TempoEventSource) -> Int {

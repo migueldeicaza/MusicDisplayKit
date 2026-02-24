@@ -24,6 +24,7 @@ public struct MusicSheetReadResult: Equatable, Sendable {
     public var expressionEvents: [ExpressionEvent]
     public var slurEvents: [SlurEvent]
     public var tempoTimelineEvents: [TempoTimelineEvent]
+    public var playbackTempoTimelineEvents: [TempoTimelineEvent]
 
     public init(
         score: Score,
@@ -34,7 +35,8 @@ public struct MusicSheetReadResult: Equatable, Sendable {
         lyricWordEvents: [LyricWordEvent],
         expressionEvents: [ExpressionEvent],
         slurEvents: [SlurEvent],
-        tempoTimelineEvents: [TempoTimelineEvent]
+        tempoTimelineEvents: [TempoTimelineEvent],
+        playbackTempoTimelineEvents: [TempoTimelineEvent]
     ) {
         self.score = score
         self.instrumentMeasureVisits = instrumentMeasureVisits
@@ -45,6 +47,7 @@ public struct MusicSheetReadResult: Equatable, Sendable {
         self.expressionEvents = expressionEvents
         self.slurEvents = slurEvents
         self.tempoTimelineEvents = tempoTimelineEvents
+        self.playbackTempoTimelineEvents = playbackTempoTimelineEvents
     }
 }
 
@@ -102,6 +105,7 @@ public struct MusicSheetReader: MusicSheetReading {
         let expressionEvents = expressionGenerator.generate(from: score)
         let slurEvents = slurGenerator.generate(from: score)
         let tempoTimelineEvents = tempoTimelineGenerator.generate(from: score)
+        let playbackTempoTimelineEvents = tempoTimelineGenerator.generatePlaybackAligned(from: score)
         return MusicSheetReadResult(
             score: score,
             instrumentMeasureVisits: visits,
@@ -111,7 +115,8 @@ public struct MusicSheetReader: MusicSheetReading {
             lyricWordEvents: lyricWordEvents,
             expressionEvents: expressionEvents,
             slurEvents: slurEvents,
-            tempoTimelineEvents: tempoTimelineEvents
+            tempoTimelineEvents: tempoTimelineEvents,
+            playbackTempoTimelineEvents: playbackTempoTimelineEvents
         )
     }
 

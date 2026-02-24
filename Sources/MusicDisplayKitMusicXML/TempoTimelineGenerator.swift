@@ -33,60 +33,164 @@ public struct TempoTimelineEvent: Equatable, Sendable {
 }
 
 public struct TempoTimelineGenerator: Sendable {
+    private enum TimelineMode {
+        case documentOrder
+        case playbackAligned
+    }
+
+    private struct EffectiveMeasureState {
+        var divisions: Int
+        var timeSignature: TimeSignature?
+    }
+
     public init() {}
 
     public func generate(from score: Score) -> [TempoTimelineEvent] {
+        generate(from: score, mode: .documentOrder)
+    }
+
+    public func generatePlaybackAligned(from score: Score) -> [TempoTimelineEvent] {
+        generate(from: score, mode: .playbackAligned)
+    }
+
+    private func generate(from score: Score, mode: TimelineMode) -> [TempoTimelineEvent] {
         var output: [TempoTimelineEvent] = []
 
         for (partIndex, part) in score.parts.enumerated() {
             var cumulativePosition = MDKFraction(0, 1)
-            var effectiveDivisions = 4
-            var effectiveTimeSignature: TimeSignature?
+            var runningTempoBPM = 120.0
 
-            for (measureIndex, measure) in part.measures.enumerated() {
-                if let divisions = measure.divisions, divisions > 0 {
-                    effectiveDivisions = divisions
-                }
-                if let time = measure.attributes?.time {
-                    effectiveTimeSignature = time
+            let effectiveStates = effectiveMeasureStates(for: part.measures)
+            let traversal = measureTraversal(for: part, mode: mode)
+
+            for measureIndex in traversal {
+                guard part.measures.indices.contains(measureIndex),
+                      effectiveStates.indices.contains(measureIndex) else {
+                    continue
                 }
 
-                let divisionsPerWholeNote = max(1, effectiveDivisions * 4)
-                let events = measure.tempoEvents.sorted(by: compareTempoEvents)
-                for event in events {
-                    let onset = max(0, event.onsetDivisions)
-                    let absolute = cumulativePosition + MDKFraction(onset, divisionsPerWholeNote)
+                let measure = part.measures[measureIndex]
+                let effectiveState = effectiveStates[measureIndex]
+                let divisionsPerWholeNote = max(1, effectiveState.divisions * 4)
+
+                switch mode {
+                case .documentOrder:
+                    let events = measure.tempoEvents.sorted(by: compareTempoEvents)
+                    for event in events {
+                        let onset = max(0, event.onsetDivisions)
+                        let absolute = cumulativePosition + MDKFraction(onset, divisionsPerWholeNote)
+                        output.append(
+                            TempoTimelineEvent(
+                                partIndex: partIndex,
+                                partID: part.id,
+                                measureIndex: measureIndex,
+                                measureNumber: measure.number,
+                                onsetDivisions: onset,
+                                bpm: event.bpm,
+                                source: event.source,
+                                absolutePosition: absolute
+                            )
+                        )
+                    }
+
+                case .playbackAligned:
                     output.append(
                         TempoTimelineEvent(
                             partIndex: partIndex,
                             partID: part.id,
                             measureIndex: measureIndex,
                             measureNumber: measure.number,
-                            onsetDivisions: onset,
-                            bpm: event.bpm,
-                            source: event.source,
-                            absolutePosition: absolute
+                            onsetDivisions: 0,
+                            bpm: runningTempoBPM,
+                            source: .carryForward,
+                            absolutePosition: cumulativePosition
                         )
                     )
+
+                    let explicitEvents = measure.tempoEvents
+                        .filter { $0.source != .carryForward }
+                        .sorted(by: compareTempoEvents)
+                    for event in explicitEvents {
+                        let onset = max(0, event.onsetDivisions)
+                        let absolute = cumulativePosition + MDKFraction(onset, divisionsPerWholeNote)
+                        output.append(
+                            TempoTimelineEvent(
+                                partIndex: partIndex,
+                                partID: part.id,
+                                measureIndex: measureIndex,
+                                measureNumber: measure.number,
+                                onsetDivisions: onset,
+                                bpm: event.bpm,
+                                source: event.source,
+                                absolutePosition: absolute
+                            )
+                        )
+                        runningTempoBPM = event.bpm
+                    }
                 }
 
                 let measureDuration = measureDurationWholeNotes(
                     measure: measure,
-                    effectiveDivisions: effectiveDivisions,
-                    effectiveTimeSignature: effectiveTimeSignature
+                    effectiveDivisions: effectiveState.divisions,
+                    effectiveTimeSignature: effectiveState.timeSignature
                 )
                 cumulativePosition = cumulativePosition + measureDuration
             }
         }
 
-        return output.sorted { lhs, rhs in
+        return sortTimelineEvents(output)
+    }
+
+    private func sortTimelineEvents(_ events: [TempoTimelineEvent]) -> [TempoTimelineEvent] {
+        events.sorted { lhs, rhs in
+            if lhs.absolutePosition != rhs.absolutePosition {
+                return fractionLessThan(lhs.absolutePosition, rhs.absolutePosition)
+            }
             if lhs.partIndex != rhs.partIndex {
                 return lhs.partIndex < rhs.partIndex
             }
-            if lhs.absolutePosition != rhs.absolutePosition {
-                return lhs.absolutePosition.asDouble < rhs.absolutePosition.asDouble
+            if lhs.measureIndex != rhs.measureIndex {
+                return lhs.measureIndex < rhs.measureIndex
+            }
+            if lhs.onsetDivisions != rhs.onsetDivisions {
+                return lhs.onsetDivisions < rhs.onsetDivisions
             }
             return tempoSourceRank(lhs.source) < tempoSourceRank(rhs.source)
+        }
+    }
+
+    private func effectiveMeasureStates(for measures: [Measure]) -> [EffectiveMeasureState] {
+        var output: [EffectiveMeasureState] = []
+        var effectiveDivisions = 4
+        var effectiveTimeSignature: TimeSignature?
+
+        for measure in measures {
+            if let divisions = measure.divisions, divisions > 0 {
+                effectiveDivisions = divisions
+            }
+            if let time = measure.attributes?.time {
+                effectiveTimeSignature = time
+            }
+            output.append(
+                EffectiveMeasureState(
+                    divisions: effectiveDivisions,
+                    timeSignature: effectiveTimeSignature
+                )
+            )
+        }
+
+        return output
+    }
+
+    private func measureTraversal(for part: Part, mode: TimelineMode) -> [Int] {
+        switch mode {
+        case .documentOrder:
+            return Array(part.measures.indices)
+        case .playbackAligned:
+            if let visits = part.playbackOrder?.visits, !visits.isEmpty {
+                return visits.map(\.measureIndex)
+            }
+            return Array(part.measures.indices)
         }
     }
 
@@ -106,6 +210,10 @@ public struct TempoTimelineGenerator: Sendable {
         case .metronome:
             return 2
         }
+    }
+
+    private func fractionLessThan(_ lhs: MDKFraction, _ rhs: MDKFraction) -> Bool {
+        lhs.numerator * rhs.denominator < rhs.numerator * lhs.denominator
     }
 
     private func measureDurationWholeNotes(
