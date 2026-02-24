@@ -602,6 +602,82 @@ public struct VexArticulationPlan: Sendable {
     }
 }
 
+public enum VexFingeringPositionPlan: Sendable {
+    case left
+    case right
+    case above
+    case below
+}
+
+public struct VexFingeringPlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let voice: Int
+    public let entryIndexInVoice: Int
+    public let number: String
+    public let position: VexFingeringPositionPlan?
+    public let sourceOrder: Int
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        entryIndexInVoice: Int,
+        number: String,
+        position: VexFingeringPositionPlan?,
+        sourceOrder: Int
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.voice = voice
+        self.entryIndexInVoice = entryIndexInVoice
+        self.number = number
+        self.position = position
+        self.sourceOrder = sourceOrder
+    }
+}
+
+public enum VexStringNumberPositionPlan: Sendable {
+    case left
+    case right
+    case above
+    case below
+}
+
+public struct VexStringNumberPlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let voice: Int
+    public let entryIndexInVoice: Int
+    public let number: String
+    public let position: VexStringNumberPositionPlan?
+    public let sourceOrder: Int
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        entryIndexInVoice: Int,
+        number: String,
+        position: VexStringNumberPositionPlan?,
+        sourceOrder: Int
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.voice = voice
+        self.entryIndexInVoice = entryIndexInVoice
+        self.number = number
+        self.position = position
+        self.sourceOrder = sourceOrder
+    }
+}
+
 public struct VexLyricPlan: Sendable {
     public let systemIndex: Int
     public let partIndex: Int
@@ -1038,6 +1114,8 @@ public struct VexRenderPlan: Sendable {
     public let ties: [VexTiePlan]
     public let slurs: [VexSlurPlan]
     public let articulations: [VexArticulationPlan]
+    public let fingerings: [VexFingeringPlan]
+    public let stringNumbers: [VexStringNumberPlan]
     public let lyrics: [VexLyricPlan]
     public let chordSymbols: [VexChordSymbolPlan]
     public let directionTexts: [VexDirectionTextPlan]
@@ -1063,6 +1141,8 @@ public struct VexRenderPlan: Sendable {
         ties: [VexTiePlan],
         slurs: [VexSlurPlan],
         articulations: [VexArticulationPlan],
+        fingerings: [VexFingeringPlan],
+        stringNumbers: [VexStringNumberPlan],
         lyrics: [VexLyricPlan],
         chordSymbols: [VexChordSymbolPlan],
         directionTexts: [VexDirectionTextPlan],
@@ -1087,6 +1167,8 @@ public struct VexRenderPlan: Sendable {
         self.ties = ties
         self.slurs = slurs
         self.articulations = articulations
+        self.fingerings = fingerings
+        self.stringNumbers = stringNumbers
         self.lyrics = lyrics
         self.chordSymbols = chordSymbols
         self.directionTexts = directionTexts
@@ -1111,6 +1193,8 @@ public struct VexFactoryExecution {
     public let ties: [StaveTie]
     public let slurs: [Curve]
     public let articulations: [VexFoundation.Articulation]
+    public let fingerings: [VexFoundation.FretHandFinger]
+    public let stringNumbers: [VexFoundation.StringNumber]
     public let lyrics: [VexFoundation.Annotation]
     public let chordSymbols: [VexFoundation.ChordSymbol]
     public let directionTexts: [VexFoundation.Annotation]
@@ -1134,6 +1218,8 @@ public struct VexFactoryExecution {
         ties: [StaveTie],
         slurs: [Curve],
         articulations: [VexFoundation.Articulation],
+        fingerings: [VexFoundation.FretHandFinger],
+        stringNumbers: [VexFoundation.StringNumber],
         lyrics: [VexFoundation.Annotation],
         chordSymbols: [VexFoundation.ChordSymbol],
         directionTexts: [VexFoundation.Annotation],
@@ -1156,6 +1242,8 @@ public struct VexFactoryExecution {
         self.ties = ties
         self.slurs = slurs
         self.articulations = articulations
+        self.fingerings = fingerings
+        self.stringNumbers = stringNumbers
         self.lyrics = lyrics
         self.chordSymbols = chordSymbols
         self.directionTexts = directionTexts
@@ -1238,6 +1326,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
             let ties: [VexTiePlan]
             let slurs: [VexSlurPlan]
             let articulations: [VexArticulationPlan]
+            let fingerings: [VexFingeringPlan]
+            let stringNumbers: [VexStringNumberPlan]
             let lyrics: [VexLyricPlan]
             let chordSymbols: [VexChordSymbolPlan]
             let directionTexts: [VexDirectionTextPlan]
@@ -1260,6 +1350,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     ties: [],
                     slurs: [],
                     articulations: [],
+                    fingerings: [],
+                    stringNumbers: [],
                     lyrics: [],
                     chordSymbols: [],
                     directionTexts: [],
@@ -1280,6 +1372,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     ties: [],
                     slurs: [],
                     articulations: [],
+                    fingerings: [],
+                    stringNumbers: [],
                     lyrics: [],
                     chordSymbols: [],
                     directionTexts: [],
@@ -1375,6 +1469,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
             var tiePlans: [VexTiePlan] = []
             var slurPlans: [VexSlurPlan] = []
             var articulationPlans: [VexArticulationPlan] = []
+            var fingeringPlans: [VexFingeringPlan] = []
+            var stringNumberPlans: [VexStringNumberPlan] = []
             var lyricPlans: [VexLyricPlan] = []
             for voice in noteIndicesByVoice.keys.sorted() {
                 guard let voiceNoteIndices = noteIndicesByVoice[voice] else {
@@ -1456,6 +1552,24 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     noteEvents: sourceMeasure.noteEvents,
                     noteToEntryIndex: noteToEntryIndex
                 ))
+                fingeringPlans.append(contentsOf: buildFingeringPlans(
+                    systemIndex: laidOutMeasure.systemIndex,
+                    partIndex: laidOutMeasure.partIndex,
+                    measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                    voice: voice,
+                    noteIndices: sortedNoteIndices,
+                    noteEvents: sourceMeasure.noteEvents,
+                    noteToEntryIndex: noteToEntryIndex
+                ))
+                stringNumberPlans.append(contentsOf: buildStringNumberPlans(
+                    systemIndex: laidOutMeasure.systemIndex,
+                    partIndex: laidOutMeasure.partIndex,
+                    measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                    voice: voice,
+                    noteIndices: sortedNoteIndices,
+                    noteEvents: sourceMeasure.noteEvents,
+                    noteToEntryIndex: noteToEntryIndex
+                ))
                 lyricPlans.append(contentsOf: buildLyricPlans(
                     systemIndex: laidOutMeasure.systemIndex,
                     partIndex: laidOutMeasure.partIndex,
@@ -1510,6 +1624,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 ties: tiePlans,
                 slurs: slurPlans,
                 articulations: articulationPlans,
+                fingerings: fingeringPlans,
+                stringNumbers: stringNumberPlans,
                 lyrics: lyricPlans,
                 chordSymbols: chordSymbolPlans,
                 directionTexts: directionTextPlans,
@@ -1554,6 +1670,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return optionalNumberSortValue(lhs.number) < optionalNumberSortValue(rhs.number)
         }
         let articulations = measureRenderPlans.flatMap(\.articulations)
+        let fingerings = measureRenderPlans.flatMap(\.fingerings)
+        let stringNumbers = measureRenderPlans.flatMap(\.stringNumbers)
         let lyrics = measureRenderPlans.flatMap(\.lyrics)
         let chordSymbols = measureRenderPlans.flatMap(\.chordSymbols)
         let directionTexts = measureRenderPlans.flatMap(\.directionTexts)
@@ -1645,6 +1763,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
             ties: ties,
             slurs: slurs,
             articulations: articulations,
+            fingerings: fingerings,
+            stringNumbers: stringNumbers,
             lyrics: lyrics,
             chordSymbols: chordSymbols,
             directionTexts: directionTexts,
@@ -1744,6 +1864,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
         var createdTies: [StaveTie] = []
         var createdSlurs: [Curve] = []
         var createdArticulations: [VexFoundation.Articulation] = []
+        var createdFingerings: [VexFoundation.FretHandFinger] = []
+        var createdStringNumbers: [VexFoundation.StringNumber] = []
         var createdLyrics: [VexFoundation.Annotation] = []
         var createdChordSymbols: [VexFoundation.ChordSymbol] = []
         var createdDirectionTexts: [VexFoundation.Annotation] = []
@@ -1788,6 +1910,20 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 systemIndex: articulationPlan.systemIndex,
                 partIndex: articulationPlan.partIndex,
                 measureIndexInPart: articulationPlan.measureIndexInPart
+            )
+        }
+        let groupedFingerings = Dictionary(grouping: plan.fingerings) { fingeringPlan in
+            NoteGroupKey(
+                systemIndex: fingeringPlan.systemIndex,
+                partIndex: fingeringPlan.partIndex,
+                measureIndexInPart: fingeringPlan.measureIndexInPart
+            )
+        }
+        let groupedStringNumbers = Dictionary(grouping: plan.stringNumbers) { stringNumberPlan in
+            NoteGroupKey(
+                systemIndex: stringNumberPlan.systemIndex,
+                partIndex: stringNumberPlan.partIndex,
+                measureIndexInPart: stringNumberPlan.measureIndexInPart
             )
         }
         let groupedLyrics = Dictionary(grouping: plan.lyrics) { lyricPlan in
@@ -2034,6 +2170,74 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     )
                     _ = note.addModifier(annotation, index: 0)
                     createdLyrics.append(annotation)
+                }
+            }
+
+            if let fingeringPlans = groupedFingerings[groupKey] {
+                let sortedFingeringPlans = fingeringPlans.sorted { lhs, rhs in
+                    if lhs.voice != rhs.voice {
+                        return lhs.voice < rhs.voice
+                    }
+                    if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                        return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+                    }
+                    return lhs.sourceOrder < rhs.sourceOrder
+                }
+                for fingeringPlan in sortedFingeringPlans {
+                    guard let note = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: fingeringPlan.systemIndex,
+                            partIndex: fingeringPlan.partIndex,
+                            measureIndexInPart: fingeringPlan.measureIndexInPart,
+                            voice: fingeringPlan.voice,
+                            entryIndexInVoice: fingeringPlan.entryIndexInVoice
+                        )
+                    ], !note.isRest() else {
+                        continue
+                    }
+
+                    let fingering: VexFoundation.FretHandFinger
+                    if let position = fingeringModifierPosition(for: fingeringPlan.position) {
+                        fingering = factory.Fingering(number: fingeringPlan.number, position: position)
+                    } else {
+                        fingering = factory.Fingering(number: fingeringPlan.number)
+                    }
+                    _ = note.addModifier(fingering, index: 0)
+                    createdFingerings.append(fingering)
+                }
+            }
+
+            if let stringNumberPlans = groupedStringNumbers[groupKey] {
+                let sortedStringNumberPlans = stringNumberPlans.sorted { lhs, rhs in
+                    if lhs.voice != rhs.voice {
+                        return lhs.voice < rhs.voice
+                    }
+                    if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                        return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+                    }
+                    return lhs.sourceOrder < rhs.sourceOrder
+                }
+                for stringNumberPlan in sortedStringNumberPlans {
+                    guard let note = notesByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: stringNumberPlan.systemIndex,
+                            partIndex: stringNumberPlan.partIndex,
+                            measureIndexInPart: stringNumberPlan.measureIndexInPart,
+                            voice: stringNumberPlan.voice,
+                            entryIndexInVoice: stringNumberPlan.entryIndexInVoice
+                        )
+                    ], !note.isRest() else {
+                        continue
+                    }
+
+                    let stringNumber: VexFoundation.StringNumber
+                    if let position = stringNumberModifierPosition(for: stringNumberPlan.position) {
+                        stringNumber = factory.StringNumber(number: stringNumberPlan.number, position: position)
+                    } else {
+                        stringNumber = factory.StringNumber(number: stringNumberPlan.number)
+                    }
+                    _ = note.addModifier(stringNumber, index: 0)
+                    createdStringNumbers.append(stringNumber)
                 }
             }
 
@@ -2722,6 +2926,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
             ties: createdTies,
             slurs: createdSlurs,
             articulations: createdArticulations,
+            fingerings: createdFingerings,
+            stringNumbers: createdStringNumbers,
             lyrics: createdLyrics,
             chordSymbols: createdChordSymbols,
             directionTexts: createdDirectionTexts,
@@ -3549,6 +3755,168 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         voice: voice,
                         entryIndexInVoice: entryIndex,
                         articulationCode: articulationCode,
+                        position: position,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+            }
+        }
+
+        return plans.sorted { lhs, rhs in
+            if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+    }
+
+    private func buildFingeringPlans(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        noteIndices: [Int],
+        noteEvents: [MusicDisplayKitModel.NoteEvent],
+        noteToEntryIndex: [Int: Int]
+    ) -> [VexFingeringPlan] {
+        struct PlanKey: Hashable {
+            let entryIndexInVoice: Int
+            let number: String
+            let position: VexFingeringPositionPlan?
+        }
+
+        var plans: [VexFingeringPlan] = []
+        var seen: Set<PlanKey> = []
+        var sourceOrder = 0
+        for noteIndex in noteIndices {
+            guard let entryIndex = noteToEntryIndex[noteIndex] else {
+                continue
+            }
+            let note = noteEvents[noteIndex]
+            for marker in note.fingerings {
+                let trimmedNumber = marker.number.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedNumber.isEmpty else {
+                    continue
+                }
+                let position = fingeringPositionPlan(
+                    placement: marker.placement,
+                    type: marker.type
+                )
+                let key = PlanKey(
+                    entryIndexInVoice: entryIndex,
+                    number: trimmedNumber,
+                    position: position
+                )
+                if seen.contains(key) {
+                    continue
+                }
+                seen.insert(key)
+                plans.append(
+                    VexFingeringPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        voice: voice,
+                        entryIndexInVoice: entryIndex,
+                        number: trimmedNumber,
+                        position: position,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+            }
+            for marker in note.fretNumbers {
+                let trimmedNumber = marker.number.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedNumber.isEmpty else {
+                    continue
+                }
+                let position = fingeringPositionPlan(
+                    placement: marker.placement,
+                    type: marker.type
+                )
+                let key = PlanKey(
+                    entryIndexInVoice: entryIndex,
+                    number: trimmedNumber,
+                    position: position
+                )
+                if seen.contains(key) {
+                    continue
+                }
+                seen.insert(key)
+                plans.append(
+                    VexFingeringPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        voice: voice,
+                        entryIndexInVoice: entryIndex,
+                        number: trimmedNumber,
+                        position: position,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+            }
+        }
+
+        return plans.sorted { lhs, rhs in
+            if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+    }
+
+    private func buildStringNumberPlans(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        noteIndices: [Int],
+        noteEvents: [MusicDisplayKitModel.NoteEvent],
+        noteToEntryIndex: [Int: Int]
+    ) -> [VexStringNumberPlan] {
+        struct PlanKey: Hashable {
+            let entryIndexInVoice: Int
+            let number: String
+            let position: VexStringNumberPositionPlan?
+        }
+
+        var plans: [VexStringNumberPlan] = []
+        var seen: Set<PlanKey> = []
+        var sourceOrder = 0
+        for noteIndex in noteIndices {
+            guard let entryIndex = noteToEntryIndex[noteIndex] else {
+                continue
+            }
+            let note = noteEvents[noteIndex]
+            for marker in note.stringNumbers {
+                let trimmedNumber = marker.number.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedNumber.isEmpty else {
+                    continue
+                }
+                let position = stringNumberPositionPlan(
+                    placement: marker.placement,
+                    type: marker.type
+                )
+                let key = PlanKey(
+                    entryIndexInVoice: entryIndex,
+                    number: trimmedNumber,
+                    position: position
+                )
+                if seen.contains(key) {
+                    continue
+                }
+                seen.insert(key)
+                plans.append(
+                    VexStringNumberPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        voice: voice,
+                        entryIndexInVoice: entryIndex,
+                        number: trimmedNumber,
                         position: position,
                         sourceOrder: sourceOrder
                     )
@@ -4873,6 +5241,80 @@ public struct VexFoundationRenderer: ScoreRenderer {
         return nil
     }
 
+    private func fingeringPositionPlan(
+        placement: String?,
+        type: String?
+    ) -> VexFingeringPositionPlan? {
+        if let placement {
+            switch placement.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "left":
+                return .left
+            case "right":
+                return .right
+            case "above", "top", "over":
+                return .above
+            case "below", "bottom", "under":
+                return .below
+            default:
+                break
+            }
+        }
+
+        if let type {
+            switch type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "left":
+                return .left
+            case "right":
+                return .right
+            case "up":
+                return .above
+            case "down":
+                return .below
+            default:
+                break
+            }
+        }
+
+        return nil
+    }
+
+    private func stringNumberPositionPlan(
+        placement: String?,
+        type: String?
+    ) -> VexStringNumberPositionPlan? {
+        if let placement {
+            switch placement.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "left":
+                return .left
+            case "right":
+                return .right
+            case "above", "top", "over":
+                return .above
+            case "below", "bottom", "under":
+                return .below
+            default:
+                break
+            }
+        }
+
+        if let type {
+            switch type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "left":
+                return .left
+            case "right":
+                return .right
+            case "up":
+                return .above
+            case "down":
+                return .below
+            default:
+                break
+            }
+        }
+
+        return nil
+    }
+
     private func directionTextValue(for rawText: String?) -> String? {
         let text = rawText?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let text, !text.isEmpty else {
@@ -5682,6 +6124,40 @@ public struct VexFoundationRenderer: ScoreRenderer {
         for planPosition: VexArticulationPositionPlan?
     ) -> ModifierPosition? {
         switch planPosition {
+        case .above:
+            return .above
+        case .below:
+            return .below
+        case .none:
+            return nil
+        }
+    }
+
+    private func fingeringModifierPosition(
+        for planPosition: VexFingeringPositionPlan?
+    ) -> ModifierPosition? {
+        switch planPosition {
+        case .left:
+            return .left
+        case .right:
+            return .right
+        case .above:
+            return .above
+        case .below:
+            return .below
+        case .none:
+            return nil
+        }
+    }
+
+    private func stringNumberModifierPosition(
+        for planPosition: VexStringNumberPositionPlan?
+    ) -> ModifierPosition? {
+        switch planPosition {
+        case .left:
+            return .left
+        case .right:
+            return .right
         case .above:
             return .above
         case .below:

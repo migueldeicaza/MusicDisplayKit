@@ -2,6 +2,10 @@
 
 SwiftPM port-in-progress of OpenSheetMusicDisplay (OSMD), using `VexFoundation` for rendering.
 
+## Contributing
+
+See `CONTRIBUTING.md` for setup, contribution checklist, and code style/testing guardrails.
+
 ## Running Tests
 
 Run the full suite:

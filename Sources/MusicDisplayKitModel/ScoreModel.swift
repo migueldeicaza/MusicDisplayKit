@@ -195,6 +195,9 @@ public struct NoteEvent: Equatable, Sendable {
     public var tuplets: [TupletMarker]
     public var timeModification: TimeModification?
     public var articulations: [ArticulationMarker]
+    public var fingerings: [FingeringMarker]
+    public var stringNumbers: [StringNumberMarker]
+    public var fretNumbers: [FretNumberMarker]
 
     public init(
         kind: NoteEventKind,
@@ -211,7 +214,10 @@ public struct NoteEvent: Equatable, Sendable {
         beams: [BeamMarker] = [],
         tuplets: [TupletMarker] = [],
         timeModification: TimeModification? = nil,
-        articulations: [ArticulationMarker] = []
+        articulations: [ArticulationMarker] = [],
+        fingerings: [FingeringMarker] = [],
+        stringNumbers: [StringNumberMarker] = [],
+        fretNumbers: [FretNumberMarker] = []
     ) {
         self.kind = kind
         self.pitch = pitch
@@ -228,6 +234,9 @@ public struct NoteEvent: Equatable, Sendable {
         self.tuplets = tuplets
         self.timeModification = timeModification
         self.articulations = articulations
+        self.fingerings = fingerings
+        self.stringNumbers = stringNumbers
+        self.fretNumbers = fretNumbers
     }
 }
 
@@ -260,6 +269,60 @@ public enum ArticulationKind: Equatable, Sendable {
     case stress
     case unstress
     case unknown(String)
+}
+
+public struct FingeringMarker: Equatable, Sendable {
+    public var number: String
+    public var placement: String?
+    public var type: String?
+    public var substitution: Bool?
+    public var alternate: Bool?
+
+    public init(
+        number: String,
+        placement: String? = nil,
+        type: String? = nil,
+        substitution: Bool? = nil,
+        alternate: Bool? = nil
+    ) {
+        self.number = number
+        self.placement = placement
+        self.type = type
+        self.substitution = substitution
+        self.alternate = alternate
+    }
+}
+
+public struct StringNumberMarker: Equatable, Sendable {
+    public var number: String
+    public var placement: String?
+    public var type: String?
+
+    public init(
+        number: String,
+        placement: String? = nil,
+        type: String? = nil
+    ) {
+        self.number = number
+        self.placement = placement
+        self.type = type
+    }
+}
+
+public struct FretNumberMarker: Equatable, Sendable {
+    public var number: String
+    public var placement: String?
+    public var type: String?
+
+    public init(
+        number: String,
+        placement: String? = nil,
+        type: String? = nil
+    ) {
+        self.number = number
+        self.placement = placement
+        self.type = type
+    }
 }
 
 public struct DirectionEvent: Equatable, Sendable {

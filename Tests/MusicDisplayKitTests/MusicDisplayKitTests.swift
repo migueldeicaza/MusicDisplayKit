@@ -46,6 +46,17 @@ private let movementTitleFallbackXML = """
 </score-partwise>
 """
 
+private let xmlTreeTraversalXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<root attr="A">
+  <child id="1">
+    <name>Alpha</name>
+  </child>
+  <child id="2"/>
+  <ns:entry xmlns:ns="urn:test" role="lead"> Text Value </ns:entry>
+</root>
+"""
+
 private let layoutTimeSignatureSpacingXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -4751,6 +4762,102 @@ private let articulationsDefaultPlacementXML = """
 </score-partwise>
 """
 
+private let fingeringsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <technical>
+            <fingering placement="above" type="up" substitution="yes" alternate="no">2</fingering>
+          </technical>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <technical>
+            <fingering placement="left">4</fingering>
+          </technical>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let stringNumbersXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <technical>
+            <string placement="below" type="up">1</string>
+          </technical>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <technical>
+            <string type="left">6</string>
+          </technical>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let fretNumbersXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>G</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <technical>
+            <fret placement="right" type="down">3</fret>
+          </technical>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>A</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <technical>
+            <fret type="left">7</fret>
+          </technical>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let directionExpressionsXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -6063,6 +6170,126 @@ private let tempoPlaybackAlignedDalSegnoCodaCrossPartTimelineXML = """
 </score-partwise>
 """
 
+private let tempoPlaybackAlignedTargetedDalSegnoCodaCrossPartTimelineXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Part 1</part-name></score-part>
+    <score-part id="P2"><part-name>Part 2</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time>
+          <beats>1</beats>
+          <beat-type>4</beat-type>
+        </time>
+      </attributes>
+      <direction placement="above">
+        <direction-type><segno>A</segno></direction-type>
+        <sound tempo="100"/>
+      </direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction placement="above">
+        <direction-type><segno>B</segno></direction-type>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction placement="above">
+        <direction-type>
+          <words>D.S. al Coda</words>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>90</per-minute>
+          </metronome>
+        </direction-type>
+        <sound dalsegno="B" tocoda="C2"/>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction placement="above">
+        <direction-type><words>To Coda</words></direction-type>
+        <sound tempo="80"/>
+      </direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction placement="above">
+        <direction-type><coda>C1</coda></direction-type>
+      </direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6">
+      <direction placement="above">
+        <direction-type><coda>C2</coda></direction-type>
+        <sound tempo="60"/>
+      </direction>
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time>
+          <beats>1</beats>
+          <beat-type>4</beat-type>
+        </time>
+      </attributes>
+      <direction placement="above">
+        <direction-type><segno>A</segno></direction-type>
+        <sound tempo="110"/>
+      </direction>
+      <note><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction placement="above">
+        <direction-type><segno>B</segno></direction-type>
+      </direction>
+      <note><pitch><step>A</step><octave>3</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction placement="above">
+        <direction-type>
+          <words>D.S. al Coda</words>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>95</per-minute>
+          </metronome>
+        </direction-type>
+        <sound dalsegno="B" tocoda="C2"/>
+      </direction>
+      <note><pitch><step>B</step><octave>3</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction placement="above">
+        <direction-type><words>To Coda</words></direction-type>
+        <sound tempo="70"/>
+      </direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction placement="above">
+        <direction-type><coda>C1</coda></direction-type>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6">
+      <direction placement="above">
+        <direction-type><coda>C2</coda></direction-type>
+        <sound tempo="50"/>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let metronomeDottedTempoXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -6280,6 +6507,32 @@ private let repeatTimesDefaultPlaybackXML = """
     <measure number="2">
       <barline location="right">
         <repeat direction="backward"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let repeatTimesLargePlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <repeat direction="forward"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <repeat direction="backward" times="130"/>
       </barline>
       <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
     </measure>
@@ -6641,6 +6894,1121 @@ private let soundToCodaFallbackOnJumpMeasureXML = """
 </score-partwise>
 """
 
+private let dalSegnoUnresolvedFallsBackToDaCapoXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.S. al Fine</words></direction-type>
+        <sound dalsegno="MissingSegno" dacapo="yes"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>Fine</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoUnresolvedWithoutDaCapoContinuesXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.S. al Fine</words></direction-type>
+        <sound dalsegno="MissingSegno"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>Fine</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedToCodaDoesNotFallbackToUntargetedCodaXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.S. al Coda</words></direction-type>
+        <sound dalsegno="S" tocoda="C2"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda/></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedToCodaUsesUntargetedTriggerWhenMatchingCodaExistsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.S. al Coda</words></direction-type>
+        <sound dalsegno="S" tocoda="C2"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction><direction-type><coda>C2</coda></direction-type></direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoUsesClosestBackwardSegnoXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno/></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><segno/></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><words>D.S.</words></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedDalSegnoPrefersMatchingTargetOverUntargetedMarkerXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno>S1</segno></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno/></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction>
+        <direction-type><words>D.S.</words></direction-type>
+        <sound dalsegno="S1"/>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let daCapoIgnoresFineWithoutAlFineXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><words>D.C.</words></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>Fine</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let markerTargetsMatchCaseInsensitivelyXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno>S2</segno></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.S. al Coda</words></direction-type>
+        <sound dalsegno="s2" tocoda="c2"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda>C2</coda></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let tempoPlaybackAlignedLargeRepeatWithExplicitTempoXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <barline location="left"><repeat direction="forward"/></barline>
+      <direction><sound tempo="100"/></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right"><repeat direction="backward" times="130"/></barline>
+      <direction>
+        <direction-type>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome>
+        </direction-type>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let tempoPlaybackAlignedToCodaAndCodaSameMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction><direction-type><segno>S</segno></direction-type><sound tempo="100"/></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.S. al Coda</words></direction-type>
+        <sound dalsegno="S" tocoda="C"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction>
+        <direction-type>
+          <words>To Coda</words>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome>
+          <coda>C</coda>
+        </direction-type>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let daCapoAlFinePlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><words>D.C. al Fine</words></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>Fine</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let tempoPlaybackAlignedDaCapoAlCodaXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction><sound tempo="100"/></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.C. al Coda</words></direction-type>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction>
+        <direction-type>
+          <words>To Coda</words>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome>
+        </direction-type>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda/></direction-type><sound tempo="60"/></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedToCodaUsesNearestForwardMatchingCodaXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.S. al Coda</words></direction-type>
+        <sound dalsegno="S" tocoda="C1"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda>C1</coda></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6">
+      <direction><direction-type><coda>C1</coda></direction-type></direction>
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="7">
+      <note><pitch><step>B</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedToCodaPrefersTargetedTriggerOverUntargetedXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.C. al Coda</words></direction-type>
+        <sound tocoda="C2"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <direction>
+        <direction-type><words>To Coda</words></direction-type>
+        <sound tocoda="C2"/>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda>C1</coda></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction><direction-type><coda>C2</coda></direction-type></direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6">
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedToCodaIgnoresMismatchedTargetedTriggerXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type><words>D.C. al Coda</words></direction-type>
+        <sound tocoda="C2"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction>
+        <direction-type><words>To Coda</words></direction-type>
+        <sound tocoda="C1"/>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda>C1</coda></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction><direction-type><coda>C2</coda></direction-type></direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6">
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedDalSegnoDoesNotFallbackToUntargetedSegnoXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><segno/></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <sound dalsegno="S2"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedDalSegnoUsesForwardMarkerFallbackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <sound dalsegno="S2"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><segno>S2</segno></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let untargetedDalSegnoUsesForwardMarkerFallbackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><words>D.S.</words></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><segno/></direction-type></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let toCodaIgnoredWithoutActiveRoadmapXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><words>To Coda</words></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><coda/></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let endingDiscontinueGatesRepeatPlaybackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <repeat direction="forward"/>
+        <ending number="1" type="start"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <ending number="1" type="discontinue"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <barline location="right">
+        <repeat direction="backward"/>
+      </barline>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let endingDiscontinueWithoutRepeatDoesNotGateXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <barline location="left">
+        <ending number="1" type="start"/>
+      </barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <barline location="right">
+        <ending number="1" type="discontinue"/>
+      </barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let tempoPlaybackAlignedDaCapoAlFineXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction><sound tempo="100"/></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><words>D.C. al Fine</words></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction>
+        <direction-type>
+          <words>Fine</words>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome>
+        </direction-type>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><sound tempo="60"/></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let tempoPlaybackAlignedTargetedDalSegnoForwardFallbackXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction><sound tempo="100"/></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <sound dalsegno="S2"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><sound tempo="70"/></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction>
+        <direction-type>
+          <segno>S2</segno>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>90</per-minute></metronome>
+        </direction-type>
+      </direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction><sound tempo="60"/></direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let daCapoSelfJumpSuppressedXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <direction><direction-type><words>D.C.</words></direction-type></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoSelfJumpSuppressedXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno/></direction-type></direction>
+      <direction><direction-type><words>D.S.</words></direction-type></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let targetedDalSegnoSelfJumpCaseInsensitiveXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno>SegA</segno></direction-type></direction>
+      <direction><sound dalsegno="sega"/></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let daCapoSelfJumpAlFineXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction>
+        <direction-type><words>D.C. al Fine</words></direction-type>
+        <sound tempo="100"/>
+      </direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction>
+        <direction-type>
+          <words>Fine</words>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome>
+        </direction-type>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><sound tempo="60"/></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoSelfJumpAlFineXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <direction>
+        <direction-type><words>D.S. al Fine</words></direction-type>
+        <sound dalsegno="S"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><words>Fine</words></direction-type></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let tempoPlaybackAlignedDalSegnoSelfJumpAlCodaXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction><sound tempo="100"/></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <direction>
+        <direction-type><words>D.S. al Coda</words></direction-type>
+        <sound dalsegno="S" tocoda="C"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction>
+        <direction-type>
+          <words>To Coda</words>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome>
+        </direction-type>
+      </direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><sound tempo="70"/></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <direction><direction-type><coda>C</coda></direction-type><sound tempo="60"/></direction>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="6">
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let daCapoSelfJumpFineSameMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction>
+        <direction-type>
+          <words>D.C. al Fine</words>
+          <words>Fine</words>
+        </direction-type>
+        <sound tempo="100"/>
+      </direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><sound tempo="70"/></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoSelfJumpFineSameMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction><sound tempo="100"/></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <direction>
+        <direction-type>
+          <words>D.S. al Fine</words>
+          <words>Fine</words>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome>
+        </direction-type>
+        <sound dalsegno="S"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><sound tempo="60"/></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let daCapoSelfJumpToCodaSameMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction>
+        <direction-type>
+          <words>D.C. al Coda</words>
+          <words>To Coda</words>
+        </direction-type>
+        <sound tempo="100"/>
+      </direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><sound tempo="70"/></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><coda/></direction-type><sound tempo="60"/></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoSelfJumpToCodaSameMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction><sound tempo="100"/></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <direction>
+        <direction-type>
+          <words>D.S. al Coda</words>
+          <words>To Coda</words>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome>
+        </direction-type>
+        <sound dalsegno="S" tocoda="C"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><sound tempo="70"/></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda>C</coda></direction-type><sound tempo="60"/></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let dalSegnoSelfJumpToCodaSoundFallbackSameMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction><sound tempo="100"/></direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><direction-type><segno>S</segno></direction-type></direction>
+      <direction>
+        <direction-type>
+          <words>D.S. al Coda</words>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome>
+        </direction-type>
+        <sound dalsegno="S" tocoda="C"/>
+      </direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><sound tempo="70"/></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <direction><direction-type><coda>C</coda></direction-type><sound tempo="60"/></direction>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="5">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let daCapoSelfJumpToCodaSoundFallbackSameMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction>
+        <direction-type><words>D.C. al Coda</words></direction-type>
+        <sound tempo="100" tocoda="C"/>
+      </direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <direction><sound tempo="70"/></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="3">
+      <direction><direction-type><coda>C</coda></direction-type><sound tempo="60"/></direction>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let instrumentTraversalXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -6835,6 +8203,27 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     }
 }
 
+@Test func xmlTreeParserBuildsTraversableNodeTree() throws {
+    let root = try XMLTreeParser().parse(xml: xmlTreeTraversalXML)
+    #expect(root.name == "root")
+    #expect(root.attribute(named: "attr") == "A")
+    #expect(root.children(named: "child").count == 2)
+
+    let firstName = root.firstDescendant(path: ["child", "name"])
+    #expect(firstName?.trimmedText == "Alpha")
+
+    let namespacedEntry = try #require(root.firstChild(named: "entry"))
+    #expect(namespacedEntry.attribute(named: "role") == "lead")
+    #expect(namespacedEntry.trimmedText == "Text Value")
+}
+
+@Test func xmlTreeParserFindsCaseInsensitiveDescendants() throws {
+    let root = try XMLTreeParser().parse(xml: xmlTreeTraversalXML)
+    let descendants = root.descendants(named: "ENTRY")
+    #expect(descendants.count == 1)
+    #expect(descendants.first?.trimmedText == "Text Value")
+}
+
 @Test func loaderParsesFromXMLStringSource() throws {
     let loader = MusicXMLLoader()
     let score = try loader.loadScore(from: .xmlString(minimalScoreXML))
@@ -6866,6 +8255,51 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(throws: MusicXMLLoaderError.unsupportedURLScheme("ftp")) {
         _ = try loader.loadScore(from: .url(ftpURL))
     }
+}
+
+@Test func loaderRejectsFileURLWhenDisabledByOptions() throws {
+    let tmpURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("musicxml")
+    defer { try? FileManager.default.removeItem(at: tmpURL) }
+    try Data(minimalScoreXML.utf8).write(to: tmpURL)
+
+    let loader = MusicXMLLoader(
+        options: MusicXMLLoaderOptions(allowsFileURLs: false)
+    )
+    #expect(throws: MusicXMLLoaderError.fileURLAccessDisabled) {
+        _ = try loader.loadScore(from: .fileURL(tmpURL))
+    }
+}
+
+@Test func loaderRejectsRemoteURLWhenDisabledByOptions() throws {
+    let remoteURL = try #require(URL(string: "https://example.com/score.musicxml"))
+    let loader = MusicXMLLoader(
+        options: MusicXMLLoaderOptions(allowsRemoteURLs: false)
+    )
+    #expect(throws: MusicXMLLoaderError.remoteURLAccessDisabled) {
+        _ = try loader.loadScore(from: .url(remoteURL))
+    }
+}
+
+@Test func loaderParsesRemoteURLUsingInjectedDataFetcher() throws {
+    struct StubFetcher: MusicXMLDataFetching {
+        let map: [URL: Data]
+
+        func data(from url: URL) throws -> Data {
+            guard let data = map[url] else {
+                throw URLError(.fileDoesNotExist)
+            }
+            return data
+        }
+    }
+
+    let remoteURL = try #require(URL(string: "https://example.com/score.musicxml"))
+    let loader = MusicXMLLoader(
+        dataFetcher: StubFetcher(map: [remoteURL: Data(minimalScoreXML.utf8)])
+    )
+    let score = try loader.loadScore(from: .url(remoteURL))
+    #expect(score.title == "Prelude in C")
 }
 
 @Test func musicSheetReaderReadsFromSource() throws {
@@ -8699,6 +10133,235 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     ])
 }
 
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForLargeRepeatTimesWithoutPrematureStepLimit() throws {
+    let score = try MusicXMLParser().parse(xml: repeatTimesLargePlaybackXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 261)
+    #expect(Array(events.prefix(6)).map(\.measureNumber) == [1, 2, 1, 2, 1, 2])
+    #expect(Array(events.suffix(5)).map(\.measureNumber) == [1, 2, 1, 2, 3])
+    #expect(events.allSatisfy { $0.source == .carryForward })
+    #expect(events.last?.absolutePosition == MDKFraction(65, 1))
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForLargeRepeatTimesWithExplicitTempoChanges() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedLargeRepeatWithExplicitTempoXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 521)
+
+    #expect(Array(events.prefix(8)).map(\.measureNumber) == [1, 1, 2, 2, 1, 1, 2, 2])
+    #expect(Array(events.prefix(8)).map(\.source) == [.carryForward, .sound, .carryForward, .metronome, .carryForward, .sound, .carryForward, .metronome])
+    #expect(Array(events.prefix(8)).map(\.bpm) == [120, 100, 100, 80, 80, 100, 100, 80])
+
+    #expect(Array(events.suffix(5)).map(\.measureNumber) == [1, 1, 2, 2, 3])
+    #expect(Array(events.suffix(5)).map(\.source) == [.carryForward, .sound, .carryForward, .metronome, .carryForward])
+    #expect(Array(events.suffix(5)).map(\.bpm) == [80, 100, 100, 80, 80])
+    #expect(events.last?.absolutePosition == MDKFraction(65, 1))
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineWhenToCodaAndCodaShareMeasureWithoutDuplicateVisit() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedToCodaAndCodaSameMeasureXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 9)
+    #expect(events.map(\.measureNumber) == [1, 1, 2, 1, 1, 2, 3, 3, 4])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .sound, .carryForward, .carryForward, .metronome, .carryForward])
+    #expect(events.map(\.bpm) == [120, 100, 100, 100, 100, 100, 100, 80, 80])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(5, 4)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDaCapoAlCoda() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedDaCapoAlCodaXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 10)
+    #expect(events.map(\.measureNumber) == [1, 1, 2, 1, 1, 2, 3, 3, 4, 4])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .sound, .carryForward, .carryForward, .metronome, .carryForward, .sound])
+    #expect(events.map(\.bpm) == [120, 100, 100, 100, 100, 100, 100, 80, 80, 60])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(5, 4),
+        MDKFraction(5, 4)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDaCapoAlFine() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedDaCapoAlFineXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 8)
+    #expect(events.map(\.measureNumber) == [1, 1, 2, 1, 1, 2, 3, 3])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .sound, .carryForward, .carryForward, .metronome])
+    #expect(events.map(\.bpm) == [120, 100, 100, 100, 100, 100, 100, 80])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForTargetedDalSegnoForwardFallback() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedTargetedDalSegnoForwardFallbackXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 7)
+    #expect(events.map(\.measureNumber) == [1, 1, 2, 4, 4, 5, 5])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .metronome, .carryForward, .sound])
+    #expect(events.map(\.bpm) == [120, 100, 100, 100, 90, 90, 60])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(3, 4)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDaCapoSelfJumpAlFineWithoutDuplicateVisit() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoSelfJumpAlFineXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 4)
+    #expect(events.map(\.measureNumber) == [1, 1, 2, 2])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .metronome])
+    #expect(events.map(\.bpm) == [120, 100, 100, 80])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDalSegnoSelfJumpAlFineWithoutDuplicateVisit() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoSelfJumpAlFineXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 3)
+    #expect(events.map(\.measureNumber) == [1, 2, 3])
+    #expect(events.map(\.source) == [.carryForward, .carryForward, .carryForward])
+    #expect(events.map(\.bpm) == [120, 120, 120])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDalSegnoSelfJumpAlCodaWithoutDuplicateVisit() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedDalSegnoSelfJumpAlCodaXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 8)
+    #expect(events.map(\.measureNumber) == [1, 1, 2, 3, 3, 5, 5, 6])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .metronome, .carryForward, .sound, .carryForward])
+    #expect(events.map(\.bpm) == [120, 100, 100, 100, 80, 80, 60, 60])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDaCapoSelfJumpFineSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoSelfJumpFineSameMeasureXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 2)
+    #expect(events.map(\.measureNumber) == [1, 1])
+    #expect(events.map(\.source) == [.carryForward, .sound])
+    #expect(events.map(\.bpm) == [120, 100])
+    #expect(events.map(\.absolutePosition) == [MDKFraction(0, 1), MDKFraction(0, 1)])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDaCapoSelfJumpToCodaSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoSelfJumpToCodaSameMeasureXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 5)
+    #expect(events.map(\.measureNumber) == [1, 1, 3, 3, 4])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .sound, .carryForward])
+    #expect(events.map(\.bpm) == [120, 100, 100, 60, 60])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDalSegnoSelfJumpToCodaSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoSelfJumpToCodaSameMeasureXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 7)
+    #expect(events.map(\.measureNumber) == [1, 1, 2, 2, 4, 4, 5])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .metronome, .carryForward, .sound, .carryForward])
+    #expect(events.map(\.bpm) == [120, 100, 100, 80, 80, 60, 60])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDalSegnoSelfJumpToCodaSoundFallbackSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoSelfJumpToCodaSoundFallbackSameMeasureXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 7)
+    #expect(events.map(\.measureNumber) == [1, 1, 2, 2, 4, 4, 5])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .metronome, .carryForward, .sound, .carryForward])
+    #expect(events.map(\.bpm) == [120, 100, 100, 80, 80, 60, 60])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDaCapoSelfJumpToCodaSoundFallbackSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoSelfJumpToCodaSoundFallbackSameMeasureXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 5)
+    #expect(events.map(\.measureNumber) == [1, 1, 3, 3, 4])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .sound, .carryForward])
+    #expect(events.map(\.bpm) == [120, 100, 100, 60, 60])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2)
+    ])
+}
+
 @Test func tempoTimelineGeneratorBuildsPlaybackAlignedTimelineForDalSegnoCodaJumps() throws {
     let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedDalSegnoCodaTimelineXML)
     let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
@@ -8752,6 +10415,43 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         MDKFraction(5, 4),
         MDKFraction(5, 4),
         MDKFraction(5, 4)
+    ])
+}
+
+@Test func tempoTimelineGeneratorBuildsPlaybackAlignedCrossPartTimelineForTargetedDalSegnoCodaJumps() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedTargetedDalSegnoCodaCrossPartTimelineXML)
+    let events = TempoTimelineGenerator().generatePlaybackAligned(from: score)
+    #expect(events.count == 24)
+    #expect(events.map(\.partIndex) == [0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1])
+    #expect(events.map(\.measureNumber) == [1, 1, 1, 1, 2, 2, 3, 3, 3, 3, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 6, 6, 6, 6])
+    #expect(events.map(\.onsetDivisions) == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    #expect(events.map(\.source) == [.carryForward, .sound, .carryForward, .sound, .carryForward, .carryForward, .carryForward, .metronome, .carryForward, .metronome, .carryForward, .carryForward, .carryForward, .metronome, .carryForward, .metronome, .carryForward, .sound, .carryForward, .sound, .carryForward, .sound, .carryForward, .sound])
+    #expect(events.map(\.bpm) == [120, 100, 120, 110, 100, 110, 100, 90, 110, 95, 90, 95, 90, 90, 95, 95, 90, 80, 95, 70, 80, 60, 70, 50])
+    #expect(events.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(5, 4),
+        MDKFraction(5, 4),
+        MDKFraction(5, 4),
+        MDKFraction(5, 4),
+        MDKFraction(3, 2),
+        MDKFraction(3, 2),
+        MDKFraction(3, 2),
+        MDKFraction(3, 2)
     ])
 }
 
@@ -10283,6 +11983,224 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     ])
 }
 
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForLargeRepeatTimesWithoutPrematureStepLimit() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(repeatTimesLargePlaybackXML))
+    #expect(result.playbackTempoTimelineEvents.count == 261)
+    #expect(Array(result.playbackTempoTimelineEvents.prefix(6)).map(\.measureNumber) == [1, 2, 1, 2, 1, 2])
+    #expect(Array(result.playbackTempoTimelineEvents.suffix(5)).map(\.measureNumber) == [1, 2, 1, 2, 3])
+    #expect(result.playbackTempoTimelineEvents.allSatisfy { $0.source == .carryForward })
+    #expect(result.playbackTempoTimelineEvents.last?.absolutePosition == MDKFraction(65, 1))
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForLargeRepeatTimesWithExplicitTempoChanges() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(tempoPlaybackAlignedLargeRepeatWithExplicitTempoXML))
+    #expect(result.playbackTempoTimelineEvents.count == 521)
+
+    #expect(Array(result.playbackTempoTimelineEvents.prefix(8)).map(\.measureNumber) == [1, 1, 2, 2, 1, 1, 2, 2])
+    #expect(Array(result.playbackTempoTimelineEvents.prefix(8)).map(\.source) == [.carryForward, .sound, .carryForward, .metronome, .carryForward, .sound, .carryForward, .metronome])
+    #expect(Array(result.playbackTempoTimelineEvents.prefix(8)).map(\.bpm) == [120, 100, 100, 80, 80, 100, 100, 80])
+
+    #expect(Array(result.playbackTempoTimelineEvents.suffix(5)).map(\.measureNumber) == [1, 1, 2, 2, 3])
+    #expect(Array(result.playbackTempoTimelineEvents.suffix(5)).map(\.source) == [.carryForward, .sound, .carryForward, .metronome, .carryForward])
+    #expect(Array(result.playbackTempoTimelineEvents.suffix(5)).map(\.bpm) == [80, 100, 100, 80, 80])
+    #expect(result.playbackTempoTimelineEvents.last?.absolutePosition == MDKFraction(65, 1))
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineWhenToCodaAndCodaShareMeasureWithoutDuplicateVisit() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(tempoPlaybackAlignedToCodaAndCodaSameMeasureXML))
+    #expect(result.playbackTempoTimelineEvents.count == 9)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 2, 1, 1, 2, 3, 3, 4])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .sound, .carryForward, .carryForward, .metronome, .carryForward])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 100, 100, 100, 100, 80, 80])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(5, 4)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForDaCapoAlCoda() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(tempoPlaybackAlignedDaCapoAlCodaXML))
+    #expect(result.playbackTempoTimelineEvents.count == 10)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 2, 1, 1, 2, 3, 3, 4, 4])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .sound, .carryForward, .carryForward, .metronome, .carryForward, .sound])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 100, 100, 100, 100, 80, 80, 60])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(5, 4),
+        MDKFraction(5, 4)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForDaCapoAlFine() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(tempoPlaybackAlignedDaCapoAlFineXML))
+    #expect(result.playbackTempoTimelineEvents.count == 8)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 2, 1, 1, 2, 3, 3])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .sound, .carryForward, .carryForward, .metronome])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 100, 100, 100, 100, 80])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForTargetedDalSegnoForwardFallback() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(tempoPlaybackAlignedTargetedDalSegnoForwardFallbackXML))
+    #expect(result.playbackTempoTimelineEvents.count == 7)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 2, 4, 4, 5, 5])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .metronome, .carryForward, .sound])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 100, 90, 90, 60])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(3, 4)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForDaCapoSelfJumpAlFineWithoutDuplicateVisit() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(daCapoSelfJumpAlFineXML))
+    #expect(result.playbackTempoTimelineEvents.count == 4)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 2, 2])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .metronome])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 80])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForDalSegnoSelfJumpAlCodaWithoutDuplicateVisit() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(tempoPlaybackAlignedDalSegnoSelfJumpAlCodaXML))
+    #expect(result.playbackTempoTimelineEvents.count == 8)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 2, 3, 3, 5, 5, 6])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .carryForward, .metronome, .carryForward, .sound, .carryForward])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 100, 80, 80, 60, 60])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForDaCapoSelfJumpFineSameMeasure() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(daCapoSelfJumpFineSameMeasureXML))
+    #expect(result.playbackTempoTimelineEvents.count == 2)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForDaCapoSelfJumpToCodaSameMeasure() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(daCapoSelfJumpToCodaSameMeasureXML))
+    #expect(result.playbackTempoTimelineEvents.count == 5)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 3, 3, 4])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .sound, .carryForward])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 60, 60])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForDalSegnoSelfJumpToCodaSameMeasure() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(dalSegnoSelfJumpToCodaSameMeasureXML))
+    #expect(result.playbackTempoTimelineEvents.count == 7)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 2, 2, 4, 4, 5])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .metronome, .carryForward, .sound, .carryForward])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 80, 80, 60, 60])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForDalSegnoSelfJumpToCodaSoundFallbackSameMeasure() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(dalSegnoSelfJumpToCodaSoundFallbackSameMeasureXML))
+    #expect(result.playbackTempoTimelineEvents.count == 7)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 2, 2, 4, 4, 5])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .metronome, .carryForward, .sound, .carryForward])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 80, 80, 60, 60])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTimelineForDaCapoSelfJumpToCodaSoundFallbackSameMeasure() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(daCapoSelfJumpToCodaSoundFallbackSameMeasureXML))
+    #expect(result.playbackTempoTimelineEvents.count == 5)
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 3, 3, 4])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .sound, .carryForward])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 100, 60, 60])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2)
+    ])
+}
+
 @Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedTempoTimelineForDalSegnoCodaJumps() throws {
     let reader = MusicSheetReader()
     let result = try reader.readWithTraversal(from: .xmlString(tempoPlaybackAlignedDalSegnoCodaTimelineXML))
@@ -10348,6 +12266,43 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         MDKFraction(5, 4),
         MDKFraction(5, 4),
         MDKFraction(5, 4)
+    ])
+}
+
+@Test func musicSheetReaderReadWithTraversalBuildsPlaybackAlignedCrossPartTempoTimelineForTargetedDalSegnoCodaJumps() throws {
+    let reader = MusicSheetReader()
+    let result = try reader.readWithTraversal(from: .xmlString(tempoPlaybackAlignedTargetedDalSegnoCodaCrossPartTimelineXML))
+    #expect(result.tempoTimelineEvents.count == 20)
+    #expect(result.playbackTempoTimelineEvents.count == 24)
+    #expect(result.playbackTempoTimelineEvents.map(\.partIndex) == [0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1])
+    #expect(result.playbackTempoTimelineEvents.map(\.measureNumber) == [1, 1, 1, 1, 2, 2, 3, 3, 3, 3, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 6, 6, 6, 6])
+    #expect(result.playbackTempoTimelineEvents.map(\.source) == [.carryForward, .sound, .carryForward, .sound, .carryForward, .carryForward, .carryForward, .metronome, .carryForward, .metronome, .carryForward, .carryForward, .carryForward, .metronome, .carryForward, .metronome, .carryForward, .sound, .carryForward, .sound, .carryForward, .sound, .carryForward, .sound])
+    #expect(result.playbackTempoTimelineEvents.map(\.bpm) == [120, 100, 120, 110, 100, 110, 100, 90, 110, 95, 90, 95, 90, 90, 95, 95, 90, 80, 95, 70, 80, 60, 70, 50])
+    #expect(result.playbackTempoTimelineEvents.map(\.absolutePosition) == [
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(0, 1),
+        MDKFraction(1, 4),
+        MDKFraction(1, 4),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(1, 2),
+        MDKFraction(3, 4),
+        MDKFraction(3, 4),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(1, 1),
+        MDKFraction(5, 4),
+        MDKFraction(5, 4),
+        MDKFraction(5, 4),
+        MDKFraction(5, 4),
+        MDKFraction(3, 2),
+        MDKFraction(3, 2),
+        MDKFraction(3, 2),
+        MDKFraction(3, 2)
     ])
 }
 
@@ -10596,6 +12551,54 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(note.articulations == [
         ArticulationMarker(kind: .staccato, placement: "above", type: nil),
         ArticulationMarker(kind: .strongAccent, placement: nil, type: "up")
+    ])
+}
+
+@Test func parserReadsFingeringMarkers() throws {
+    let score = try MusicXMLParser().parse(xml: fingeringsXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.noteEvents.count == 2)
+
+    let first = measure.noteEvents[0]
+    #expect(first.fingerings == [
+        FingeringMarker(number: "2", placement: "above", type: "up", substitution: true, alternate: false)
+    ])
+
+    let second = measure.noteEvents[1]
+    #expect(second.fingerings == [
+        FingeringMarker(number: "4", placement: "left", type: nil, substitution: nil, alternate: nil)
+    ])
+}
+
+@Test func parserReadsStringNumberMarkers() throws {
+    let score = try MusicXMLParser().parse(xml: stringNumbersXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.noteEvents.count == 2)
+
+    let first = measure.noteEvents[0]
+    #expect(first.stringNumbers == [
+        StringNumberMarker(number: "1", placement: "below", type: "up")
+    ])
+
+    let second = measure.noteEvents[1]
+    #expect(second.stringNumbers == [
+        StringNumberMarker(number: "6", placement: nil, type: "left")
+    ])
+}
+
+@Test func parserReadsFretNumberMarkers() throws {
+    let score = try MusicXMLParser().parse(xml: fretNumbersXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.noteEvents.count == 2)
+
+    let first = measure.noteEvents[0]
+    #expect(first.fretNumbers == [
+        FretNumberMarker(number: "3", placement: "right", type: "down")
+    ])
+
+    let second = measure.noteEvents[1]
+    #expect(second.fretNumbers == [
+        FretNumberMarker(number: "7", placement: nil, type: "left")
     ])
 }
 
@@ -10927,6 +12930,16 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     }
 }
 
+@Test func parserBuildsPlaybackOrderForTempoPlaybackAlignedTargetedDalSegnoCodaCrossPartFixture() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedTargetedDalSegnoCodaCrossPartTimelineXML)
+    #expect(score.parts.count == 2)
+    for part in score.parts {
+        let playback = try #require(part.playbackOrder)
+        #expect(playback.termination == .endOfScore)
+        #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 2, 3, 4, 6])
+    }
+}
+
 @Test func parserAppliesMetronomeDotMultiplierToTempoEvents() throws {
     let score = try MusicXMLParser().parse(xml: metronomeDottedTempoXML)
     let part = try #require(score.parts.first)
@@ -10990,6 +13003,160 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3])
 }
 
+@Test func parserHandlesLargeRepeatTimesWithoutPrematureStepLimit() throws {
+    let score = try MusicXMLParser().parse(xml: repeatTimesLargePlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.count == 261)
+    #expect(Array(playback.visits.prefix(6)).map(\.measureNumber) == [1, 2, 1, 2, 1, 2])
+    #expect(Array(playback.visits.suffix(5)).map(\.measureNumber) == [1, 2, 1, 2, 3])
+}
+
+@Test func parserHandlesToCodaAndCodaOnSameMeasureWithoutDuplicateVisit() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedToCodaAndCodaSameMeasureXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4])
+}
+
+@Test func parserSuppressesDaCapoSelfJumpAtStartMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoSelfJumpSuppressedXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3])
+}
+
+@Test func parserSuppressesDalSegnoSelfJumpWhenSegnoIsOnJumpMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoSelfJumpSuppressedXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3])
+}
+
+@Test func parserSuppressesTargetedDalSegnoSelfJumpCaseInsensitively() throws {
+    let score = try MusicXMLParser().parse(xml: targetedDalSegnoSelfJumpCaseInsensitiveXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3])
+}
+
+@Test func parserSuppressesDaCapoSelfJumpAndStillStopsAtFine() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoSelfJumpAlFineXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .fine)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2])
+}
+
+@Test func parserSuppressesDalSegnoSelfJumpAndPreservesRoadmapFlow() throws {
+    let fineScore = try MusicXMLParser().parse(xml: dalSegnoSelfJumpAlFineXML)
+    let finePlayback = try #require(fineScore.parts.first?.playbackOrder)
+    #expect(finePlayback.termination == .fine)
+    #expect(finePlayback.visits.map(\.measureNumber) == [1, 2, 3])
+
+    let codaScore = try MusicXMLParser().parse(xml: tempoPlaybackAlignedDalSegnoSelfJumpAlCodaXML)
+    let codaPlayback = try #require(codaScore.parts.first?.playbackOrder)
+    #expect(codaPlayback.termination == .endOfScore)
+    #expect(codaPlayback.visits.map(\.measureNumber) == [1, 2, 3, 5, 6])
+}
+
+@Test func parserStopsAtFineWhenDaCapoSelfJumpHasFineOnSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoSelfJumpFineSameMeasureXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .fine)
+    #expect(playback.visits.map(\.measureNumber) == [1])
+}
+
+@Test func parserStopsAtFineWhenDalSegnoSelfJumpHasFineOnSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoSelfJumpFineSameMeasureXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .fine)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2])
+}
+
+@Test func parserAppliesToCodaWhenDaCapoSelfJumpHasToCodaOnSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoSelfJumpToCodaSameMeasureXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 3, 4])
+}
+
+@Test func parserAppliesToCodaWhenDalSegnoSelfJumpHasToCodaOnSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoSelfJumpToCodaSameMeasureXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 4, 5])
+}
+
+@Test func parserAppliesToCodaWhenDalSegnoSelfJumpUsesSoundToCodaFallbackOnSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoSelfJumpToCodaSoundFallbackSameMeasureXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 4, 5])
+}
+
+@Test func parserAppliesToCodaWhenDaCapoSelfJumpUsesSoundToCodaFallbackOnSameMeasure() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoSelfJumpToCodaSoundFallbackSameMeasureXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 3, 4])
+}
+
+@Test func parserDoesNotFallbackToUntargetedSegnoForUnresolvableTargetedDalSegno() throws {
+    let score = try MusicXMLParser().parse(xml: targetedDalSegnoDoesNotFallbackToUntargetedSegnoXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3])
+}
+
+@Test func parserUsesForwardFallbackForTargetedDalSegnoWhenBackwardMarkerIsMissing() throws {
+    let score = try MusicXMLParser().parse(xml: targetedDalSegnoUsesForwardMarkerFallbackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 4, 5])
+}
+
+@Test func parserUsesForwardFallbackForUntargetedDalSegnoWhenBackwardMarkerIsMissing() throws {
+    let score = try MusicXMLParser().parse(xml: untargetedDalSegnoUsesForwardMarkerFallbackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 4, 5])
+}
+
+@Test func parserIgnoresToCodaWithoutActiveRoadmapJump() throws {
+    let score = try MusicXMLParser().parse(xml: toCodaIgnoredWithoutActiveRoadmapXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3])
+}
+
+@Test func parserTreatsEndingDiscontinueAsRepeatGateBoundary() throws {
+    let score = try MusicXMLParser().parse(xml: endingDiscontinueGatesRepeatPlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 3, 4])
+}
+
+@Test func parserDoesNotApplyEndingDiscontinueGateWithoutBackwardRepeat() throws {
+    let score = try MusicXMLParser().parse(xml: endingDiscontinueWithoutRepeatDoesNotGateXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2])
+}
+
+@Test func parserFallsBackToDaCapoWhenDalSegnoTargetIsUnresolvable() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoUnresolvedFallsBackToDaCapoXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .fine)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3])
+}
+
+@Test func parserContinuesForwardWhenDalSegnoIsUnresolvableAndNoDaCapo() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoUnresolvedWithoutDaCapoContinuesXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3])
+}
+
 @Test func parserDoesNotApplyEndingSkipsWithoutBackwardRepeat() throws {
     let score = try MusicXMLParser().parse(xml: endingWithoutBackwardRepeatXML)
     let playback = try #require(score.parts.first?.playbackOrder)
@@ -11004,11 +13171,74 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4])
 }
 
+@Test func parserBuildsPlaybackOrderForDaCapoAlFine() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoAlFinePlaybackXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .fine)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3])
+}
+
+@Test func parserBuildsPlaybackOrderForDaCapoAlCoda() throws {
+    let score = try MusicXMLParser().parse(xml: tempoPlaybackAlignedDaCapoAlCodaXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4])
+}
+
 @Test func parserBuildsPlaybackOrderWithTargetedSegnoAndCoda() throws {
     let score = try MusicXMLParser().parse(xml: targetedDalSegnoToCodaXML)
     let playback = try #require(score.parts.first?.playbackOrder)
     #expect(playback.termination == .endOfScore)
     #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 2, 3, 4, 6])
+}
+
+@Test func parserUsesNearestForwardMatchingCodaForTargetedToCoda() throws {
+    let score = try MusicXMLParser().parse(xml: targetedToCodaUsesNearestForwardMatchingCodaXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4, 5, 6, 7])
+}
+
+@Test func parserPrefersTargetedToCodaTriggerOverUntargetedWhenRoadmapTargetExists() throws {
+    let score = try MusicXMLParser().parse(xml: targetedToCodaPrefersTargetedTriggerOverUntargetedXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 5, 6])
+}
+
+@Test func parserFallsBackToUntargetedToCodaWhenMismatchedTargetedTriggerCoexists() throws {
+    let score = try MusicXMLParser().parse(xml: targetedToCodaIgnoresMismatchedTargetedTriggerXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 5, 6])
+}
+
+@Test func parserDoesNotFallbackToUntargetedCodaWhenTargetedCodaIsMissing() throws {
+    let score = try MusicXMLParser().parse(xml: targetedToCodaDoesNotFallbackToUntargetedCodaXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4, 5])
+}
+
+@Test func parserUsesUntargetedToCodaTriggerWhenTargetedRoadmapCodaExists() throws {
+    let score = try MusicXMLParser().parse(xml: targetedToCodaUsesUntargetedTriggerWhenMatchingCodaExistsXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 5])
+}
+
+@Test func parserSelectsClosestBackwardSegnoForUntargetedDalSegno() throws {
+    let score = try MusicXMLParser().parse(xml: dalSegnoUsesClosestBackwardSegnoXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 4, 3, 4, 5])
+}
+
+@Test func parserPrefersTargetedSegnoMatchOverUntargetedSegnoMarkers() throws {
+    let score = try MusicXMLParser().parse(xml: targetedDalSegnoPrefersMatchingTargetOverUntargetedMarkerXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 3, 1, 2, 3, 4])
 }
 
 @Test func parserPrefersDalSegnoOverDaCapoWhenBothPresent() throws {
@@ -11035,6 +13265,20 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
 @Test func parserDoesNotStopAtFineWithoutAlFine() throws {
     let score = try MusicXMLParser().parse(xml: dalSegnoAlCodaIgnoresFineXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4])
+}
+
+@Test func parserDaCapoIgnoresFineWithoutAlFineRoadmap() throws {
+    let score = try MusicXMLParser().parse(xml: daCapoIgnoresFineWithoutAlFineXML)
+    let playback = try #require(score.parts.first?.playbackOrder)
+    #expect(playback.termination == .endOfScore)
+    #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4])
+}
+
+@Test func parserMatchesMarkerTargetsCaseInsensitively() throws {
+    let score = try MusicXMLParser().parse(xml: markerTargetsMatchCaseInsensitivelyXML)
     let playback = try #require(score.parts.first?.playbackOrder)
     #expect(playback.termination == .endOfScore)
     #expect(playback.visits.map(\.measureNumber) == [1, 2, 1, 2, 3, 4])
@@ -11244,6 +13488,43 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let metronomeURL = try osmdFixtureURL(named: "OSMD_function_test_metronome_marks.mxl")
     let metronomeResult = try reader.readWithTraversal(from: .fileURL(metronomeURL))
     #expect(!metronomeResult.tempoTimelineEvents.isEmpty)
+}
+
+@Test func pipelineProcessesAdditionalOSMDFixturesAcrossParserLayoutAndRenderPlan() throws {
+    let fixtures = [
+        "OSMD_function_test_accidentals.musicxml",
+        "OSMD_function_test_in-measure-clefs.xml",
+        "OSMD_function_test_drumset.musicxml",
+        "test_grace_slash.musicxml",
+        "test_tie_direction.musicxml",
+        "test_rest_positioning_piano_two_voices.musicxml",
+        "test_rehearsal_marks_bolivia.musicxml",
+        "test_pagebreak_implies_systembreak.musicxml",
+    ]
+
+    let parser = MusicXMLParser()
+    let reader = MusicSheetReader()
+    let layoutEngine = MusicLayoutEngine()
+    let renderer = VexFoundationRenderer()
+    let layoutOptions = LayoutOptions(pageWidth: 900, pageHeight: 1400)
+
+    for fixture in fixtures {
+        let url = try osmdFixtureURL(named: fixture)
+        let score = try parser.parse(fileURL: url)
+        #expect(!score.parts.isEmpty)
+        #expect(score.parts.contains { !$0.measures.isEmpty })
+
+        let traversal = try reader.readWithTraversal(from: .fileURL(url))
+        #expect(!traversal.instrumentMeasureVisits.isEmpty)
+
+        let laidOut = try layoutEngine.layout(score: score, options: layoutOptions)
+        #expect(!laidOut.systems.isEmpty)
+        #expect(!laidOut.measures.isEmpty)
+
+        let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "fixture-smoke"))
+        #expect(!plan.staves.isEmpty)
+        #expect(!plan.measures.isEmpty)
+    }
 }
 
 @Test func parserDoesNotFallbackToDifferentCodaWhenTargetMissing() throws {
@@ -12732,6 +15013,42 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
     #expect(plan.articulations.count == 2)
     #expect(plan.articulations.allSatisfy { $0.position == nil })
+}
+
+@Test func vexAdapterBuildsFingeringPlans() throws {
+    let score = try MusicXMLParser().parse(xml: fingeringsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 2)
+    #expect(plan.fingerings.count == 2)
+    #expect(plan.fingerings.map(\.number) == ["2", "4"])
+    #expect(plan.fingerings.map(\.entryIndexInVoice) == [0, 1])
+    #expect(plan.fingerings.map(\.position) == [.above, .left])
+}
+
+@Test func vexAdapterBuildsStringNumberPlans() throws {
+    let score = try MusicXMLParser().parse(xml: stringNumbersXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 2)
+    #expect(plan.stringNumbers.count == 2)
+    #expect(plan.stringNumbers.map(\.number) == ["1", "6"])
+    #expect(plan.stringNumbers.map(\.entryIndexInVoice) == [0, 1])
+    #expect(plan.stringNumbers.map(\.position) == [.below, .left])
+}
+
+@Test func vexAdapterBuildsFretNumberPlans() throws {
+    let score = try MusicXMLParser().parse(xml: fretNumbersXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 2)
+    #expect(plan.fingerings.count == 2)
+    #expect(plan.fingerings.map(\.number) == ["3", "7"])
+    #expect(plan.fingerings.map(\.entryIndexInVoice) == [0, 1])
+    #expect(plan.fingerings.map(\.position) == [.right, .left])
 }
 
 @Test func vexAdapterBuildsLyricPlans() throws {
@@ -14369,6 +16686,51 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
     let firstNote = try #require(execution.notes.first)
     #expect(firstNote.getModifiersByType("Articulation").count == 2)
+}
+
+@Test func vexAdapterExecutesFingeringModifiers() throws {
+    let score = try MusicXMLParser().parse(xml: fingeringsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.fingerings.count == 2)
+    #expect(execution.fingerings.map(\.finger) == ["2", "4"])
+    #expect(execution.fingerings.map { $0.getPosition() } == [.above, .left])
+    #expect(execution.notes.count == 2)
+    #expect(execution.notes[0].getModifiersByType("FretHandFinger").count == 1)
+    #expect(execution.notes[1].getModifiersByType("FretHandFinger").count == 1)
+}
+
+@Test func vexAdapterExecutesStringNumberModifiers() throws {
+    let score = try MusicXMLParser().parse(xml: stringNumbersXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.stringNumbers.count == 2)
+    #expect(execution.stringNumbers.map(\.stringNumber) == ["1", "6"])
+    #expect(execution.stringNumbers.map { $0.getPosition() } == [.below, .left])
+    #expect(execution.notes.count == 2)
+    #expect(execution.notes[0].getModifiersByType("StringNumber").count == 1)
+    #expect(execution.notes[1].getModifiersByType("StringNumber").count == 1)
+}
+
+@Test func vexAdapterExecutesFretNumberModifiers() throws {
+    let score = try MusicXMLParser().parse(xml: fretNumbersXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.fingerings.count == 2)
+    #expect(execution.fingerings.map(\.finger) == ["3", "7"])
+    #expect(execution.fingerings.map { $0.getPosition() } == [.right, .left])
+    #expect(execution.notes.count == 2)
+    #expect(execution.notes[0].getModifiersByType("FretHandFinger").count == 1)
+    #expect(execution.notes[1].getModifiersByType("FretHandFinger").count == 1)
 }
 
 @Test func vexAdapterDefaultsArticulationPlacementFromNotePosition() throws {

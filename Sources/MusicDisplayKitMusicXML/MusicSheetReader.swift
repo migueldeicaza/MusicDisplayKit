@@ -65,6 +65,8 @@ public struct MusicSheetReader: MusicSheetReading {
 
     public init(
         parser: ScoreParser = MusicXMLParser(),
+        loaderOptions: MusicXMLLoaderOptions = MusicXMLLoaderOptions(),
+        loaderDataFetcher: any MusicXMLDataFetching = FoundationMusicXMLDataFetcher(),
         instrumentReader: InstrumentReader = InstrumentReader(),
         voiceGenerator: VoiceGenerator = VoiceGenerator(),
         chordSymbolGenerator: ChordSymbolGenerator = ChordSymbolGenerator(),
@@ -75,7 +77,11 @@ public struct MusicSheetReader: MusicSheetReading {
         tempoTimelineGenerator: TempoTimelineGenerator = TempoTimelineGenerator(),
         afterReadingModules: [any AfterScoreReadingModule] = []
     ) {
-        self.loader = MusicXMLLoader(parser: parser)
+        self.loader = MusicXMLLoader(
+            parser: parser,
+            options: loaderOptions,
+            dataFetcher: loaderDataFetcher
+        )
         self.instrumentReader = instrumentReader
         self.voiceGenerator = voiceGenerator
         self.chordSymbolGenerator = chordSymbolGenerator

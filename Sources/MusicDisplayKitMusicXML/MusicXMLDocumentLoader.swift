@@ -1,7 +1,5 @@
 import Foundation
-#if canImport(FoundationXML)
-import FoundationXML
-#endif
+import MusicDisplayKitCore
 import MusicDisplayKitModel
 import ZIPFoundation
 
@@ -125,19 +123,32 @@ struct MusicXMLDocumentLoader {
     }
 
     private func parseContainerRootfilePath(from containerData: Data) throws -> String {
-        let delegate = ContainerXMLDelegate()
-        let parser = XMLParser(data: containerData)
-        parser.delegate = delegate
-        guard parser.parse() else {
+        let rootNode: MusicDisplayKitCore.XMLNode
+        do {
+            rootNode = try XMLTreeParser().parse(data: containerData)
+        } catch {
             throw MusicXMLDocumentLoaderError.missingContainerRootfile
         }
 
-        if let typedRoot = delegate.rootfiles.first(where: {
+        let rootfiles: [(fullPath: String, mediaType: String?)] = rootNode
+            .descendants(named: "rootfile")
+            .compactMap { node in
+                guard let fullPath = node.attribute(named: "full-path")?
+                    .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines),
+                    !fullPath.isEmpty else {
+                    return nil
+                }
+                let mediaType = node.attribute(named: "media-type")?
+                    .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+                return (fullPath: fullPath, mediaType: mediaType)
+            }
+
+        if let typedRoot = rootfiles.first(where: {
             ($0.mediaType?.lowercased() ?? "") == "application/vnd.recordare.musicxml+xml"
         })?.fullPath {
             return typedRoot
         }
-        if let anyRoot = delegate.rootfiles.first?.fullPath {
+        if let anyRoot = rootfiles.first?.fullPath {
             return anyRoot
         }
         throw MusicXMLDocumentLoaderError.missingContainerRootfile
@@ -229,33 +240,5 @@ struct MusicXMLDocumentLoader {
         default:
             return nil
         }
-    }
-}
-
-private final class ContainerXMLDelegate: NSObject, XMLParserDelegate {
-    typealias Rootfile = (fullPath: String, mediaType: String?)
-    var rootfiles: [Rootfile] = []
-
-    func parser(
-        _ parser: XMLParser,
-        didStartElement elementName: String,
-        namespaceURI: String?,
-        qualifiedName qName: String?,
-        attributes attributeDict: [String: String] = [:]
-    ) {
-        guard elementName.lowercased() == "rootfile" else {
-            return
-        }
-        guard let fullPath = attributeDict["full-path"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-            !fullPath.isEmpty else {
-            return
-        }
-        rootfiles.append(
-            (
-                fullPath: fullPath,
-                mediaType: attributeDict["media-type"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        )
     }
 }

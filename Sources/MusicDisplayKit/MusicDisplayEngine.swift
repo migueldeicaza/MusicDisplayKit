@@ -15,6 +15,8 @@ public enum MusicDisplayEngineError: Error {
 
 public final class MusicDisplayEngine {
     private let parser: ScoreParser
+    private let loaderOptions: MusicXMLLoaderOptions
+    private let loaderDataFetcher: any MusicXMLDataFetching
     private let layoutEngine: ScoreLayoutEngine
     private let renderer: ScoreRenderer
 
@@ -22,10 +24,14 @@ public final class MusicDisplayEngine {
 
     public init(
         parser: ScoreParser = MusicXMLParser(),
+        loaderOptions: MusicXMLLoaderOptions = MusicXMLLoaderOptions(),
+        loaderDataFetcher: any MusicXMLDataFetching = FoundationMusicXMLDataFetcher(),
         layoutEngine: ScoreLayoutEngine = MusicLayoutEngine(),
         renderer: ScoreRenderer = VexFoundationRenderer()
     ) {
         self.parser = parser
+        self.loaderOptions = loaderOptions
+        self.loaderDataFetcher = loaderDataFetcher
         self.layoutEngine = layoutEngine
         self.renderer = renderer
     }
@@ -43,7 +49,11 @@ public final class MusicDisplayEngine {
     }
 
     public func load(source: MusicXMLSource) throws {
-        let sheetReader = MusicSheetReader(parser: parser)
+        let sheetReader = MusicSheetReader(
+            parser: parser,
+            loaderOptions: loaderOptions,
+            loaderDataFetcher: loaderDataFetcher
+        )
         do {
             loadedScore = try sheetReader.read(from: source)
         } catch MusicXMLLoaderError.undecodableInputData {

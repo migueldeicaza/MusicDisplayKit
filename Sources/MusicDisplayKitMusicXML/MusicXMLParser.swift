@@ -160,6 +160,61 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var extend: Bool = false
     }
 
+    private struct FingeringBuilder {
+        var number: String?
+        var placement: String?
+        var type: String?
+        var substitution: Bool?
+        var alternate: Bool?
+
+        func build() -> FingeringMarker? {
+            guard let number = number?.trimmedNonEmpty else {
+                return nil
+            }
+            return FingeringMarker(
+                number: number,
+                placement: placement,
+                type: type,
+                substitution: substitution,
+                alternate: alternate
+            )
+        }
+    }
+
+    private struct StringNumberBuilder {
+        var number: String?
+        var placement: String?
+        var type: String?
+
+        func build() -> StringNumberMarker? {
+            guard let number = number?.trimmedNonEmpty else {
+                return nil
+            }
+            return StringNumberMarker(
+                number: number,
+                placement: placement,
+                type: type
+            )
+        }
+    }
+
+    private struct FretNumberBuilder {
+        var number: String?
+        var placement: String?
+        var type: String?
+
+        func build() -> FretNumberMarker? {
+            guard let number = number?.trimmedNonEmpty else {
+                return nil
+            }
+            return FretNumberMarker(
+                number: number,
+                placement: placement,
+                type: type
+            )
+        }
+    }
+
     private struct MetronomeBuilder {
         var beatUnit: String?
         var beatUnitDotCount: Int = 0
@@ -334,6 +389,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var timeModificationActualNotes: Int?
         var timeModificationNormalNotes: Int?
         var articulations: [ArticulationMarker] = []
+        var fingerings: [FingeringMarker] = []
+        var stringNumbers: [StringNumberMarker] = []
+        var fretNumbers: [FretNumberMarker] = []
 
         func build(onsetDivisions: Int) -> NoteEvent? {
             let resolvedVoice = max(voice ?? 1, 1)
@@ -358,7 +416,10 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     beams: beams,
                     tuplets: tuplets,
                     timeModification: timeModification,
-                    articulations: articulations
+                    articulations: articulations,
+                    fingerings: fingerings,
+                    stringNumbers: stringNumbers,
+                    fretNumbers: fretNumbers
                 )
             }
 
@@ -381,7 +442,10 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 beams: beams,
                 tuplets: tuplets,
                 timeModification: timeModification,
-                articulations: articulations
+                articulations: articulations,
+                fingerings: fingerings,
+                stringNumbers: stringNumbers,
+                fretNumbers: fretNumbers
             )
         }
     }
@@ -409,6 +473,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case noteStaff
         case lyricText
         case lyricSyllabic
+        case noteFingering
+        case noteStringNumber
+        case noteFretNumber
         case beamValue
         case timeModificationActualNotes
         case timeModificationNormalNotes
@@ -455,6 +522,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private var currentClefBuilder: ClefBuilder?
     private var currentNote: NoteBuilder?
     private var currentLyricBuilder: LyricBuilder?
+    private var currentFingeringBuilder: FingeringBuilder?
+    private var currentStringNumberBuilder: StringNumberBuilder?
+    private var currentFretNumberBuilder: FretNumberBuilder?
     private var currentDirectionBuilder: DirectionBuilder?
     private var currentMetronomeBuilder: MetronomeBuilder?
     private var currentHarmonyBuilder: HarmonyBuilder?
@@ -462,6 +532,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private var currentBarlineLocation: String?
     private var insideTimeModification = false
     private var insideArticulations = false
+    private var insideTechnical = false
     private var currentArticulationsPlacement: String?
     private var insideDirectionType = false
     private var insideDynamics = false
@@ -621,8 +692,12 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "note":
             currentNote = NoteBuilder()
             currentLyricBuilder = nil
+            currentFingeringBuilder = nil
+            currentStringNumberBuilder = nil
+            currentFretNumberBuilder = nil
             insideTimeModification = false
             insideArticulations = false
+            insideTechnical = false
             currentArticulationsPlacement = nil
             currentBeamNumber = nil
 
@@ -842,6 +917,32 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             let parsedNumber = attributeDict["number"].flatMap(Int.init) ?? 1
             currentLyricBuilder = LyricBuilder(number: max(1, parsedNumber))
 
+        case "technical" where currentNote != nil:
+            insideTechnical = true
+
+        case "fingering" where currentNote != nil && insideTechnical:
+            currentFingeringBuilder = FingeringBuilder(
+                placement: attributeDict["placement"]?.trimmedNonEmpty?.lowercased(),
+                type: attributeDict["type"]?.trimmedNonEmpty?.lowercased(),
+                substitution: yesNoToBool(attributeDict["substitution"]),
+                alternate: yesNoToBool(attributeDict["alternate"])
+            )
+            startTextCapture(.noteFingering)
+
+        case "string" where currentNote != nil && insideTechnical:
+            currentStringNumberBuilder = StringNumberBuilder(
+                placement: attributeDict["placement"]?.trimmedNonEmpty?.lowercased(),
+                type: attributeDict["type"]?.trimmedNonEmpty?.lowercased()
+            )
+            startTextCapture(.noteStringNumber)
+
+        case "fret" where currentNote != nil && insideTechnical:
+            currentFretNumberBuilder = FretNumberBuilder(
+                placement: attributeDict["placement"]?.trimmedNonEmpty?.lowercased(),
+                type: attributeDict["type"]?.trimmedNonEmpty?.lowercased()
+            )
+            startTextCapture(.noteFretNumber)
+
         case "text" where currentLyricBuilder != nil:
             startTextCapture(.lyricText)
 
@@ -1050,8 +1151,12 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             }
             currentNote = nil
             currentLyricBuilder = nil
+            currentFingeringBuilder = nil
+            currentStringNumberBuilder = nil
+            currentFretNumberBuilder = nil
             insideTimeModification = false
             insideArticulations = false
+            insideTechnical = false
             currentArticulationsPlacement = nil
             currentBeamNumber = nil
 
@@ -1140,6 +1245,48 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "articulations":
             insideArticulations = false
             currentArticulationsPlacement = nil
+
+        case "technical":
+            insideTechnical = false
+
+        case "fingering":
+            if case .noteFingering = currentTextTarget,
+               var currentFingeringBuilder {
+                currentFingeringBuilder.number = consumeCapturedText()
+                self.currentFingeringBuilder = currentFingeringBuilder
+            }
+            if let fingering = currentFingeringBuilder?.build(),
+               var currentNote {
+                currentNote.fingerings.append(fingering)
+                self.currentNote = currentNote
+            }
+            currentFingeringBuilder = nil
+
+        case "string":
+            if case .noteStringNumber = currentTextTarget,
+               var currentStringNumberBuilder {
+                currentStringNumberBuilder.number = consumeCapturedText()
+                self.currentStringNumberBuilder = currentStringNumberBuilder
+            }
+            if let stringNumber = currentStringNumberBuilder?.build(),
+               var currentNote {
+                currentNote.stringNumbers.append(stringNumber)
+                self.currentNote = currentNote
+            }
+            currentStringNumberBuilder = nil
+
+        case "fret":
+            if case .noteFretNumber = currentTextTarget,
+               var currentFretNumberBuilder {
+                currentFretNumberBuilder.number = consumeCapturedText()
+                self.currentFretNumberBuilder = currentFretNumberBuilder
+            }
+            if let fretNumber = currentFretNumberBuilder?.build(),
+               var currentNote {
+                currentNote.fretNumbers.append(fretNumber)
+                self.currentNote = currentNote
+            }
+            currentFretNumberBuilder = nil
 
         case "barline":
             currentBarlineLocation = nil
@@ -1788,7 +1935,11 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var executedJumps: Set<JumpExecutionKey> = []
         var roadmap = RoadmapState()
 
-        let maxSteps = max(256, measures.count * 24)
+        let maxSteps = estimatedPlaybackStepLimit(
+            measures: measures,
+            repeatSectionStartByBackwardMeasure: repeatSectionStartByBackwardMeasure,
+            backwardRepeatTotalIterationsByMeasure: backwardRepeatTotalIterationsByMeasure
+        )
         var currentMeasureIndex = 0
         var termination: PlaybackTermination = .endOfScore
         var stepCount = 0
@@ -1881,8 +2032,10 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 ) {
                     roadmap.requiresCoda = false
                     roadmap.codaTarget = nil
-                    currentMeasureIndex = codaIndex
-                    continue playbackLoop
+                    if codaIndex != currentMeasureIndex {
+                        currentMeasureIndex = codaIndex
+                        continue playbackLoop
+                    }
                 }
             }
 
@@ -1899,8 +2052,49 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 roadmap.stopAtFine = jump.stopAtFine
                 roadmap.requiresCoda = jump.requiresCoda
                 roadmap.codaTarget = jump.codaTarget
-                currentMeasureIndex = destination
-                continue playbackLoop
+                if destination != currentMeasureIndex {
+                    currentMeasureIndex = destination
+                    continue playbackLoop
+                }
+
+                // Self-jumps are suppressed to avoid duplicate visits, but roadmap effects
+                // should still apply as if playback resumed from the jump destination.
+                if roadmap.stopAtFine,
+                   instructions.contains(where: { $0.kind == .fine }) {
+                    termination = .fine
+                    break playbackLoop
+                }
+
+                if roadmap.requiresCoda,
+                   let toCodaInstruction = selectToCodaInstruction(
+                       from: instructions,
+                       requiredTarget: roadmap.codaTarget,
+                       preferExplicitMarkersOnJumpCommandMeasure: instructions.contains {
+                           $0.kind == .daCapo || $0.kind == .dalSegno
+                       },
+                       allowSoundFallbackWhenNoExplicitForwardMarker: !hasForwardExplicitToCodaTrigger(
+                           measures: measures,
+                           afterMeasureIndex: currentMeasureIndex,
+                           requiredTarget: roadmap.codaTarget
+                       )
+                   ) {
+                    let codaTarget = roadmap.codaTarget ?? toCodaInstruction.target
+                    let strictCodaTarget = normalizeMarkerTarget(codaTarget) != nil
+                    if let codaIndex = resolveMarkerIndex(
+                        from: codaMarkers,
+                        target: codaTarget,
+                        strictTarget: strictCodaTarget,
+                        anchorIndex: currentMeasureIndex,
+                        direction: .forwardInclusive
+                    ) {
+                        roadmap.requiresCoda = false
+                        roadmap.codaTarget = nil
+                        if codaIndex != currentMeasureIndex {
+                            currentMeasureIndex = codaIndex
+                            continue playbackLoop
+                        }
+                    }
+                }
             }
 
             if let totalIterations = backwardRepeatTotalIterationsByMeasure[currentMeasureIndex] {
@@ -2215,6 +2409,66 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         }
 
         return output
+    }
+
+    private func estimatedPlaybackStepLimit(
+        measures: [Measure],
+        repeatSectionStartByBackwardMeasure: [Int: Int],
+        backwardRepeatTotalIterationsByMeasure: [Int: Int]
+    ) -> Int {
+        guard !measures.isEmpty else {
+            return 256
+        }
+
+        let absoluteCap = max(2_048, measures.count * 4_096)
+        var estimatedVisits = min(absoluteCap, measures.count)
+
+        for (repeatEnd, totalIterations) in backwardRepeatTotalIterationsByMeasure {
+            let extraIterations = max(0, totalIterations - 1)
+            guard extraIterations > 0 else {
+                continue
+            }
+
+            let sectionStart = repeatSectionStartByBackwardMeasure[repeatEnd] ?? 0
+            let sectionLength = max(1, repeatEnd - sectionStart + 1)
+            let additionalVisits = boundedMultiply(sectionLength, extraIterations, cap: absoluteCap)
+            estimatedVisits = boundedAdd(estimatedVisits, additionalVisits, cap: absoluteCap)
+        }
+
+        let jumpCommandCount = measures.reduce(into: 0) { partialResult, measure in
+            let jumps = measure.repetitionInstructions.reduce(into: 0) { count, instruction in
+                switch instruction.kind {
+                case .daCapo, .dalSegno:
+                    count += 1
+                default:
+                    break
+                }
+            }
+            partialResult = boundedAdd(partialResult, jumps, cap: absoluteCap)
+        }
+        let jumpAllowance = boundedMultiply(jumpCommandCount, measures.count, cap: absoluteCap)
+        estimatedVisits = boundedAdd(estimatedVisits, jumpAllowance, cap: absoluteCap)
+
+        let safetyMargin = max(128, measures.count * 8)
+        estimatedVisits = boundedAdd(estimatedVisits, safetyMargin, cap: absoluteCap)
+
+        return max(256, min(absoluteCap, estimatedVisits))
+    }
+
+    private func boundedAdd(_ lhs: Int, _ rhs: Int, cap: Int) -> Int {
+        let (sum, overflow) = lhs.addingReportingOverflow(rhs)
+        if overflow {
+            return cap
+        }
+        return min(cap, sum)
+    }
+
+    private func boundedMultiply(_ lhs: Int, _ rhs: Int, cap: Int) -> Int {
+        let (product, overflow) = lhs.multipliedReportingOverflow(by: rhs)
+        if overflow {
+            return cap
+        }
+        return min(cap, product)
     }
 
     private func buildEndingRanges(
