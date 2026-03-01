@@ -1,6 +1,8 @@
 # MusicDisplayKit
 
-SwiftPM port-in-progress of OpenSheetMusicDisplay (OSMD), using `VexFoundation` for rendering.
+Swift port-in-progress of OpenSheetMusicDisplay (OSMD), using `VexFoundation` for rendering.
+
+See AUTHORS and LICENSE for the original authors of the code.
 
 ## Contributing
 
