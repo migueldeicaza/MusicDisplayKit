@@ -198,6 +198,7 @@ public struct NoteEvent: Equatable, Sendable {
     public var fingerings: [FingeringMarker]
     public var stringNumbers: [StringNumberMarker]
     public var fretNumbers: [FretNumberMarker]
+    public var tabPositions: [TabPositionMarker]
 
     public init(
         kind: NoteEventKind,
@@ -217,7 +218,8 @@ public struct NoteEvent: Equatable, Sendable {
         articulations: [ArticulationMarker] = [],
         fingerings: [FingeringMarker] = [],
         stringNumbers: [StringNumberMarker] = [],
-        fretNumbers: [FretNumberMarker] = []
+        fretNumbers: [FretNumberMarker] = [],
+        tabPositions: [TabPositionMarker] = []
     ) {
         self.kind = kind
         self.pitch = pitch
@@ -237,6 +239,7 @@ public struct NoteEvent: Equatable, Sendable {
         self.fingerings = fingerings
         self.stringNumbers = stringNumbers
         self.fretNumbers = fretNumbers
+        self.tabPositions = tabPositions
     }
 }
 
@@ -322,6 +325,19 @@ public struct FretNumberMarker: Equatable, Sendable {
         self.number = number
         self.placement = placement
         self.type = type
+    }
+}
+
+public struct TabPositionMarker: Equatable, Sendable {
+    public var stringNumber: String
+    public var fretNumber: String
+
+    public init(
+        stringNumber: String,
+        fretNumber: String
+    ) {
+        self.stringNumber = stringNumber
+        self.fretNumber = fretNumber
     }
 }
 

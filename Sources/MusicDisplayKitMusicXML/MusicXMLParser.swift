@@ -393,6 +393,29 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var stringNumbers: [StringNumberMarker] = []
         var fretNumbers: [FretNumberMarker] = []
 
+        private func buildTabPositions() -> [TabPositionMarker] {
+            let pairCount = min(stringNumbers.count, fretNumbers.count)
+            guard pairCount > 0 else {
+                return []
+            }
+            var positions: [TabPositionMarker] = []
+            positions.reserveCapacity(pairCount)
+            for index in 0..<pairCount {
+                let stringNumber = stringNumbers[index].number.trimmingCharacters(in: .whitespacesAndNewlines)
+                let fretNumber = fretNumbers[index].number.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !stringNumber.isEmpty, !fretNumber.isEmpty else {
+                    continue
+                }
+                positions.append(
+                    TabPositionMarker(
+                        stringNumber: stringNumber,
+                        fretNumber: fretNumber
+                    )
+                )
+            }
+            return positions
+        }
+
         func build(onsetDivisions: Int) -> NoteEvent? {
             let resolvedVoice = max(voice ?? 1, 1)
             let timeModification = (
@@ -401,6 +424,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 actualNotes: timeModificationActualNotes,
                 normalNotes: timeModificationNormalNotes
             ) : nil
+            let tabPositions = buildTabPositions()
             if isRest {
                 return NoteEvent(
                     kind: .rest,
@@ -419,7 +443,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     articulations: articulations,
                     fingerings: fingerings,
                     stringNumbers: stringNumbers,
-                    fretNumbers: fretNumbers
+                    fretNumbers: fretNumbers,
+                    tabPositions: tabPositions
                 )
             }
 
@@ -445,7 +470,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 articulations: articulations,
                 fingerings: fingerings,
                 stringNumbers: stringNumbers,
-                fretNumbers: fretNumbers
+                fretNumbers: fretNumbers,
+                tabPositions: tabPositions
             )
         }
     }

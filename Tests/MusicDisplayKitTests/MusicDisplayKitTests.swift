@@ -4858,6 +4858,130 @@ private let fretNumbersXML = """
 </score-partwise>
 """
 
+private let tabTechnicalPairXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Instrument</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <technical>
+            <string>1</string>
+            <fret>3</fret>
+          </technical>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <notations>
+          <technical>
+            <string>2</string>
+            <fret>5</fret>
+          </technical>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let mixedTabAndClassicalPartsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Tab Part</part-name></score-part>
+    <score-part id="P2"><part-name>Classical Part</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <technical>
+            <string>1</string>
+            <fret>7</fret>
+          </technical>
+        </notations>
+      </note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let tabAnchoredAnnotationsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Tab Part</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony>
+        <root><root-step>C</root-step></root>
+        <kind>major</kind>
+      </harmony>
+      <direction placement="above">
+        <direction-type>
+          <words>Fine</words>
+        </direction-type>
+        <sound tempo="96"/>
+      </direction>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <technical>
+            <string>1</string>
+            <fret>3</fret>
+          </technical>
+        </notations>
+        <lyric number="1">
+          <syllabic>begin</syllabic>
+          <text>Hel</text>
+        </lyric>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <notations>
+          <technical>
+            <string>2</string>
+            <fret>5</fret>
+          </technical>
+        </notations>
+        <lyric number="1">
+          <syllabic>end</syllabic>
+          <text>lo</text>
+        </lyric>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let directionExpressionsXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -12602,6 +12726,22 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     ])
 }
 
+@Test func parserBuildsTabPositionMarkersFromTechnicalStringAndFretPairs() throws {
+    let score = try MusicXMLParser().parse(xml: tabTechnicalPairXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    #expect(measure.noteEvents.count == 2)
+
+    let first = measure.noteEvents[0]
+    #expect(first.tabPositions == [
+        TabPositionMarker(stringNumber: "1", fretNumber: "3")
+    ])
+
+    let second = measure.noteEvents[1]
+    #expect(second.tabPositions == [
+        TabPositionMarker(stringNumber: "2", fretNumber: "5")
+    ])
+}
+
 @Test func parserReadsDirectionExpressionMarkers() throws {
     let score = try MusicXMLParser().parse(xml: directionExpressionsXML)
     let measure = try #require(score.parts.first?.measures.first)
@@ -15051,6 +15191,18 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(plan.fingerings.map(\.position) == [.right, .left])
 }
 
+@Test func vexAdapterBuildsTabPositionPlans() throws {
+    let score = try MusicXMLParser().parse(xml: tabTechnicalPairXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 2)
+    #expect(plan.tabPositions.count == 2)
+    #expect(plan.tabPositions.map(\.stringNumber) == ["1", "2"])
+    #expect(plan.tabPositions.map(\.fretNumber) == ["3", "5"])
+    #expect(plan.tabPositions.map(\.entryIndexInVoice) == [0, 1])
+}
+
 @Test func vexAdapterBuildsLyricPlans() throws {
     let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -16731,6 +16883,80 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(execution.notes.count == 2)
     #expect(execution.notes[0].getModifiersByType("FretHandFinger").count == 1)
     #expect(execution.notes[1].getModifiersByType("FretHandFinger").count == 1)
+}
+
+@Test func vexAdapterSuppressesProvisionalClassicalTechnicalModifiersForTabPairs() throws {
+    let score = try MusicXMLParser().parse(xml: tabTechnicalPairXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.tabPositions.count == 2)
+    #expect(plan.fingerings.isEmpty)
+    #expect(plan.stringNumbers.isEmpty)
+    #expect(execution.fingerings.isEmpty)
+    #expect(execution.stringNumbers.isEmpty)
+}
+
+@Test func vexAdapterExecutesTabNotesForTechnicalTabPairs() throws {
+    let score = try MusicXMLParser().parse(xml: tabTechnicalPairXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.tabPositions.count == 2)
+    #expect(execution.tabNotes.count == 2)
+    #expect(execution.notes.isEmpty)
+    #expect(execution.staves.count == 1)
+    let stave = try #require(execution.staves.first)
+    #expect(stave.getNumLines() == 6)
+
+    let first = execution.tabNotes[0]
+    let second = execution.tabNotes[1]
+    #expect(first.getPositions().map(\.str) == [1])
+    #expect(first.getPositions().map(\.fret) == ["3"])
+    #expect(second.getPositions().map(\.str) == [2])
+    #expect(second.getPositions().map(\.fret) == ["5"])
+}
+
+@Test func vexAdapterExecutesMixedTabAndClassicalStavesPerPart() throws {
+    let score = try MusicXMLParser().parse(xml: mixedTabAndClassicalPartsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.staves.count == 2)
+    #expect(plan.tabPositions.count == 1)
+    #expect(execution.staves.count == 2)
+    #expect(execution.tabNotes.count == 1)
+    #expect(execution.notes.count == 1)
+
+    let lineCounts = execution.staves.map { $0.getNumLines() }
+    #expect(lineCounts.filter { $0 == 6 }.count == 1)
+    #expect(lineCounts.filter { $0 == 5 }.count == 1)
+}
+
+@Test func vexAdapterExecutesTabAnchoredChordDirectionTempoRoadmapAndLyrics() throws {
+    let score = try MusicXMLParser().parse(xml: tabAnchoredAnnotationsXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.notes.isEmpty)
+    #expect(execution.tabNotes.count == 2)
+    #expect(execution.chordSymbols.count == 1)
+    #expect(execution.directionTexts.count == 1)
+    #expect(execution.tempoMarks.count == 1)
+    #expect(execution.roadmapRepetitions.count == 1)
+    #expect(execution.lyrics.count == 2)
+    #expect(execution.lyricConnectors.count == 1)
+    #expect(execution.chordSymbols.first?.getNote().getCategory() == "TabNote")
+    #expect(execution.directionTexts.first?.getNote().getCategory() == "TabNote")
+    #expect(execution.lyrics.allSatisfy { $0.getNote().getCategory() == "TabNote" })
 }
 
 @Test func vexAdapterDefaultsArticulationPlacementFromNotePosition() throws {
