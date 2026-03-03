@@ -971,9 +971,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
             effectiveTime: effectiveTime,
             defaultUnits: options.defaultMeasureDurationUnits
         )
-        let densityUnits = inferredDensityUnits(measure: measure)
-        let widthUnits = max(durationUnits, densityUnits)
-        return max(options.measureMinWidth, widthUnits * options.durationWidthScale)
+        return max(options.measureMinWidth, durationUnits * options.durationWidthScale)
     }
 
     private func inferredDurationUnits(
@@ -1004,34 +1002,5 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
         }
 
         return max(0.25, defaultUnits)
-    }
-
-    private func inferredDensityUnits(measure: Measure) -> Double {
-        struct VoiceOnsetKey: Hashable {
-            let voice: Int
-            let onsetDivisions: Int
-        }
-
-        let nonGraceNotes = measure.noteEvents.filter { !$0.isGrace }
-        guard !nonGraceNotes.isEmpty else {
-            return 0
-        }
-
-        var uniqueEntries: Set<VoiceOnsetKey> = []
-        var voices: Set<Int> = []
-        for note in nonGraceNotes {
-            let normalizedVoice = max(1, note.voice)
-            uniqueEntries.insert(
-                VoiceOnsetKey(
-                    voice: normalizedVoice,
-                    onsetDivisions: max(0, note.onsetDivisions)
-                )
-            )
-            voices.insert(normalizedVoice)
-        }
-
-        let entryUnits = Double(uniqueEntries.count) * 0.5
-        let voiceUnits = Double(max(0, voices.count - 1)) * 0.5
-        return max(0.25, entryUnits + voiceUnits)
     }
 }

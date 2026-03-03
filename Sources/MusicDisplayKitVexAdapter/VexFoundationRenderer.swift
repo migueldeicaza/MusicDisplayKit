@@ -2246,6 +2246,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
         struct MeasureColumnAlignmentRecord {
             let stave: Stave
             let tickContextsByOnset: [Int: TickContext]
+            let minimumAbsoluteX: Double
+            let maximumAbsoluteX: Double
         }
         struct DeferredTempoMark {
             let groupKey: NoteGroupKey
@@ -3178,29 +3180,6 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 }
             }
 
-            // Keep note columns inside the current measure frame when Vex's minimum
-            // spacing pushes dense content beyond the right barline.
-            if !contexts.isEmpty {
-                let measureRightX = anchorPlan.measureFrame.x + anchorPlan.measureFrame.width - trailingInset
-                let anchorAbsoluteXs = anchorNotesByEntryKey.values.map { $0.getAbsoluteX() }
-                if let currentMinX = anchorAbsoluteXs.min(),
-                   let currentMaxX = anchorAbsoluteXs.max(),
-                   currentMaxX > measureRightX + 0.5,
-                   measureRightX > currentMinX + 1 {
-                    let currentSpan = max(currentMaxX - currentMinX, 1)
-                    let targetSpan = max(measureRightX - currentMinX, 1)
-                    let scale = min(1, targetSpan / currentSpan)
-                    if scale < 0.999 {
-                        for context in contexts {
-                            let absoluteX = context.getX() + stave.getNoteStartX() + stavePadding
-                            let scaledAbsoluteX = currentMinX + ((absoluteX - currentMinX) * scale)
-                            let relativeX = scaledAbsoluteX - stave.getNoteStartX() - stavePadding
-                            _ = context.setX(relativeX)
-                        }
-                    }
-                }
-            }
-
             var tickContextsByOnset: [Int: TickContext] = [:]
             for notePlan in sortedPlans {
                 let entryKey = NoteEntryKey(
@@ -3226,7 +3205,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 measureColumnAlignmentRecords[measureColumnKey, default: []].append(
                     MeasureColumnAlignmentRecord(
                         stave: stave,
-                        tickContextsByOnset: tickContextsByOnset
+                        tickContextsByOnset: tickContextsByOnset,
+                        minimumAbsoluteX: desiredAbsoluteStartX,
+                        maximumAbsoluteX: anchorPlan.measureFrame.x + anchorPlan.measureFrame.width - trailingInset
                     )
                 )
             }
@@ -3406,29 +3387,33 @@ public struct VexFoundationRenderer: ScoreRenderer {
             }
             return lhs.measureIndexInPart < rhs.measureIndexInPart
         }
+        // Cross-stave column alignment: distribute all onset positions
+        // linearly across the available measure width so that notes at the
+        // same beat align vertically between staves.  This replaces per-stave
+        // formatter positions (which differ because each stave formats its
+        // voices independently and may have very different note densities).
         for measureColumnKey in sortedMeasureColumnKeys {
             guard let records = measureColumnAlignmentRecords[measureColumnKey],
                   records.count > 1 else {
                 continue
             }
             let sortedOnsets = Set(records.flatMap { $0.tickContextsByOnset.keys }).sorted()
-            var previousTargetAbsoluteX: Double?
-            // Keep adjacent aligned onsets visually distinct across staves.
-            let minimumOnsetSpacing = 10.0
+            guard sortedOnsets.count >= 2,
+                  let firstOnset = sortedOnsets.first,
+                  let lastOnset = sortedOnsets.last,
+                  lastOnset > firstOnset else {
+                continue
+            }
+            let minimumAbsoluteX = records.map(\.minimumAbsoluteX).max() ?? 0
+            let maximumAbsoluteX = records.map(\.maximumAbsoluteX).min() ?? 0
+            guard maximumAbsoluteX > minimumAbsoluteX else { continue }
+
+            let availableWidth = maximumAbsoluteX - minimumAbsoluteX
+            let onsetRange = Double(lastOnset - firstOnset)
+
             for onset in sortedOnsets {
-                guard let maxAbsoluteX = records.compactMap({ record -> Double? in
-                    guard let context = record.tickContextsByOnset[onset] else {
-                        return nil
-                    }
-                    return context.getX() + record.stave.getNoteStartX() + stavePadding
-                }).max() else {
-                    continue
-                }
-                var targetAbsoluteX = maxAbsoluteX
-                if let previousTargetAbsoluteX {
-                    targetAbsoluteX = max(targetAbsoluteX, previousTargetAbsoluteX + minimumOnsetSpacing)
-                }
-                previousTargetAbsoluteX = targetAbsoluteX
+                let ratio = Double(onset - firstOnset) / onsetRange
+                let targetAbsoluteX = minimumAbsoluteX + (ratio * availableWidth)
                 for record in records {
                     guard let context = record.tickContextsByOnset[onset] else {
                         continue
