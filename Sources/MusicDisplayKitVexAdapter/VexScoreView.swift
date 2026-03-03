@@ -65,33 +65,98 @@ public struct MusicDisplayScoreView: View {
     private let score: Score
     private let layoutOptions: LayoutOptions
     private let target: RenderTarget
+    /// When true, the view re-layouts when its width changes (auto-resize).
+    private let autoResize: Bool
 
     public init(
         score: Score,
         layoutOptions: LayoutOptions = LayoutOptions(),
-        target: RenderTarget = .view(identifier: "music-display-view")
+        target: RenderTarget = .view(identifier: "music-display-view"),
+        autoResize: Bool = false
     ) {
         self.score = score
         self.layoutOptions = layoutOptions
         self.target = target
+        self.autoResize = autoResize
     }
 
     public init(
         score: Score,
         layoutOptions: LayoutOptions = LayoutOptions(),
-        targetIdentifier: String
+        targetIdentifier: String,
+        autoResize: Bool = false
     ) {
-        self.init(score: score, layoutOptions: layoutOptions, target: .view(identifier: targetIdentifier))
+        self.init(score: score, layoutOptions: layoutOptions, target: .view(identifier: targetIdentifier), autoResize: autoResize)
     }
 
     public var body: some View {
-        if let laidOutScore = try? MusicLayoutEngine().layout(score: score, options: layoutOptions) {
-            VexScoreView(laidOutScore: laidOutScore, target: target)
+        if autoResize {
+            GeometryReader { geometry in
+                let adjustedOptions: LayoutOptions = {
+                    var opts = layoutOptions
+                    opts.pageWidth = max(200, geometry.size.width)
+                    return opts
+                }()
+                if let laidOutScore = try? MusicLayoutEngine().layout(score: score, options: adjustedOptions) {
+                    VexScoreView(laidOutScore: laidOutScore, target: target)
+                } else {
+                    Text("MusicDisplay layout failed")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.red)
+                        .padding(8)
+                }
+            }
         } else {
-            Text("MusicDisplay layout failed")
-                .font(.caption.monospaced())
-                .foregroundStyle(.red)
-                .padding(8)
+            if let laidOutScore = try? MusicLayoutEngine().layout(score: score, options: layoutOptions) {
+                VexScoreView(laidOutScore: laidOutScore, target: target)
+            } else {
+                Text("MusicDisplay layout failed")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.red)
+                    .padding(8)
+            }
+        }
+    }
+}
+
+/// A scrollable score view that can follow a cursor position.
+@available(iOS 17.0, macOS 14.0, *)
+public struct MusicDisplayScrollableScoreView: View {
+    private let score: Score
+    private let layoutOptions: LayoutOptions
+    private let target: RenderTarget
+    private let cursorMeasureIndex: Int?
+
+    public init(
+        score: Score,
+        layoutOptions: LayoutOptions = LayoutOptions(),
+        target: RenderTarget = .view(identifier: "music-display-view"),
+        cursorMeasureIndex: Int? = nil
+    ) {
+        self.score = score
+        self.layoutOptions = layoutOptions
+        self.target = target
+        self.cursorMeasureIndex = cursorMeasureIndex
+    }
+
+    public var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                if let laidOutScore = try? MusicLayoutEngine().layout(score: score, options: layoutOptions) {
+                    VexScoreView(laidOutScore: laidOutScore, target: target)
+                        .id("score-content")
+                } else {
+                    Text("MusicDisplay layout failed")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.red)
+                        .padding(8)
+                }
+            }
+            .onChange(of: cursorMeasureIndex) { _, _ in
+                withAnimation {
+                    proxy.scrollTo("score-content", anchor: .center)
+                }
+            }
         }
     }
 }
@@ -151,6 +216,76 @@ public struct MusicDisplayScoreView: View {
         ),
         layoutOptions: LayoutOptions(pageWidth: 520, pageMargin: 20, systemSpacing: 16)
     )
+}
+
+/// A lazy score view that renders each system row as a separate canvas (8.3).
+/// Only visible systems (plus buffer) are materialised, reducing memory and
+/// initial render time for long scores.
+@available(iOS 17.0, macOS 14.0, *)
+public struct MusicDisplayLazyScoreView: View {
+    private let score: Score
+    private let layoutOptions: LayoutOptions
+    private let target: RenderTarget
+
+    public init(
+        score: Score,
+        layoutOptions: LayoutOptions = LayoutOptions(),
+        target: RenderTarget = .view(identifier: "music-display-view")
+    ) {
+        self.score = score
+        self.layoutOptions = layoutOptions
+        self.target = target
+    }
+
+    public var body: some View {
+        ScrollView {
+            if let laidOutScore = try? MusicLayoutEngine().layout(score: score, options: layoutOptions) {
+                let renderPlan = VexFoundationRenderer().makeRenderPlan(from: laidOutScore, target: target)
+                let systemGroups = groupSystemsByRow(renderPlan: renderPlan, laidOutScore: laidOutScore)
+                LazyVStack(spacing: 0) {
+                    ForEach(systemGroups, id: \.systemIndex) { group in
+                        VexScoreView(laidOutScore: laidOutScore, target: target)
+                            .frame(
+                                width: max(1, renderPlan.canvasWidth),
+                                height: max(1, group.height)
+                            )
+                            .clipped()
+                            .id("system-\(group.systemIndex)")
+                    }
+                }
+                .frame(width: max(1, renderPlan.canvasWidth))
+            } else {
+                Text("MusicDisplay layout failed")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.red)
+                    .padding(8)
+            }
+        }
+    }
+
+    private struct SystemGroup: Identifiable {
+        let systemIndex: Int
+        let height: Double
+        var id: Int { systemIndex }
+    }
+
+    private func groupSystemsByRow(renderPlan: VexRenderPlan, laidOutScore: LaidOutScore) -> [SystemGroup] {
+        var groups: [Int: Double] = [:]
+        for system in laidOutScore.systems {
+            let bottom = system.frame.y + system.frame.height
+            groups[system.systemIndex] = max(groups[system.systemIndex, default: 0], bottom)
+        }
+        let sortedIndices = groups.keys.sorted()
+        var result: [SystemGroup] = []
+        var prevBottom: Double = 0
+        for idx in sortedIndices {
+            let bottom = groups[idx] ?? 0
+            let height = max(40, bottom - prevBottom)
+            result.append(SystemGroup(systemIndex: idx, height: height))
+            prevBottom = bottom
+        }
+        return result
+    }
 }
 
 public enum VexImageExportError: Error {

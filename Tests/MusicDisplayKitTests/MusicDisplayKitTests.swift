@@ -13923,6 +13923,174 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(plan.notes.map(\.measureIndexInPart).sorted() == [0, 0, 0, 0, 1])
 }
 
+@Test func vexAdapterBuildsNotesForMultipleParts() throws {
+    let xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <score-partwise version="3.1">
+      <part-list>
+        <score-part id="P1"><part-name>Upper</part-name></score-part>
+        <score-part id="P2"><part-name>Lower</part-name></score-part>
+      </part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes>
+            <divisions>1</divisions>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>G</sign><line>2</line></clef>
+          </attributes>
+          <note>
+            <pitch><step>C</step><octave>5</octave></pitch>
+            <duration>1</duration><type>quarter</type>
+          </note>
+        </measure>
+      </part>
+      <part id="P2">
+        <measure number="1">
+          <attributes>
+            <divisions>1</divisions>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>F</sign><line>4</line></clef>
+          </attributes>
+          <note>
+            <pitch><step>C</step><octave>3</octave></pitch>
+            <duration>1</duration><type>quarter</type>
+          </note>
+        </measure>
+      </part>
+    </score-partwise>
+    """
+
+    let score = try MusicXMLParser().parse(xml: xml)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.notes.count == 2)
+    #expect(Set(plan.notes.map(\.partIndex)) == Set([0, 1]))
+    #expect(plan.notes.contains { $0.partIndex == 0 && $0.clef == "treble" })
+    #expect(plan.notes.contains { $0.partIndex == 1 && $0.clef == "bass" })
+}
+
+@Test func vexAdapterExecutesRenderPlanForMultipleParts() throws {
+    let xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <score-partwise version="3.1">
+      <part-list>
+        <score-part id="P1"><part-name>Upper</part-name></score-part>
+        <score-part id="P2"><part-name>Lower</part-name></score-part>
+      </part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes>
+            <divisions>1</divisions>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>G</sign><line>2</line></clef>
+          </attributes>
+          <note>
+            <pitch><step>E</step><octave>5</octave></pitch>
+            <duration>4</duration><type>whole</type>
+          </note>
+        </measure>
+      </part>
+      <part id="P2">
+        <measure number="1">
+          <attributes>
+            <divisions>1</divisions>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>F</sign><line>4</line></clef>
+          </attributes>
+          <note>
+            <pitch><step>G</step><octave>2</octave></pitch>
+            <duration>4</duration><type>whole</type>
+          </note>
+        </measure>
+      </part>
+    </score-partwise>
+    """
+
+    let score = try MusicXMLParser().parse(xml: xml)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(plan.notes.count == 2)
+    #expect(execution.notes.count == 2)
+    #expect(execution.notes.contains { $0.getKeys().contains("e/5") && $0.clef == .treble })
+    #expect(execution.notes.contains { $0.getKeys().contains("g/2") && $0.clef == .bass })
+}
+
+@Test func vexAdapterAlignsOnsetsAcrossPartsWithinMeasureColumn() throws {
+    let xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <score-partwise version="3.1">
+      <part-list>
+        <score-part id="P1"><part-name>Upper</part-name></score-part>
+        <score-part id="P2"><part-name>Lower</part-name></score-part>
+      </part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes>
+            <divisions>2</divisions>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>G</sign><line>2</line></clef>
+          </attributes>
+          <note><pitch><step>C</step><octave>5</octave></pitch><duration>2</duration><type>quarter</type></note>
+          <note><pitch><step>D</step><octave>5</octave></pitch><duration>2</duration><type>quarter</type></note>
+          <note><pitch><step>E</step><octave>5</octave></pitch><duration>2</duration><type>quarter</type></note>
+          <note><pitch><step>F</step><octave>5</octave></pitch><duration>2</duration><type>quarter</type></note>
+        </measure>
+      </part>
+      <part id="P2">
+        <measure number="1">
+          <attributes>
+            <divisions>2</divisions>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>F</sign><line>4</line></clef>
+          </attributes>
+          <note><pitch><step>C</step><octave>3</octave></pitch><duration>1</duration><type>eighth</type></note>
+          <note><pitch><step>G</step><octave>3</octave></pitch><duration>1</duration><type>eighth</type></note>
+          <note><pitch><step>D</step><octave>3</octave></pitch><duration>1</duration><type>eighth</type></note>
+          <note><pitch><step>A</step><octave>3</octave></pitch><duration>1</duration><type>eighth</type></note>
+          <note><pitch><step>E</step><octave>3</octave></pitch><duration>1</duration><type>eighth</type></note>
+          <note><pitch><step>B</step><octave>2</octave></pitch><duration>1</duration><type>eighth</type></note>
+          <note><pitch><step>F</step><octave>3</octave></pitch><duration>1</duration><type>eighth</type></note>
+          <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><type>eighth</type></note>
+        </measure>
+      </part>
+    </score-partwise>
+    """
+
+    let score = try MusicXMLParser().parse(xml: xml)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(execution.notes.count == 12)
+
+    func absoluteX(for key: String) throws -> Double {
+        let note = try #require(execution.notes.first(where: { $0.getKeys().contains(key) }))
+        return note.getAbsoluteX()
+    }
+
+    let topQuarterStarts = try [
+        absoluteX(for: "c/5"),
+        absoluteX(for: "d/5"),
+        absoluteX(for: "e/5"),
+        absoluteX(for: "f/5")
+    ]
+    let bottomQuarterStarts = try [
+        absoluteX(for: "c/3"),
+        absoluteX(for: "d/3"),
+        absoluteX(for: "e/3"),
+        absoluteX(for: "f/3")
+    ]
+
+    for (topX, bottomX) in zip(topQuarterStarts, bottomQuarterStarts) {
+        #expect(abs(topX - bottomX) < 0.001)
+    }
+}
+
 @Test func vexAdapterBuildsChordGroupedNotePlans() throws {
     let score = try MusicXMLParser().parse(xml: multiVoiceChordRenderNotesXML)
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
@@ -17335,3 +17503,495 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(Array(data.prefix(8)) == pngSignaturePrefix)
 }
 #endif
+
+// MARK: - MDKBoundingBox Tests (9.2)
+
+@Test func boundingBoxMerge() {
+    var a = MDKBoundingBox(x: 10, y: 20, width: 30, height: 40)
+    let b = MDKBoundingBox(x: 5, y: 25, width: 50, height: 10)
+    a.mergeWith(b)
+    #expect(a.x == 5)
+    #expect(a.y == 20)
+    #expect(a.maxX == 55)
+    #expect(a.maxY == 60)
+}
+
+@Test func boundingBoxContainsPoint() {
+    let box = MDKBoundingBox(x: 10, y: 20, width: 30, height: 40)
+    #expect(box.contains(point: MDKPoint(x: 15, y: 30)))
+    #expect(!box.contains(point: MDKPoint(x: 5, y: 30)))
+    #expect(!box.contains(point: MDKPoint(x: 15, y: 65)))
+}
+
+@Test func boundingBoxOverlaps() {
+    let a = MDKBoundingBox(x: 0, y: 0, width: 20, height: 20)
+    let b = MDKBoundingBox(x: 10, y: 10, width: 20, height: 20)
+    let c = MDKBoundingBox(x: 25, y: 25, width: 10, height: 10)
+    #expect(a.overlaps(b))
+    #expect(!a.overlaps(c))
+}
+
+@Test func boundingBoxComputedProperties() {
+    let box = MDKBoundingBox(x: 10, y: 20, width: 30, height: 40)
+    #expect(box.maxX == 40)
+    #expect(box.maxY == 60)
+    #expect(box.midX == 25)
+    #expect(box.midY == 40)
+}
+
+// MARK: - SkylineProfile Tests (9.2)
+
+@Test func skylineProfileInsertAndQuery() {
+    let profile = SkylineProfile(startX: 0, resolution: 1, count: 100, initialValue: 100, isSkyline: true)
+    profile.insertBoundingBox(MDKBoundingBox(x: 10, y: 30, width: 20, height: 10))
+    let result = profile.querySkyline(xStart: 15, xEnd: 25)
+    #expect(result == 30)
+    let outside = profile.querySkyline(xStart: 50, xEnd: 60)
+    #expect(outside == 100)
+}
+
+@Test func bottomlineProfileInsertAndQuery() {
+    let profile = SkylineProfile(startX: 0, resolution: 1, count: 100, initialValue: 50, isSkyline: false)
+    profile.insertBoundingBox(MDKBoundingBox(x: 10, y: 50, width: 20, height: 30))
+    let result = profile.queryBottomline(xStart: 15, xEnd: 25)
+    #expect(result == 80)
+}
+
+@Test func skylineProfileBatchInsert() {
+    let profile = SkylineProfile(startX: 0, resolution: 1, count: 100, initialValue: 100, isSkyline: true)
+    let boxes = [
+        MDKBoundingBox(x: 5, y: 40, width: 10, height: 10),
+        MDKBoundingBox(x: 20, y: 20, width: 10, height: 10),
+    ]
+    profile.insertBoundingBoxes(boxes)
+    #expect(profile.querySkyline(xStart: 5, xEnd: 15) == 40)
+    #expect(profile.querySkyline(xStart: 20, xEnd: 30) == 20)
+    #expect(profile.querySkyline(xStart: 50, xEnd: 60) == 100)
+}
+
+// MARK: - EngravingRules Tests (9.2)
+
+@Test func engravingRulesDefaultValues() {
+    let rules = EngravingRules.default
+    #expect(rules.noteSpacingMultiplier == 1.0)
+    #expect(rules.collisionPadding == 4)
+    #expect(rules.skylineResolution == 2)
+    #expect(rules.systemFillThreshold == 0.6)
+    #expect(rules.accidentalPadding == 3)
+}
+
+// MARK: - ScoreCursor Tests (9.2)
+
+@Test func scoreCursorAdvanceAndRetreat() {
+    let score = Score(
+        title: "Test",
+        parts: [
+            Part(
+                id: "P1",
+                name: "Piano",
+                measures: [
+                    Measure(
+                        number: 1,
+                        divisions: 4,
+                        noteEvents: [
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "C", octave: 4),
+                                      onsetDivisions: 0, durationDivisions: 4, voice: 1),
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "D", octave: 4),
+                                      onsetDivisions: 4, durationDivisions: 4, voice: 1),
+                        ]
+                    ),
+                    Measure(
+                        number: 2,
+                        divisions: 4,
+                        noteEvents: [
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "E", octave: 4),
+                                      onsetDivisions: 0, durationDivisions: 4, voice: 1),
+                        ]
+                    ),
+                ]
+            ),
+        ]
+    )
+
+    var cursor = ScoreCursor()
+    #expect(cursor.partIndex == 0)
+    #expect(cursor.measureIndex == 0)
+    #expect(cursor.noteIndex == 0)
+
+    let notes = cursor.currentNotes(in: score)
+    #expect(notes.count == 1)
+    #expect(notes[0].pitch?.step == "C")
+
+    let advanced = cursor.advance(in: score)
+    #expect(advanced)
+    #expect(cursor.noteIndex == 1)
+
+    let advanced2 = cursor.advance(in: score)
+    #expect(advanced2)
+    #expect(cursor.measureIndex == 1)
+    #expect(cursor.noteIndex == 0)
+
+    let retreated = cursor.retreat(in: score)
+    #expect(retreated)
+    #expect(cursor.measureIndex == 0)
+    #expect(cursor.noteIndex == 1)
+}
+
+// MARK: - TransposeCalculator Tests (9.2)
+
+@Test func transposeCalculatorTransposeUp() {
+    let score = Score(
+        title: "Test",
+        parts: [
+            Part(
+                id: "P1",
+                name: "Piano",
+                measures: [
+                    Measure(
+                        number: 1,
+                        divisions: 4,
+                        noteEvents: [
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "C", octave: 4),
+                                      onsetDivisions: 0, durationDivisions: 4, voice: 1),
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "E", octave: 4),
+                                      onsetDivisions: 4, durationDivisions: 4, voice: 1),
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "G", octave: 4),
+                                      onsetDivisions: 8, durationDivisions: 4, voice: 1),
+                        ]
+                    ),
+                ]
+            ),
+        ]
+    )
+
+    let calculator = TransposeCalculator()
+    let transposed = calculator.transpose(score: score, chromaticSteps: 2, diatonicSteps: 1)
+
+    let notes = transposed.parts[0].measures[0].noteEvents
+    #expect(notes[0].pitch?.step == "D")
+    #expect(notes[0].pitch?.octave == 4)
+}
+
+@Test func transposeCalculatorTransposeDown() {
+    let score = Score(
+        title: "Test",
+        parts: [
+            Part(
+                id: "P1",
+                name: "Piano",
+                measures: [
+                    Measure(
+                        number: 1,
+                        divisions: 4,
+                        noteEvents: [
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "C", octave: 4),
+                                      onsetDivisions: 0, durationDivisions: 4, voice: 1),
+                        ]
+                    ),
+                ]
+            ),
+        ]
+    )
+
+    let calculator = TransposeCalculator()
+    let transposed = calculator.transpose(score: score, chromaticSteps: -2, diatonicSteps: -1)
+
+    let notes = transposed.parts[0].measures[0].noteEvents
+    #expect(notes[0].pitch?.step == "B")
+    #expect(notes[0].pitch?.octave == 3)
+}
+
+// MARK: - GraphicalModel Tests (9.2)
+
+@Test func graphicalModelPopulation() {
+    let score = Score(
+        title: "Test",
+        parts: [
+            Part(
+                id: "P1",
+                name: "Piano",
+                measures: [
+                    Measure(
+                        number: 1,
+                        divisions: 4,
+                        noteEvents: [
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "C", octave: 4),
+                                      onsetDivisions: 0, durationDivisions: 4, voice: 1),
+                        ]
+                    ),
+                ]
+            ),
+        ]
+    )
+
+    let laidOutScore = try! MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let calculator = ScoreCalculator()
+    let graphicalScore = calculator.populateGraphicalModel(score: score, laidOutScore: laidOutScore)
+
+    #expect(!graphicalScore.systems.isEmpty)
+    let system = graphicalScore.systems[0]
+    #expect(!system.measures.isEmpty)
+    let measure = system.measures[0]
+    #expect(!measure.staffEntries.isEmpty)
+    let entry = measure.staffEntries[0]
+    #expect(entry.notes.count == 1)
+    #expect(entry.notes[0].sourceNoteEvent.pitch?.step == "C")
+}
+
+// MARK: - SystemBuilder Tests (9.2)
+
+@Test func systemBuilderProducesAtLeastOneSystem() {
+    let widths: [Double] = [100, 100, 100, 100]
+    let builder = SystemBuilder()
+    let breaks = builder.buildSystems(
+        columnWidths: widths,
+        usableWidth: 250,
+        measureGap: 2,
+        rules: .default
+    )
+    #expect(!breaks.isEmpty)
+    #expect(breaks[0].measureRange.lowerBound == 0)
+}
+
+@Test func systemBuilderSingleMeasure() {
+    let builder = SystemBuilder()
+    let breaks = builder.buildSystems(
+        columnWidths: [200],
+        usableWidth: 500,
+        measureGap: 2,
+        rules: .default
+    )
+    #expect(breaks.count == 1)
+    #expect(breaks[0].measureRange == 0..<1)
+}
+
+// MARK: - HitTesting Tests (9.2)
+
+@Test func hitTesterReturnsMeasure() {
+    let graphicalScore = GraphicalScore()
+    let system = GraphicalSystem(
+        systemIndex: 0,
+        pageIndex: 0,
+        frame: MDKBoundingBox(x: 0, y: 0, width: 500, height: 100)
+    )
+    let measure = GraphicalMeasure(
+        partIndex: 0,
+        measureIndex: 0,
+        frame: MDKBoundingBox(x: 50, y: 10, width: 200, height: 80)
+    )
+    system.measures.append(measure)
+    graphicalScore.systems.append(system)
+
+    let tester = ScoreHitTester()
+    let result = tester.measureAt(point: MDKPoint(x: 100, y: 50), in: graphicalScore)
+    #expect(result?.measureIndex == 0)
+
+    let miss = tester.measureAt(point: MDKPoint(x: 400, y: 50), in: graphicalScore)
+    #expect(miss == nil)
+}
+
+// MARK: - AccidentalCalculator Tests (9.2)
+
+@Test func accidentalCalculatorRunsWithoutError() {
+    let graphicalScore = GraphicalScore()
+    let system = GraphicalSystem(
+        systemIndex: 0,
+        pageIndex: 0,
+        frame: MDKBoundingBox(x: 0, y: 0, width: 500, height: 100)
+    )
+    let measure = GraphicalMeasure(
+        partIndex: 0,
+        measureIndex: 0,
+        frame: MDKBoundingBox(x: 0, y: 0, width: 200, height: 80)
+    )
+    let entry = GraphicalStaffEntry(onsetDivisions: 0, voice: 1)
+    var noteEventC = NoteEvent(kind: .pitched, pitch: PitchValue(step: "C", alter: 1, octave: 4),
+                               onsetDivisions: 0, durationDivisions: 4, voice: 1)
+    noteEventC.accidental = .sharp
+    let noteC = GraphicalNote(sourceNoteEvent: noteEventC, sourceNoteIndex: 0)
+    var noteEventE = NoteEvent(kind: .pitched, pitch: PitchValue(step: "E", alter: -1, octave: 4),
+                               onsetDivisions: 0, durationDivisions: 4, voice: 1)
+    noteEventE.accidental = .flat
+    let noteE = GraphicalNote(sourceNoteEvent: noteEventE, sourceNoteIndex: 1)
+    entry.notes = [noteC, noteE]
+    measure.staffEntries = [entry]
+    system.measures = [measure]
+    graphicalScore.systems = [system]
+
+    let calculator = AccidentalCalculator()
+    calculator.calculate(graphicalScore, rules: .default)
+
+    let hasOffset = entry.notes.contains { $0.accidentalXOffset != nil }
+    #expect(hasOffset)
+}
+
+// MARK: - VexNotePosition Extraction Tests (9.2)
+
+@Test func notePositionExtractionProducesPositions() throws {
+    let score = Score(
+        title: "Test",
+        parts: [
+            Part(
+                id: "P1",
+                name: "Piano",
+                measures: [
+                    Measure(
+                        number: 1,
+                        divisions: 4,
+                        attributes: MeasureAttributes(
+                            key: KeySignature(fifths: 0, mode: "major"),
+                            time: TimeSignature(beats: 4, beatType: 4),
+                            clefs: [ClefSetting(sign: "G", line: 2)]
+                        ),
+                        noteEvents: [
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "C", octave: 4),
+                                      onsetDivisions: 0, durationDivisions: 4, voice: 1),
+                            NoteEvent(kind: .pitched, pitch: PitchValue(step: "D", octave: 4),
+                                      onsetDivisions: 4, durationDivisions: 4, voice: 1),
+                        ]
+                    ),
+                ]
+            ),
+        ]
+    )
+
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 400))
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 400, height: 200))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(!execution.notePositions.isEmpty)
+    for pos in execution.notePositions {
+        #expect(pos.x > 0)
+    }
+
+    let posMap = renderer.notePositionMap(from: execution)
+    #expect(!posMap.isEmpty)
+}
+
+// MARK: - OSMD Fixture Parity Baseline (9.1)
+
+@Test func osmdFixtureParityParseAccidentals() throws {
+    let url = try osmdFixtureURL(named: "OSMD_function_test_accidentals.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 0))
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(!execution.notes.isEmpty)
+}
+
+@Test func osmdFixtureParityParseBarLines() throws {
+    let url = try osmdFixtureURL(named: "OSMD_function_test_bar_lines.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 0))
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(!execution.staves.isEmpty)
+}
+
+@Test func osmdFixtureParityParseChordSymbols() throws {
+    let url = try osmdFixtureURL(named: "OSMD_function_test_chord_symbols.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 0))
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(!execution.chordSymbols.isEmpty)
+}
+
+@Test func osmdFixtureParityParseExpressions() throws {
+    let url = try osmdFixtureURL(named: "OSMD_function_test_expressions.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 0))
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(!execution.notes.isEmpty)
+}
+
+@Test func osmdFixtureParityParseChordTests() throws {
+    let url = try osmdFixtureURL(named: "OSMD_function_test_chord_tests_various.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 0))
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(!execution.notes.isEmpty)
+}
+
+@Test func osmdFixtureParityParseDrumset() throws {
+    let url = try osmdFixtureURL(named: "OSMD_function_test_drumset.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    #expect(!laidOut.systems.isEmpty)
+}
+
+@Test func osmdFixtureParityParseColorNotes() throws {
+    let url = try osmdFixtureURL(named: "OSMD_function_test_color.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 0))
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(!execution.notes.isEmpty)
+}
+
+@Test func osmdFixtureParityParseLabels() throws {
+    let url = try osmdFixtureURL(named: "OSMD_Function_Test_Labels.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    #expect(!score.parts.isEmpty)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    #expect(!laidOut.systems.isEmpty)
+}
+
+@Test func osmdFixtureParityParseMozartExcerpt() throws {
+    let url = try osmdFixtureURL(named: "Mozart_String_Quartet_in_G_K._387_1st_Mvmnt_excerpt.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    #expect(score.parts.count >= 4)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    #expect(!laidOut.systems.isEmpty)
+}
+
+@Test func osmdFixtureParityParseNoteheadShapes() throws {
+    let url = try osmdFixtureURL(named: "OSMD_function_test_noteheadShapes.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 0))
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(!execution.notes.isEmpty)
+}
+
+@Test func osmdFixtureParityParsePedals() throws {
+    let url = try osmdFixtureURL(named: "OSMD_Function_Test_Pedals.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 0))
+    let execution = renderer.executeRenderPlan(plan)
+    #expect(!execution.pedalMarkings.isEmpty)
+}
+
+@Test func osmdFixtureParityParseTremolo() throws {
+    let url = try osmdFixtureURL(named: "OSMD_Function_Test_Tremolo_2bars.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    #expect(!laidOut.systems.isEmpty)
+}
+
+@Test func osmdFixtureParityParseLandDerBerge() throws {
+    let url = try osmdFixtureURL(named: "Land_der_Berge.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    #expect(!score.parts.isEmpty)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    #expect(!laidOut.systems.isEmpty)
+}
+
+@Test func osmdFixtureParityParseSkylineTestSample() throws {
+    let url = try osmdFixtureURL(named: "note_height_skyline_test_sample_with_chord_symbol_etc.musicxml")
+    let score = try MusicXMLParser().parse(fileURL: url)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    #expect(!laidOut.systems.isEmpty)
+}

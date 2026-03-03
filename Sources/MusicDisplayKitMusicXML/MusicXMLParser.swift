@@ -75,10 +75,20 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private struct PartBuilder {
         let id: String
         let name: String?
+        let abbreviation: String?
+        var scoreInstruments: [ScoreInstrument]
+        var midiInstruments: [MidiInstrument]
         var measures: [Measure] = []
 
         func build() -> Part {
-            Part(id: id, name: name, measures: measures)
+            Part(
+                id: id,
+                name: name,
+                abbreviation: abbreviation,
+                measures: measures,
+                scoreInstruments: scoreInstruments,
+                midiInstruments: midiInstruments
+            )
         }
     }
 
@@ -114,10 +124,14 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var timingDirectives: [TimingDirective] = []
         var directionEvents: [DirectionEvent] = []
         var harmonyEvents: [HarmonyEvent] = []
+        var figuredBassEvents: [FiguredBassEvent] = []
         var repetitionInstructions: [RepetitionInstruction] = []
         var tempoEvents: [TempoEvent] = []
         var timeCursorDivisions: Int = 0
         var lastNonChordOnsetByVoice: [Int: Int] = [:]
+        var implicit: Bool = false
+        var newSystem: Bool = false
+        var newPage: Bool = false
 
         func build() -> Measure {
             Measure(
@@ -129,8 +143,12 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 timingDirectives: timingDirectives,
                 directionEvents: directionEvents,
                 harmonyEvents: harmonyEvents,
+                figuredBassEvents: figuredBassEvents,
                 repetitionInstructions: repetitionInstructions,
-                tempoEvents: tempoEvents
+                tempoEvents: tempoEvents,
+                implicit: implicit,
+                newSystem: newSystem,
+                newPage: newPage
             )
         }
     }
@@ -371,15 +389,45 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         }
     }
 
+    private struct FiguredBassBuilder {
+        var parentheses: Bool = false
+        var figures: [FiguredBassFigure] = []
+
+        func build(currentOnset: Int) -> FiguredBassEvent {
+            FiguredBassEvent(
+                onsetDivisions: currentOnset,
+                figures: figures,
+                parentheses: parentheses
+            )
+        }
+    }
+
+    private struct FiguredBassFigureBuilder {
+        var number: Int?
+        var prefix: FiguredBassModifier?
+        var suffix: FiguredBassModifier?
+
+        func build() -> FiguredBassFigure {
+            FiguredBassFigure(number: number, prefix: prefix, suffix: suffix)
+        }
+    }
+
     private struct NoteBuilder {
         var isRest = false
         var isChord = false
         var isGrace = false
+        var isGraceSlash = false
+        var isCue = false
+        var noteheadType: NoteheadType?
         var voice: Int?
         var staff: Int?
         var durationDivisions: Int?
+        var noteType: NoteTypeValue?
+        var dotCount: Int = 0
+        var accidental: AccidentalValue?
+        var stemDirection: NoteStemDirection?
         var pitchStep: String?
-        var pitchAlter: Int?
+        var pitchAlter: Double?
         var pitchOctave: Int?
         var lyrics: [LyricEvent] = []
         var ties: [TieMarker] = []
@@ -389,9 +437,16 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var timeModificationActualNotes: Int?
         var timeModificationNormalNotes: Int?
         var articulations: [ArticulationMarker] = []
+        var ornaments: [OrnamentMarker] = []
+        var fermatas: [FermataMarker] = []
+        var arpeggiate: ArpeggiateMarker?
+        var tremolo: TremoloMarker?
+        var glissandos: [GlissandoMarker] = []
+        var dynamics: [String] = []
         var fingerings: [FingeringMarker] = []
         var stringNumbers: [StringNumberMarker] = []
         var fretNumbers: [FretNumberMarker] = []
+        var color: String?
 
         private func buildTabPositions() -> [TabPositionMarker] {
             let pairCount = min(stringNumbers.count, fretNumbers.count)
@@ -430,10 +485,17 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     kind: .rest,
                     onsetDivisions: onsetDivisions,
                     durationDivisions: durationDivisions,
+                    noteType: noteType,
+                    dotCount: dotCount,
+                    accidental: accidental,
+                    stemDirection: stemDirection,
                     voice: resolvedVoice,
                     staff: staff,
                     isChord: isChord,
                     isGrace: isGrace,
+                    isGraceSlash: isGraceSlash,
+                    isCue: isCue,
+                    noteheadType: noteheadType,
                     lyrics: lyrics,
                     ties: ties,
                     slurs: slurs,
@@ -441,10 +503,17 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     tuplets: tuplets,
                     timeModification: timeModification,
                     articulations: articulations,
+                    ornaments: ornaments,
+                    fermatas: fermatas,
+                    arpeggiate: arpeggiate,
+                    tremolo: tremolo,
+                    glissandos: glissandos,
+                    dynamics: dynamics,
                     fingerings: fingerings,
                     stringNumbers: stringNumbers,
                     fretNumbers: fretNumbers,
-                    tabPositions: tabPositions
+                    tabPositions: tabPositions,
+                    color: color
                 )
             }
 
@@ -457,6 +526,10 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 pitch: PitchValue(step: pitchStep, alter: pitchAlter ?? 0, octave: pitchOctave),
                 onsetDivisions: onsetDivisions,
                 durationDivisions: durationDivisions,
+                noteType: noteType,
+                dotCount: dotCount,
+                accidental: accidental,
+                stemDirection: stemDirection,
                 voice: resolvedVoice,
                 staff: staff,
                 isChord: isChord,
@@ -468,10 +541,14 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 tuplets: tuplets,
                 timeModification: timeModification,
                 articulations: articulations,
+                fermatas: fermatas,
+                glissandos: glissandos,
+                dynamics: dynamics,
                 fingerings: fingerings,
                 stringNumbers: stringNumbers,
                 fretNumbers: fretNumbers,
-                tabPositions: tabPositions
+                tabPositions: tabPositions,
+                color: color
             )
         }
     }
@@ -486,7 +563,20 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private enum TextTarget {
         case workTitle
         case movementTitle
+        case identificationCreator
+        case identificationRights
+        case defaultsScalingMillimeters
+        case defaultsScalingTenths
+        case defaultsPageWidth
+        case defaultsPageHeight
+        case defaultsMargin(side: String)
+        case defaultsSystemDistance
+        case defaultsTopSystemDistance
+        case defaultsSystemMargin(side: String)
+        case defaultsStaffDistance
+        case multipleRest
         case partName(partID: String)
+        case partAbbreviation(partID: String)
         case partGroupSymbol
         case partGroupName
         case partGroupBarline
@@ -497,6 +587,11 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case pitchAlter
         case pitchOctave
         case noteStaff
+        case noteType
+        case noteAccidental
+        case noteStem
+        case notehead
+        case tremolo
         case lyricText
         case lyricSyllabic
         case noteFingering
@@ -535,14 +630,40 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case clefSign
         case clefLine
         case clefOctaveChange
+        case transposeDiatonic
+        case transposeChromatic
+        case transposeOctaveChange
+        case scoreInstrumentName
+        case midiChannel
+        case midiProgram
+        case midiUnpitched
+        case midiVolume
+        case midiPan
+        case figuredBassFigureNumber
+        case figuredBassFigurePrefix
+        case figuredBassFigureSuffix
     }
 
     private var sawScorePartwise = false
     private var insidePartList = false
     private var currentScorePartID: String?
+    private var currentScoreInstrumentID: String?
+    private var currentMidiInstrumentID: String?
+    private var scoreInstrumentsByPartID: [String: [ScoreInstrument]] = [:]
+    private var midiInstrumentsByPartID: [String: [MidiInstrument]] = [:]
+    private var currentMidiChannel: Int?
+    private var currentMidiProgram: Int?
+    private var currentMidiUnpitched: Int?
+    private var currentMidiVolume: Double?
+    private var currentMidiPan: Double?
     private var currentPart: PartBuilder?
     private var currentMeasure: MeasureBuilder?
     private var insideAttributes = false
+    private var insideTranspose = false
+    private var transposeDoubleFlag = false
+    private var currentTransposeDiatonic: Int?
+    private var currentTransposeChromatic: Int?
+    private var currentTransposeOctaveChange: Int?
     private var currentKeyBuilder: KeyBuilder?
     private var currentTimeBuilder: TimeBuilder?
     private var currentClefBuilder: ClefBuilder?
@@ -555,6 +676,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private var currentMetronomeBuilder: MetronomeBuilder?
     private var currentHarmonyBuilder: HarmonyBuilder?
     private var currentHarmonyDegreeBuilder: HarmonyDegreeBuilder?
+    private var currentFiguredBassBuilder: FiguredBassBuilder?
+    private var currentFiguredBassFigureBuilder: FiguredBassFigureBuilder?
     private var currentBarlineLocation: String?
     private var insideTimeModification = false
     private var insideArticulations = false
@@ -562,6 +685,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
     private var currentArticulationsPlacement: String?
     private var insideDirectionType = false
     private var insideDynamics = false
+    private var insideNotationDynamics = false
     private var currentBeamNumber: Int?
     private var currentTimingDirectiveKind: TimingDirectiveKind?
     private var currentTimingDirectiveDuration: Int?
@@ -571,7 +695,22 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
     private var workTitle: String?
     private var movementTitle: String?
+    private var identificationComposer: String?
+    private var identificationLyricist: String?
+    private var identificationArranger: String?
+    private var identificationRights: String?
+    private var insideIdentification = false
+    private var currentCreatorType: String?
+    private var insideDefaults = false
+    private var insideDefaultsScaling = false
+    private var insideDefaultsPageLayout = false
+    private var insideDefaultsSystemLayout = false
+    private var insideDefaultsStaffLayout = false
+    private var insideDefaultsPageMargins = false
+    private var insideDefaultsSystemMargins = false
+    private var defaultsBuilder = ScoreDefaults()
     private var partNamesByID: [String: String] = [:]
+    private var partAbbreviationsByID: [String: String] = [:]
     private var parts: [Part] = []
     private var activePartGroupsByKey: [String: PartGroupBuilder] = [:]
     private var activePartGroupOrder: [String] = []
@@ -589,6 +728,66 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         switch element {
         case "score-partwise":
             sawScorePartwise = true
+
+        case "defaults":
+            insideDefaults = true
+
+        case "scaling" where insideDefaults:
+            insideDefaultsScaling = true
+
+        case "millimeters" where insideDefaultsScaling:
+            startTextCapture(.defaultsScalingMillimeters)
+
+        case "tenths" where insideDefaultsScaling:
+            startTextCapture(.defaultsScalingTenths)
+
+        case "page-layout" where insideDefaults:
+            insideDefaultsPageLayout = true
+
+        case "page-width" where insideDefaultsPageLayout:
+            startTextCapture(.defaultsPageWidth)
+
+        case "page-height" where insideDefaultsPageLayout:
+            startTextCapture(.defaultsPageHeight)
+
+        case "page-margins" where insideDefaultsPageLayout:
+            insideDefaultsPageMargins = true
+
+        case "left-margin" where insideDefaultsPageMargins:
+            startTextCapture(.defaultsMargin(side: "left"))
+
+        case "right-margin" where insideDefaultsPageMargins:
+            startTextCapture(.defaultsMargin(side: "right"))
+
+        case "top-margin" where insideDefaultsPageMargins:
+            startTextCapture(.defaultsMargin(side: "top"))
+
+        case "bottom-margin" where insideDefaultsPageMargins:
+            startTextCapture(.defaultsMargin(side: "bottom"))
+
+        case "system-layout" where insideDefaults:
+            insideDefaultsSystemLayout = true
+
+        case "system-distance" where insideDefaultsSystemLayout:
+            startTextCapture(.defaultsSystemDistance)
+
+        case "top-system-distance" where insideDefaultsSystemLayout:
+            startTextCapture(.defaultsTopSystemDistance)
+
+        case "system-margins" where insideDefaultsSystemLayout:
+            insideDefaultsSystemMargins = true
+
+        case "left-margin" where insideDefaultsSystemMargins:
+            startTextCapture(.defaultsSystemMargin(side: "left"))
+
+        case "right-margin" where insideDefaultsSystemMargins:
+            startTextCapture(.defaultsSystemMargin(side: "right"))
+
+        case "staff-layout" where insideDefaults:
+            insideDefaultsStaffLayout = true
+
+        case "staff-distance" where insideDefaultsStaffLayout:
+            startTextCapture(.defaultsStaffDistance)
 
         case "part-list":
             insidePartList = true
@@ -623,6 +822,38 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "part-name" where insidePartList && currentScorePartID != nil:
             startTextCapture(.partName(partID: currentScorePartID!))
 
+        case "part-abbreviation" where insidePartList && currentScorePartID != nil:
+            startTextCapture(.partAbbreviation(partID: currentScorePartID!))
+
+        case "score-instrument" where insidePartList && currentScorePartID != nil:
+            currentScoreInstrumentID = attributeDict["id"]?.trimmedNonEmpty
+
+        case "instrument-name" where currentScoreInstrumentID != nil:
+            startTextCapture(.scoreInstrumentName)
+
+        case "midi-instrument" where insidePartList && currentScorePartID != nil:
+            currentMidiInstrumentID = attributeDict["id"]?.trimmedNonEmpty
+            currentMidiChannel = nil
+            currentMidiProgram = nil
+            currentMidiUnpitched = nil
+            currentMidiVolume = nil
+            currentMidiPan = nil
+
+        case "midi-channel" where currentMidiInstrumentID != nil:
+            startTextCapture(.midiChannel)
+
+        case "midi-program" where currentMidiInstrumentID != nil:
+            startTextCapture(.midiProgram)
+
+        case "midi-unpitched" where currentMidiInstrumentID != nil:
+            startTextCapture(.midiUnpitched)
+
+        case "volume" where currentMidiInstrumentID != nil:
+            startTextCapture(.midiVolume)
+
+        case "pan" where currentMidiInstrumentID != nil:
+            startTextCapture(.midiPan)
+
         case "group-symbol" where insidePartList && currentPartGroupKey != nil:
             startTextCapture(.partGroupSymbol)
 
@@ -636,7 +867,14 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             partCounter += 1
             let id = attributeDict["id"]?.trimmedNonEmpty ?? "P\(partCounter)"
             let name = partNamesByID[id]
-            currentPart = PartBuilder(id: id, name: name)
+            let abbreviation = partAbbreviationsByID[id]
+            currentPart = PartBuilder(
+                id: id,
+                name: name,
+                abbreviation: abbreviation,
+                scoreInstruments: scoreInstrumentsByPartID[id] ?? [],
+                midiInstruments: midiInstrumentsByPartID[id] ?? []
+            )
 
         case "measure":
             guard currentPart != nil else {
@@ -645,8 +883,20 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             let xmlNumber = attributeDict["number"]?.trimmedNonEmpty
             let parsedNumber = xmlNumber.flatMap(Int.init)
             let fallbackNumber = (currentPart?.measures.count ?? 0) + 1
-            currentMeasure = MeasureBuilder(number: parsedNumber ?? fallbackNumber, xmlNumber: xmlNumber)
+            var measureBuilder = MeasureBuilder(number: parsedNumber ?? fallbackNumber, xmlNumber: xmlNumber)
+            if attributeDict["implicit"]?.lowercased() == "yes" {
+                measureBuilder.implicit = true
+            }
+            currentMeasure = measureBuilder
             currentBarlineLocation = nil
+
+        case "print" where currentMeasure != nil:
+            if attributeDict["new-system"]?.lowercased() == "yes" {
+                currentMeasure?.newSystem = true
+            }
+            if attributeDict["new-page"]?.lowercased() == "yes" {
+                currentMeasure?.newPage = true
+            }
 
         case "barline" where currentMeasure != nil:
             currentBarlineLocation = attributeDict["location"]?.trimmedNonEmpty?.lowercased()
@@ -703,6 +953,25 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "beat-type" where currentTimeBuilder != nil:
             startTextCapture(.timeBeatType)
 
+        case "multiple-rest" where insideAttributes:
+            startTextCapture(.multipleRest)
+
+        case "transpose" where insideAttributes:
+            insideTranspose = true
+            transposeDoubleFlag = false
+
+        case "diatonic" where insideTranspose:
+            startTextCapture(.transposeDiatonic)
+
+        case "chromatic" where insideTranspose:
+            startTextCapture(.transposeChromatic)
+
+        case "octave-change" where insideTranspose:
+            startTextCapture(.transposeOctaveChange)
+
+        case "double" where insideTranspose:
+            transposeDoubleFlag = true
+
         case "clef" where insideAttributes:
             currentClefBuilder = ClefBuilder(number: attributeDict["number"].flatMap(Int.init))
 
@@ -717,6 +986,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "note":
             currentNote = NoteBuilder()
+            currentNote?.color = attributeDict["color"]?.trimmedNonEmpty
             currentLyricBuilder = nil
             currentFingeringBuilder = nil
             currentStringNumberBuilder = nil
@@ -804,6 +1074,23 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "staff" where currentHarmonyBuilder != nil && currentNote == nil:
             startTextCapture(.harmonyStaff)
 
+        case "figured-bass" where currentMeasure != nil:
+            currentFiguredBassBuilder = FiguredBassBuilder(
+                parentheses: yesNoToBool(attributeDict["parentheses"]) ?? false
+            )
+
+        case "figure" where currentFiguredBassBuilder != nil:
+            currentFiguredBassFigureBuilder = FiguredBassFigureBuilder()
+
+        case "figure-number" where currentFiguredBassFigureBuilder != nil:
+            startTextCapture(.figuredBassFigureNumber)
+
+        case "prefix" where currentFiguredBassFigureBuilder != nil:
+            startTextCapture(.figuredBassFigurePrefix)
+
+        case "suffix" where currentFiguredBassFigureBuilder != nil:
+            startTextCapture(.figuredBassFigureSuffix)
+
         case "sound" where currentDirectionBuilder != nil:
             if var currentDirectionBuilder,
                let tempo = attributeDict["tempo"]?.trimmedNonEmpty.flatMap(Double.init) {
@@ -883,6 +1170,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "dynamics" where currentDirectionBuilder != nil && insideDirectionType:
             insideDynamics = true
 
+        case "dynamics" where currentNote != nil:
+            insideNotationDynamics = true
+
         case "other-dynamics" where currentDirectionBuilder != nil && insideDynamics:
             startTextCapture(.directionOtherDynamics)
 
@@ -930,6 +1220,106 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 self.currentDirectionBuilder = currentDirectionBuilder
             }
 
+        case "type" where currentNote != nil:
+            startTextCapture(.noteType)
+
+        case "dot" where currentNote != nil:
+            if var currentNote {
+                currentNote.dotCount += 1
+                self.currentNote = currentNote
+            }
+
+        case "accidental" where currentNote != nil:
+            startTextCapture(.noteAccidental)
+
+        case "stem" where currentNote != nil:
+            startTextCapture(.noteStem)
+
+        case "fermata" where currentNote != nil:
+            if var currentNote {
+                let shape = parseFermataShape(from: attributeDict["type"])
+                let placement: String?
+                if let rawPlacement = attributeDict["placement"]?.trimmedNonEmpty?.lowercased() {
+                    placement = rawPlacement
+                } else {
+                    // MusicXML fermata: "inverted" attribute means below
+                    placement = nil
+                }
+                currentNote.fermatas.append(
+                    FermataMarker(shape: shape, placement: placement)
+                )
+                self.currentNote = currentNote
+            }
+
+        case "trill-mark", "mordent", "inverted-mordent", "turn", "inverted-turn",
+             "delayed-turn", "delayed-inverted-turn", "shake", "wavy-line":
+            if var currentNote, let kind = OrnamentKind(rawValue: elementName) {
+                let placement = attributeDict["placement"]?.trimmedNonEmpty?.lowercased()
+                currentNote.ornaments.append(
+                    OrnamentMarker(kind: kind, placement: placement)
+                )
+                self.currentNote = currentNote
+            }
+
+        case "arpeggiate" where currentNote != nil:
+            if var currentNote {
+                let direction: ArpeggiateDirection
+                switch attributeDict["direction"]?.lowercased() {
+                case "up": direction = .up
+                case "down": direction = .down
+                default: direction = .none
+                }
+                currentNote.arpeggiate = ArpeggiateMarker(direction: direction)
+                self.currentNote = currentNote
+            }
+
+        case "non-arpeggiate" where currentNote != nil:
+            // non-arpeggiate is a bracket indicating notes NOT arpeggiated
+            break
+
+        case "glissando" where currentNote != nil,
+             "slide" where currentNote != nil:
+            if var currentNote {
+                let spanType = notationSpanType(from: attributeDict["type"])
+                let lineType: GlissandoLineType
+                switch attributeDict["line-type"]?.lowercased() {
+                case "solid": lineType = .solid
+                case "dashed": lineType = .dashed
+                case "dotted": lineType = .dotted
+                default: lineType = element == "glissando" ? .wavy : .solid
+                }
+                let number = attributeDict["number"].flatMap(Int.init) ?? 1
+                currentNote.glissandos.append(
+                    GlissandoMarker(
+                        type: spanType,
+                        lineType: lineType,
+                        text: attributeDict["text"]?.trimmedNonEmpty ?? (element == "glissando" ? "gliss." : nil),
+                        number: number
+                    )
+                )
+                self.currentNote = currentNote
+            }
+
+        case "tremolo" where currentNote != nil:
+            startTextCapture(.tremolo)
+            if var currentNote {
+                let tremoloType: TremoloType
+                switch attributeDict["type"]?.lowercased() {
+                case "start": tremoloType = .start
+                case "stop": tremoloType = .stop
+                case "unmeasured": tremoloType = .unmeasured
+                default: tremoloType = .single
+                }
+                currentNote.tremolo = TremoloMarker(bars: 1, type: tremoloType)
+                self.currentNote = currentNote
+            }
+
+        case "cue" where currentNote != nil:
+            currentNote?.isCue = true
+
+        case "notehead" where currentNote != nil:
+            startTextCapture(.notehead)
+
         case "rest" where currentNote != nil:
             currentNote?.isRest = true
 
@@ -938,6 +1328,9 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "grace" where currentNote != nil:
             currentNote?.isGrace = true
+            if attributeDict["slash"]?.lowercased() == "yes" {
+                currentNote?.isGraceSlash = true
+            }
 
         case "lyric" where currentNote != nil:
             let parsedNumber = attributeDict["number"].flatMap(Int.init) ?? 1
@@ -968,6 +1361,24 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 type: attributeDict["type"]?.trimmedNonEmpty?.lowercased()
             )
             startTextCapture(.noteFretNumber)
+
+        case "up-bow" where currentNote != nil && insideTechnical:
+            appendTechnicalArticulation(.upBow, placement: attributeDict["placement"])
+
+        case "down-bow" where currentNote != nil && insideTechnical:
+            appendTechnicalArticulation(.downBow, placement: attributeDict["placement"])
+
+        case "harmonic" where currentNote != nil && insideTechnical:
+            appendTechnicalArticulation(.harmonicTechnical, placement: attributeDict["placement"])
+
+        case "open-string" where currentNote != nil && insideTechnical:
+            appendTechnicalArticulation(.openString, placement: attributeDict["placement"])
+
+        case "snap-pizzicato" where currentNote != nil && insideTechnical:
+            appendTechnicalArticulation(.snapPizzicato, placement: attributeDict["placement"])
+
+        case "stopped" where currentNote != nil && insideTechnical:
+            appendTechnicalArticulation(.stopped, placement: attributeDict["placement"])
 
         case "text" where currentLyricBuilder != nil:
             startTextCapture(.lyricText)
@@ -1053,6 +1464,12 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 self.currentDirectionBuilder = currentDirectionBuilder
             }
 
+        case _ where currentNote != nil && insideNotationDynamics && element != "dynamics" && element != "other-dynamics":
+            if var currentNote {
+                currentNote.dynamics.append(element)
+                self.currentNote = currentNote
+            }
+
         case "duration":
             if currentNote != nil {
                 startTextCapture(.noteDuration)
@@ -1088,6 +1505,16 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "movement-title":
             startTextCapture(.movementTitle)
+
+        case "identification":
+            insideIdentification = true
+
+        case "creator" where insideIdentification:
+            currentCreatorType = attributeDict["type"]?.trimmedNonEmpty?.lowercased()
+            startTextCapture(.identificationCreator)
+
+        case "rights" where insideIdentification:
+            startTextCapture(.identificationRights)
 
         default:
             break
@@ -1129,6 +1556,49 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "attributes":
             insideAttributes = false
+
+        case "multiple-rest":
+            if case .multipleRest = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Int.init),
+               var currentMeasure {
+                var attributes = currentMeasure.attributes ?? MeasureAttributes()
+                attributes.multipleRestCount = value
+                currentMeasure.attributes = attributes
+                self.currentMeasure = currentMeasure
+            }
+
+        case "diatonic" where insideTranspose:
+            if case .transposeDiatonic = currentTextTarget {
+                currentTransposeDiatonic = consumeCapturedText().flatMap(Int.init)
+            }
+
+        case "chromatic" where insideTranspose:
+            if case .transposeChromatic = currentTextTarget {
+                currentTransposeChromatic = consumeCapturedText().flatMap(Int.init)
+            }
+
+        case "octave-change" where insideTranspose:
+            if case .transposeOctaveChange = currentTextTarget {
+                currentTransposeOctaveChange = consumeCapturedText().flatMap(Int.init)
+            }
+
+        case "transpose":
+            if insideTranspose, var currentMeasure {
+                var attributes = currentMeasure.attributes ?? MeasureAttributes()
+                let transpose = TransposeSettings(
+                    diatonic: currentTransposeDiatonic,
+                    chromatic: currentTransposeChromatic ?? 0,
+                    octaveChange: currentTransposeOctaveChange,
+                    double: transposeDoubleFlag
+                )
+                attributes.transpose = transpose
+                currentMeasure.attributes = attributes
+                self.currentMeasure = currentMeasure
+            }
+            insideTranspose = false
+            currentTransposeDiatonic = nil
+            currentTransposeChromatic = nil
+            currentTransposeOctaveChange = nil
 
         case "key":
             if let key = buildKeySignature(), var currentMeasure {
@@ -1241,6 +1711,24 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             currentHarmonyBuilder = nil
             currentHarmonyDegreeBuilder = nil
 
+        case "figured-bass":
+            if let figuredBassBuilder = currentFiguredBassBuilder,
+               var currentMeasure {
+                let event = figuredBassBuilder.build(currentOnset: currentMeasure.timeCursorDivisions)
+                currentMeasure.figuredBassEvents.append(event)
+                self.currentMeasure = currentMeasure
+            }
+            currentFiguredBassBuilder = nil
+            currentFiguredBassFigureBuilder = nil
+
+        case "figure":
+            if let figureBuilder = currentFiguredBassFigureBuilder,
+               var currentFiguredBassBuilder {
+                currentFiguredBassBuilder.figures.append(figureBuilder.build())
+                self.currentFiguredBassBuilder = currentFiguredBassBuilder
+            }
+            currentFiguredBassFigureBuilder = nil
+
         case "degree":
             if let degreeBuilder = currentHarmonyDegreeBuilder,
                var currentHarmonyBuilder {
@@ -1259,6 +1747,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "dynamics":
             insideDynamics = false
+            insideNotationDynamics = false
 
         case "metronome":
             if let metronome = currentMetronomeBuilder?.build(),
@@ -1317,6 +1806,46 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "barline":
             currentBarlineLocation = nil
 
+        case "type":
+            if case .noteType = currentTextTarget,
+               let value = consumeCapturedText(),
+               var currentNote {
+                currentNote.noteType = NoteTypeValue(rawValue: value.lowercased())
+                self.currentNote = currentNote
+            }
+
+        case "accidental":
+            if case .noteAccidental = currentTextTarget,
+               let value = consumeCapturedText(),
+               var currentNote {
+                currentNote.accidental = parseAccidentalValue(from: value)
+                self.currentNote = currentNote
+            }
+
+        case "stem":
+            if case .noteStem = currentTextTarget,
+               let value = consumeCapturedText(),
+               var currentNote {
+                currentNote.stemDirection = NoteStemDirection(rawValue: value.lowercased())
+                self.currentNote = currentNote
+            }
+
+        case "notehead":
+            if case .notehead = currentTextTarget,
+               let value = consumeCapturedText()?.lowercased(),
+               var currentNote {
+                currentNote.noteheadType = NoteheadType(rawValue: value)
+                self.currentNote = currentNote
+            }
+
+        case "tremolo":
+            if case .tremolo = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Int.init),
+               var currentNote {
+                currentNote.tremolo?.bars = max(1, value)
+                self.currentNote = currentNote
+            }
+
         case "beam":
             if case .beamValue = currentTextTarget,
                var currentNote {
@@ -1346,6 +1875,58 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "part-group":
             currentPartGroupKey = nil
 
+        case "instrument-name" where currentScoreInstrumentID != nil:
+            if case .scoreInstrumentName = currentTextTarget,
+               let name = consumeCapturedText(),
+               let instrumentID = currentScoreInstrumentID,
+               let partID = currentScorePartID {
+                let instrument = ScoreInstrument(id: instrumentID, name: name)
+                scoreInstrumentsByPartID[partID, default: []].append(instrument)
+            }
+
+        case "score-instrument":
+            currentScoreInstrumentID = nil
+
+        case "midi-channel" where currentMidiInstrumentID != nil:
+            if case .midiChannel = currentTextTarget {
+                currentMidiChannel = consumeCapturedText().flatMap(Int.init)
+            }
+
+        case "midi-program" where currentMidiInstrumentID != nil:
+            if case .midiProgram = currentTextTarget {
+                currentMidiProgram = consumeCapturedText().flatMap(Int.init)
+            }
+
+        case "midi-unpitched" where currentMidiInstrumentID != nil:
+            if case .midiUnpitched = currentTextTarget {
+                currentMidiUnpitched = consumeCapturedText().flatMap(Int.init)
+            }
+
+        case "volume" where currentMidiInstrumentID != nil:
+            if case .midiVolume = currentTextTarget {
+                currentMidiVolume = consumeCapturedText().flatMap(Double.init)
+            }
+
+        case "pan" where currentMidiInstrumentID != nil:
+            if case .midiPan = currentTextTarget {
+                currentMidiPan = consumeCapturedText().flatMap(Double.init)
+            }
+
+        case "midi-instrument":
+            if let instrumentID = currentMidiInstrumentID,
+               let partID = currentScorePartID {
+                let midi = MidiInstrument(
+                    id: instrumentID,
+                    channel: currentMidiChannel,
+                    program: currentMidiProgram,
+                    unpitched: currentMidiUnpitched,
+                    volume: currentMidiVolume,
+                    pan: currentMidiPan
+                )
+                midiInstrumentsByPartID[partID, default: []].append(midi)
+            }
+            currentMidiInstrumentID = nil
+
         case "score-part":
             currentScorePartID = nil
 
@@ -1363,9 +1944,135 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 movementTitle = consumeCapturedText()
             }
 
+        case "identification":
+            insideIdentification = false
+
+        case "defaults":
+            insideDefaults = false
+
+        case "scaling":
+            insideDefaultsScaling = false
+
+        case "millimeters":
+            if case .defaultsScalingMillimeters = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.scalingMillimeters = value
+            }
+
+        case "tenths":
+            if case .defaultsScalingTenths = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.scalingTenths = value
+            }
+
+        case "page-layout":
+            insideDefaultsPageLayout = false
+
+        case "page-width":
+            if case .defaultsPageWidth = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.pageWidth = value
+            }
+
+        case "page-height":
+            if case .defaultsPageHeight = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.pageHeight = value
+            }
+
+        case "page-margins":
+            insideDefaultsPageMargins = false
+
+        case "left-margin":
+            if case .defaultsMargin(let side) = currentTextTarget, side == "left",
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.pageMarginLeft = value
+            } else if case .defaultsSystemMargin(let side) = currentTextTarget, side == "left",
+                      let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.systemMarginLeft = value
+            }
+
+        case "right-margin":
+            if case .defaultsMargin(let side) = currentTextTarget, side == "right",
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.pageMarginRight = value
+            } else if case .defaultsSystemMargin(let side) = currentTextTarget, side == "right",
+                      let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.systemMarginRight = value
+            }
+
+        case "top-margin":
+            if case .defaultsMargin(let side) = currentTextTarget, side == "top",
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.pageMarginTop = value
+            }
+
+        case "bottom-margin":
+            if case .defaultsMargin(let side) = currentTextTarget, side == "bottom",
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.pageMarginBottom = value
+            }
+
+        case "system-layout":
+            insideDefaultsSystemLayout = false
+
+        case "system-distance":
+            if case .defaultsSystemDistance = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.systemDistance = value
+            }
+
+        case "top-system-distance":
+            if case .defaultsTopSystemDistance = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.topSystemDistance = value
+            }
+
+        case "system-margins":
+            insideDefaultsSystemMargins = false
+
+        case "staff-layout":
+            insideDefaultsStaffLayout = false
+
+        case "staff-distance":
+            if case .defaultsStaffDistance = currentTextTarget,
+               let value = consumeCapturedText().flatMap(Double.init) {
+                defaultsBuilder.staffDistance = value
+            }
+
+        case "creator":
+            if case .identificationCreator = currentTextTarget,
+               let value = consumeCapturedText() {
+                switch currentCreatorType {
+                case "composer":
+                    identificationComposer = value
+                case "lyricist":
+                    identificationLyricist = value
+                case "arranger":
+                    identificationArranger = value
+                default:
+                    if identificationComposer == nil {
+                        identificationComposer = value
+                    }
+                }
+            }
+            currentCreatorType = nil
+
+        case "rights":
+            if case .identificationRights = currentTextTarget,
+               let value = consumeCapturedText() {
+                identificationRights = value
+            }
+
         case "part-name":
             if case .partName = currentTextTarget {
                 finishPartNameCapture()
+            }
+
+        case "part-abbreviation":
+            if case .partAbbreviation(let partID) = currentTextTarget,
+               let abbreviation = consumeCapturedText() {
+                partAbbreviationsByID[partID] = abbreviation
             }
 
         case "group-symbol":
@@ -1647,6 +2354,30 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 self.currentHarmonyDegreeBuilder = currentHarmonyDegreeBuilder
             }
 
+        case "figure-number":
+            if case .figuredBassFigureNumber = currentTextTarget,
+               let value = consumeCapturedText(),
+               var currentFiguredBassFigureBuilder {
+                currentFiguredBassFigureBuilder.number = Int(value)
+                self.currentFiguredBassFigureBuilder = currentFiguredBassFigureBuilder
+            }
+
+        case "prefix" where currentFiguredBassFigureBuilder != nil:
+            if case .figuredBassFigurePrefix = currentTextTarget,
+               let value = consumeCapturedText(),
+               var currentFiguredBassFigureBuilder {
+                currentFiguredBassFigureBuilder.prefix = FiguredBassModifier(rawValue: value)
+                self.currentFiguredBassFigureBuilder = currentFiguredBassFigureBuilder
+            }
+
+        case "suffix" where currentFiguredBassFigureBuilder != nil:
+            if case .figuredBassFigureSuffix = currentTextTarget,
+               let value = consumeCapturedText(),
+               var currentFiguredBassFigureBuilder {
+                currentFiguredBassFigureBuilder.suffix = FiguredBassModifier(rawValue: value)
+                self.currentFiguredBassFigureBuilder = currentFiguredBassFigureBuilder
+            }
+
         case "beat-unit":
             if case .metronomeBeatUnit = currentTextTarget,
                let value = consumeCapturedText(),
@@ -1689,7 +2420,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "alter":
             if case .pitchAlter = currentTextTarget,
-               let value = consumeCapturedText().flatMap(Int.init),
+               let value = consumeCapturedText().flatMap(Double.init),
                var currentNote {
                 currentNote.pitchAlter = value
                 self.currentNote = currentNote
@@ -1721,8 +2452,17 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         let title = workTitle?.trimmedNonEmpty
             ?? movementTitle?.trimmedNonEmpty
             ?? "Untitled Score"
+        let hasDefaults = defaultsBuilder.scalingMillimeters != nil
+            || defaultsBuilder.pageWidth != nil
+            || defaultsBuilder.systemDistance != nil
+            || defaultsBuilder.staffDistance != nil
         return Score(
             title: title,
+            composer: identificationComposer?.trimmedNonEmpty,
+            lyricist: identificationLyricist?.trimmedNonEmpty,
+            arranger: identificationArranger?.trimmedNonEmpty,
+            copyright: identificationRights?.trimmedNonEmpty,
+            defaults: hasDefaults ? defaultsBuilder : nil,
             parts: parts,
             partGroups: normalizedPartGroups(filteredTo: parts)
         )
@@ -2735,6 +3475,17 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         }
     }
 
+    private func appendTechnicalArticulation(_ kind: ArticulationKind, placement: String?) {
+        guard var currentNote else { return }
+        currentNote.articulations.append(
+            ArticulationMarker(
+                kind: kind,
+                placement: placement?.trimmedNonEmpty?.lowercased()
+            )
+        )
+        self.currentNote = currentNote
+    }
+
     private func parseArticulationKind(from element: String) -> ArticulationKind {
         switch element {
         case "accent":
@@ -2769,6 +3520,55 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             return .unstress
         default:
             return .unknown(element)
+        }
+    }
+
+    private func parseAccidentalValue(from value: String) -> AccidentalValue {
+        switch value.lowercased() {
+        case "sharp":
+            return .sharp
+        case "flat":
+            return .flat
+        case "natural":
+            return .natural
+        case "double-sharp":
+            return .doubleSharp
+        case "sharp-sharp":
+            return .sharpSharp
+        case "flat-flat":
+            return .flatFlat
+        case "double-flat":
+            return .doubleFlat
+        case "natural-sharp":
+            return .naturalSharp
+        case "natural-flat":
+            return .naturalFlat
+        case "quarter-flat":
+            return .quarterFlat
+        case "quarter-sharp":
+            return .quarterSharp
+        case "three-quarters-flat":
+            return .threeQuartersFlat
+        case "three-quarters-sharp":
+            return .threeQuartersSharp
+        default:
+            return .unknown(value)
+        }
+    }
+
+    private func parseFermataShape(from value: String?) -> FermataShape {
+        guard let value = value?.trimmedNonEmpty?.lowercased() else {
+            return .normal
+        }
+        switch value {
+        case "normal", "":
+            return .normal
+        case "angled":
+            return .angled
+        case "square":
+            return .square
+        default:
+            return .unknown(value)
         }
     }
 
@@ -3018,7 +3818,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
             var voice: Int
             var staff: Int?
             var step: String
-            var alter: Int
+            var alter: Double
             var octave: Int
         }
 

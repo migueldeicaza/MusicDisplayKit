@@ -3,6 +3,16 @@ import MusicDisplayKitLayout
 import MusicDisplayKitModel
 import VexFoundation
 
+/// Position data extracted from VexFoundation objects post-format.
+public struct VexNotePosition: Sendable {
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let sourceOrder: Int
+    public let x: Double
+    public let ys: [Double]
+    public let boundingBox: MDKBoundingBox?
+}
+
 public enum RenderTarget: Sendable {
     case view(identifier: String)
     case image(width: Int, height: Int)
@@ -282,6 +292,7 @@ public struct VexStavePlan: Sendable {
     public let initialKeySignature: String?
     public let initialTimeSignature: String?
     public let beginBarline: VexStaveBarlineKind?
+    public let multipleRestCount: Int?
     public let endBarline: VexStaveBarlineKind?
 
     public init(
@@ -294,6 +305,7 @@ public struct VexStavePlan: Sendable {
         initialClefAnnotation: String? = nil,
         initialKeySignature: String? = nil,
         initialTimeSignature: String? = nil,
+        multipleRestCount: Int? = nil,
         beginBarline: VexStaveBarlineKind? = nil,
         endBarline: VexStaveBarlineKind? = nil
     ) {
@@ -306,6 +318,7 @@ public struct VexStavePlan: Sendable {
         self.initialClefAnnotation = initialClefAnnotation
         self.initialKeySignature = initialKeySignature
         self.initialTimeSignature = initialTimeSignature
+        self.multipleRestCount = multipleRestCount
         self.beginBarline = beginBarline
         self.endBarline = endBarline
     }
@@ -367,6 +380,25 @@ public struct VexMeasureBoundaryPlan: Sendable {
     }
 }
 
+public struct VexGraceNotePlan: Sendable {
+    public let keyTokens: [String]
+    public let noteType: NoteTypeValue?
+    public let slash: Bool
+    public let accidental: AccidentalValue?
+
+    public init(
+        keyTokens: [String],
+        noteType: NoteTypeValue? = nil,
+        slash: Bool = false,
+        accidental: AccidentalValue? = nil
+    ) {
+        self.keyTokens = keyTokens
+        self.noteType = noteType
+        self.slash = slash
+        self.accidental = accidental
+    }
+}
+
 public struct VexNotePlan: Sendable {
     public let systemIndex: Int
     public let partIndex: Int
@@ -377,6 +409,7 @@ public struct VexNotePlan: Sendable {
     public let isFirstMeasureInSystem: Bool
     public let voice: Int
     public let staff: Int?
+    public let clef: String?
     public let entryIndexInVoice: Int
     public let onsetDivisions: Int
     public let durationDivisions: Int
@@ -384,6 +417,21 @@ public struct VexNotePlan: Sendable {
     public let isRest: Bool
     public let keyTokens: [String]
     public let sourceOrder: Int
+    public let noteType: NoteTypeValue?
+    public let dotCount: Int
+    public let accidental: AccidentalValue?
+    public let stemDirection: NoteStemDirection?
+    public let ornaments: [OrnamentMarker]
+    public let fermatas: [FermataMarker]
+    public let arpeggiate: ArpeggiateMarker?
+    public let tremolo: TremoloMarker?
+    public let dynamics: [String]
+    public let glissandos: [GlissandoMarker]
+    public let isCue: Bool
+    public let noteheadType: NoteheadType?
+    public let color: String?
+    public let graceNotes: [VexGraceNotePlan]
+    public let crossStaffTarget: Int?
 
     public init(
         systemIndex: Int,
@@ -395,13 +443,29 @@ public struct VexNotePlan: Sendable {
         isFirstMeasureInSystem: Bool,
         voice: Int,
         staff: Int?,
+        clef: String? = nil,
         entryIndexInVoice: Int,
         onsetDivisions: Int,
         durationDivisions: Int,
         divisions: Int,
         isRest: Bool,
         keyTokens: [String],
-        sourceOrder: Int
+        sourceOrder: Int,
+        noteType: NoteTypeValue? = nil,
+        dotCount: Int = 0,
+        accidental: AccidentalValue? = nil,
+        stemDirection: NoteStemDirection? = nil,
+        ornaments: [OrnamentMarker] = [],
+        fermatas: [FermataMarker] = [],
+        arpeggiate: ArpeggiateMarker? = nil,
+        tremolo: TremoloMarker? = nil,
+        dynamics: [String] = [],
+        glissandos: [GlissandoMarker] = [],
+        isCue: Bool = false,
+        noteheadType: NoteheadType? = nil,
+        color: String? = nil,
+        graceNotes: [VexGraceNotePlan] = [],
+        crossStaffTarget: Int? = nil
     ) {
         self.systemIndex = systemIndex
         self.partIndex = partIndex
@@ -412,6 +476,7 @@ public struct VexNotePlan: Sendable {
         self.isFirstMeasureInSystem = isFirstMeasureInSystem
         self.voice = voice
         self.staff = staff
+        self.clef = clef
         self.entryIndexInVoice = entryIndexInVoice
         self.onsetDivisions = onsetDivisions
         self.durationDivisions = durationDivisions
@@ -419,6 +484,21 @@ public struct VexNotePlan: Sendable {
         self.isRest = isRest
         self.keyTokens = keyTokens
         self.sourceOrder = sourceOrder
+        self.noteType = noteType
+        self.dotCount = dotCount
+        self.accidental = accidental
+        self.stemDirection = stemDirection
+        self.ornaments = ornaments
+        self.fermatas = fermatas
+        self.arpeggiate = arpeggiate
+        self.tremolo = tremolo
+        self.dynamics = dynamics
+        self.glissandos = glissandos
+        self.isCue = isCue
+        self.noteheadType = noteheadType
+        self.color = color
+        self.graceNotes = graceNotes
+        self.crossStaffTarget = crossStaffTarget
     }
 }
 
@@ -1136,6 +1216,12 @@ public struct VexRenderPlan: Sendable {
     public let canvasWidth: Double
     public let canvasHeight: Double
     public let pageCount: Int
+    public let autoBeam: Bool
+    public let title: String?
+    public let composer: String?
+    public let lyricist: String?
+    public let partNames: [Int: String]
+    public let partAbbreviations: [Int: String]
     public let staves: [VexStavePlan]
     public let measures: [VexMeasurePlan]
     public let measureBoundaries: [VexMeasureBoundaryPlan]
@@ -1164,6 +1250,12 @@ public struct VexRenderPlan: Sendable {
         canvasWidth: Double,
         canvasHeight: Double,
         pageCount: Int,
+        autoBeam: Bool = false,
+        title: String? = nil,
+        composer: String? = nil,
+        lyricist: String? = nil,
+        partNames: [Int: String] = [:],
+        partAbbreviations: [Int: String] = [:],
         staves: [VexStavePlan],
         measures: [VexMeasurePlan],
         measureBoundaries: [VexMeasureBoundaryPlan],
@@ -1191,6 +1283,12 @@ public struct VexRenderPlan: Sendable {
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
         self.pageCount = pageCount
+        self.autoBeam = autoBeam
+        self.title = title
+        self.composer = composer
+        self.lyricist = lyricist
+        self.partNames = partNames
+        self.partAbbreviations = partAbbreviations
         self.staves = staves
         self.measures = measures
         self.measureBoundaries = measureBoundaries
@@ -1227,6 +1325,7 @@ public struct VexFactoryExecution {
     public let tuplets: [Tuplet]
     public let ties: [StaveTie]
     public let slurs: [Curve]
+    public let glissandos: [StaveLine]
     public let articulations: [VexFoundation.Articulation]
     public let fingerings: [VexFoundation.FretHandFinger]
     public let stringNumbers: [VexFoundation.StringNumber]
@@ -1242,6 +1341,7 @@ public struct VexFactoryExecution {
     public let measureBarlineConnectors: [StaveConnector]
     public let partGroupConnectors: [StaveConnector]
     public let barlineConnectors: [StaveConnector]
+    public let notePositions: [VexNotePosition]
 
     public init(
         factory: Factory,
@@ -1253,6 +1353,7 @@ public struct VexFactoryExecution {
         tuplets: [Tuplet],
         ties: [StaveTie],
         slurs: [Curve],
+        glissandos: [StaveLine],
         articulations: [VexFoundation.Articulation],
         fingerings: [VexFoundation.FretHandFinger],
         stringNumbers: [VexFoundation.StringNumber],
@@ -1267,7 +1368,8 @@ public struct VexFactoryExecution {
         lyricConnectors: [VexFoundation.Annotation],
         measureBarlineConnectors: [StaveConnector],
         partGroupConnectors: [StaveConnector],
-        barlineConnectors: [StaveConnector]
+        barlineConnectors: [StaveConnector],
+        notePositions: [VexNotePosition] = []
     ) {
         self.factory = factory
         self.staves = staves
@@ -1278,6 +1380,7 @@ public struct VexFactoryExecution {
         self.tuplets = tuplets
         self.ties = ties
         self.slurs = slurs
+        self.glissandos = glissandos
         self.articulations = articulations
         self.fingerings = fingerings
         self.stringNumbers = stringNumbers
@@ -1293,6 +1396,48 @@ public struct VexFactoryExecution {
         self.measureBarlineConnectors = measureBarlineConnectors
         self.partGroupConnectors = partGroupConnectors
         self.barlineConnectors = barlineConnectors
+        self.notePositions = notePositions
+    }
+}
+
+/// Cache for incremental re-rendering (8.2).
+/// Tracks the previously executed render plan and factory execution per system.
+/// When a score is re-rendered with only a subset of systems changed (dirty),
+/// only those systems need to be re-executed; the rest reuse cached VexFoundation
+/// objects.
+public final class VexRenderCache {
+    /// Previously cached execution, keyed by system index.
+    public private(set) var cachedExecutions: [Int: VexFactoryExecution] = [:]
+    /// System indices that have been marked dirty and need re-execution.
+    public private(set) var dirtySystems: Set<Int> = []
+
+    public init() {}
+
+    /// Marks the given system indices as dirty (needing re-render).
+    public func markDirty(_ systemIndices: some Sequence<Int>) {
+        dirtySystems.formUnion(systemIndices)
+    }
+
+    /// Marks all systems as dirty.
+    public func markAllDirty() {
+        dirtySystems = Set(cachedExecutions.keys)
+    }
+
+    /// Stores an execution for the given system index and clears its dirty flag.
+    public func store(_ execution: VexFactoryExecution, forSystem systemIndex: Int) {
+        cachedExecutions[systemIndex] = execution
+        dirtySystems.remove(systemIndex)
+    }
+
+    /// Returns `true` if the given system index needs re-execution.
+    public func isDirty(_ systemIndex: Int) -> Bool {
+        dirtySystems.contains(systemIndex) || cachedExecutions[systemIndex] == nil
+    }
+
+    /// Clears the entire cache.
+    public func invalidate() {
+        cachedExecutions.removeAll()
+        dirtySystems.removeAll()
     }
 }
 
@@ -1316,6 +1461,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 initialClefAnnotation: initialState.clefAnnotation,
                 initialKeySignature: initialState.keySignature,
                 initialTimeSignature: initialState.timeSignature,
+                multipleRestCount: initialState.multipleRestCount,
                 beginBarline: initialState.beginBarline,
                 endBarline: initialState.endBarline
             )
@@ -1429,6 +1575,11 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 in: part,
                 upToMeasureIndex: laidOutMeasure.measureIndexInPart
             )
+            let effectiveAttributes = effectiveStaveAttributes(
+                in: part,
+                upToMeasureIndex: laidOutMeasure.measureIndexInPart
+            )
+            let effectiveClef = effectiveAttributes.clef.flatMap(vexClefName(for:))?.rawValue
 
             let nonGraceEvents = sourceMeasure.noteEvents
                 .enumerated()
@@ -1444,6 +1595,25 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     return lhs.voice < rhs.voice
                 }
                 return lhs.onsetDivisions < rhs.onsetDivisions
+            }
+
+            // Build grace note plans grouped by voice and onset (attached to following regular note).
+            let graceEvents = sourceMeasure.noteEvents
+                .enumerated()
+                .filter { _, event in event.isGrace }
+            var graceNotesByVoiceOnset: [VoiceOnsetKey: [VexGraceNotePlan]] = [:]
+            for (_, graceEvent) in graceEvents {
+                let voice = max(1, graceEvent.voice)
+                let onset = max(0, graceEvent.onsetDivisions)
+                let key = VoiceOnsetKey(voice: voice, onsetDivisions: onset)
+                let keyToken = noteKeyToken(for: graceEvent).map { [$0] } ?? ["b/4"]
+                let plan = VexGraceNotePlan(
+                    keyTokens: keyToken,
+                    noteType: graceEvent.noteType,
+                    slash: graceEvent.isGraceSlash,
+                    accidental: graceEvent.accidental
+                )
+                graceNotesByVoiceOnset[key, default: []].append(plan)
             }
             let firstMeasureIndexInSystem = firstMeasureIndexBySystem[laidOutMeasure.systemIndex] ?? Int.max
             let isFirstMeasureInSystem = laidOutMeasure.index == firstMeasureIndexInSystem
@@ -1477,6 +1647,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     keyTokens = uniqueTokens.isEmpty ? ["r/4"] : uniqueTokens
                 }
 
+                let firstEvent = events.first
+                let allOrnaments = events.flatMap(\.ornaments)
+                let allFermatas = events.flatMap(\.fermatas)
+
                 return VexNotePlan(
                     systemIndex: laidOutMeasure.systemIndex,
                     partIndex: laidOutMeasure.partIndex,
@@ -1487,13 +1661,29 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     isFirstMeasureInSystem: isFirstMeasureInSystem,
                     voice: key.voice,
                     staff: resolvedStaff,
+                    clef: effectiveClef,
                     entryIndexInVoice: entryIndex,
                     onsetDivisions: key.onsetDivisions,
                     durationDivisions: max(1, maxDuration),
                     divisions: max(1, effectiveDivisions),
                     isRest: isRest,
                     keyTokens: keyTokens,
-                    sourceOrder: sourceOrder
+                    sourceOrder: sourceOrder,
+                    noteType: firstEvent?.noteType,
+                    dotCount: firstEvent?.dotCount ?? 0,
+                    accidental: firstEvent?.accidental,
+                    stemDirection: firstEvent?.stemDirection,
+                    ornaments: allOrnaments,
+                    fermatas: allFermatas,
+                    arpeggiate: firstEvent?.arpeggiate,
+                    tremolo: firstEvent?.tremolo,
+                    dynamics: firstEvent?.dynamics ?? [],
+                    glissandos: firstEvent?.glissandos ?? [],
+                    isCue: firstEvent?.isCue ?? false,
+                    noteheadType: firstEvent?.noteheadType,
+                    color: firstEvent?.color,
+                    graceNotes: graceNotesByVoiceOnset[key] ?? [],
+                    crossStaffTarget: firstEvent?.crossStaffTarget
                 )
             }
 
@@ -1806,6 +1996,20 @@ public struct VexFoundationRenderer: ScoreRenderer {
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             pageCount: pageCount,
+            autoBeam: score.autoBeam,
+            title: score.score.title,
+            composer: score.score.composer,
+            lyricist: score.score.lyricist,
+            partNames: Dictionary(
+                uniqueKeysWithValues: score.score.parts.enumerated().compactMap { index, part in
+                    part.name.map { (index, $0) }
+                }
+            ),
+            partAbbreviations: Dictionary(
+                uniqueKeysWithValues: score.score.parts.enumerated().compactMap { index, part in
+                    part.abbreviation.map { (index, $0) }
+                }
+            ),
             staves: staves,
             measures: measures,
             measureBoundaries: measureBoundaries,
@@ -1918,6 +2122,90 @@ public struct VexFoundationRenderer: ScoreRenderer {
                let timeSignatureSpec = TimeSignatureSpec(parsing: timeSignature, validate: false) {
                 _ = stave.addTimeSignature(timeSignatureSpec)
             }
+
+            // Render instrument name to the left of the stave.
+            // First system: full name; subsequent systems: abbreviation.
+            if !plan.partNames.isEmpty {
+                let label: String?
+                if stavePlan.systemIndex == 0 {
+                    label = plan.partNames[stavePlan.partIndex]
+                } else {
+                    label = plan.partAbbreviations[stavePlan.partIndex]
+                }
+                if let label, !label.isEmpty {
+                    let nameText = StaveText(
+                        text: label,
+                        position: .left
+                    )
+                    _ = nameText.setFont(FontInfo(
+                        family: VexFont.SERIF,
+                        size: 11,
+                        weight: VexFontWeight.normal.rawValue,
+                        style: VexFontStyle.normal.rawValue
+                    ))
+                    _ = stave.addModifier(nameText)
+                }
+            }
+
+            // Render multi-measure rest if present.
+            if let mmrCount = stavePlan.multipleRestCount, mmrCount > 1 {
+                let mmr = factory.MultiMeasureRest(
+                    numberOfMeasures: mmrCount,
+                    options: MultiMeasureRestRenderOptions(numberOfMeasures: mmrCount)
+                )
+                _ = mmr.setStave(stave)
+            }
+        }
+
+        // Add score metadata text (title, composer, lyricist) to the first system's top stave.
+        if let firstStaveKey = sortedStavePlans.firstIndex(where: { $0.systemIndex == 0 }),
+           createdStaves.indices.contains(firstStaveKey) {
+            let firstStave = createdStaves[firstStaveKey]
+            if let title = plan.title, title != "Untitled Score" {
+                let titleText = StaveText(
+                    text: title,
+                    position: .above,
+                    shiftY: -14,
+                    justification: .center
+                )
+                _ = titleText.setFont(FontInfo(
+                    family: VexFont.SERIF,
+                    size: 18,
+                    weight: VexFontWeight.bold.rawValue,
+                    style: VexFontStyle.normal.rawValue
+                ))
+                _ = firstStave.addModifier(titleText)
+            }
+            if let composer = plan.composer {
+                let composerText = StaveText(
+                    text: composer,
+                    position: .above,
+                    shiftY: 0,
+                    justification: .right
+                )
+                _ = composerText.setFont(FontInfo(
+                    family: VexFont.SERIF,
+                    size: 12,
+                    weight: VexFontWeight.normal.rawValue,
+                    style: VexFontStyle.italic.rawValue
+                ))
+                _ = firstStave.addModifier(composerText)
+            }
+            if let lyricist = plan.lyricist {
+                let lyricistText = StaveText(
+                    text: lyricist,
+                    position: .above,
+                    shiftY: 0,
+                    justification: .left
+                )
+                _ = lyricistText.setFont(FontInfo(
+                    family: VexFont.SERIF,
+                    size: 12,
+                    weight: VexFontWeight.normal.rawValue,
+                    style: VexFontStyle.italic.rawValue
+                ))
+                _ = firstStave.addModifier(lyricistText)
+            }
         }
 
         let stavesByLookupKey = Dictionary(
@@ -1950,14 +2238,39 @@ public struct VexFoundationRenderer: ScoreRenderer {
             let measureIndexInPart: Int
             let voice: Int
         }
+        struct MeasureColumnKey: Hashable {
+            let measureIndexInPart: Int
+        }
+        struct MeasureColumnAlignmentRecord {
+            let stave: Stave
+            let tickContextsByOnset: [Int: TickContext]
+        }
+        struct DeferredTempoMark {
+            let groupKey: NoteGroupKey
+            let plan: VexTempoMarkPlan
+        }
+        struct DeferredRoadmapRepetition {
+            let groupKey: NoteGroupKey
+            let plan: VexRoadmapRepetitionPlan
+        }
+
+        struct NoteSourceInfo {
+            let entryKey: NoteEntryKey
+            let partIndex: Int
+            let measureIndexInPart: Int
+            let sourceOrder: Int
+            let crossStaffTarget: Int?
+        }
 
         var createdVoices: [Voice] = []
         var createdNotes: [StaveNote] = []
         var createdTabNotes: [VexFoundation.TabNote] = []
+        var noteSourceInfoByEntryKey: [NoteEntryKey: NoteSourceInfo] = [:]
         var createdBeams: [Beam] = []
         var createdTuplets: [Tuplet] = []
         var createdTies: [StaveTie] = []
         var createdSlurs: [Curve] = []
+        var createdGlissandos: [StaveLine] = []
         var createdArticulations: [VexFoundation.Articulation] = []
         var createdFingerings: [VexFoundation.FretHandFinger] = []
         var createdStringNumbers: [VexFoundation.StringNumber] = []
@@ -1970,6 +2283,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
         var createdOctaveShiftSpanners: [TextBracket] = []
         var createdPedalMarkings: [PedalMarking] = []
         var createdLyricConnectors: [VexFoundation.Annotation] = []
+        var measureColumnAlignmentRecords: [MeasureColumnKey: [MeasureColumnAlignmentRecord]] = [:]
+        var deferredTempoMarks: [DeferredTempoMark] = []
+        var deferredRoadmapRepetitions: [DeferredRoadmapRepetition] = []
         let quarterTickThreshold = Tables.durationToTicks("4").map(Double.init)
         let stavePadding = (Glyph.MUSIC_FONT_STACK.first?.lookupMetric("stave.padding") as? Double) ?? 0
         let groupedNotes = Dictionary(grouping: plan.notes) { notePlan in
@@ -2167,6 +2483,19 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 return mapping
             }()
 
+            // Ghost note voice alignment (4.15): collect onset positions per voice
+            // for multi-voice measures to insert ghost note spacers.
+            let allOnsetsByVoice: [Int: Set<Int>] = {
+                var result: [Int: Set<Int>] = [:]
+                for v in sortedVoices {
+                    guard let plans = groupedByVoice[v] else { continue }
+                    result[v] = Set(plans.map(\.onsetDivisions))
+                }
+                return result
+            }()
+            let globalOnsets: Set<Int> = allOnsetsByVoice.values.reduce(into: Set<Int>()) { $0.formUnion($1) }
+            let needsGhostNotes = sortedVoices.count > 1
+
             for voiceNumber in sortedVoices {
                 guard let voicePlans = groupedByVoice[voiceNumber], !voicePlans.isEmpty else {
                     continue
@@ -2178,13 +2507,81 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     }
                     return lhs.sourceOrder < rhs.sourceOrder
                 }
-                let stemDirection: StemDirection? = sortedVoices.count > 1
+                let voiceStemDirection: StemDirection? = sortedVoices.count > 1
                     ? (voiceNumber == sortedVoices.first ? .up : .down)
                     : nil
 
+                let voiceOnsetSet = allOnsetsByVoice[voiceNumber] ?? []
+
                 var voiceTickables: [Tickable] = []
                 var voiceNotes: [StaveNote] = []
-                for notePlan in sortedVoicePlans {
+
+                // Insert leading ghost notes for onsets that exist globally but not in this voice,
+                // if they fall before this voice's first note.
+                if needsGhostNotes, let firstPlan = sortedVoicePlans.first {
+                    let leadingOnsets = globalOnsets.filter { $0 < firstPlan.onsetDivisions && !voiceOnsetSet.contains($0) }.sorted()
+                    for onset in leadingOnsets {
+                        let nextOnset = (globalOnsets.filter { $0 > onset }.min()) ?? firstPlan.onsetDivisions
+                        let gapDivisions = nextOnset - onset
+                        let divisions = firstPlan.divisions
+                        if gapDivisions > 0, divisions > 0 {
+                            let ghostDuration = noteDurationSpec(
+                                durationDivisions: gapDivisions,
+                                divisions: divisions,
+                                isRest: true
+                            )
+                            let ghost = factory.GhostNote(duration: ghostDuration.value, dots: ghostDuration.dots)
+                            voiceTickables.append(ghost)
+                        }
+                    }
+                }
+
+                for (planIdx, notePlan) in sortedVoicePlans.enumerated() {
+                    // Insert inter-note ghost notes for global onsets between the
+                    // previous note's end and this note's onset.
+                    if needsGhostNotes {
+                        let prevEnd: Int
+                        if planIdx == 0 {
+                            // After leading ghosts, prevEnd is the first note's onset
+                            // (leading ghosts already cover before that).
+                            prevEnd = notePlan.onsetDivisions
+                        } else {
+                            let prev = sortedVoicePlans[planIdx - 1]
+                            prevEnd = prev.onsetDivisions + prev.durationDivisions
+                        }
+                        let gapOnsets = globalOnsets
+                            .filter { $0 >= prevEnd && $0 < notePlan.onsetDivisions && !voiceOnsetSet.contains($0) }
+                            .sorted()
+                        for onset in gapOnsets {
+                            let nextOnset = (globalOnsets.filter { $0 > onset }.min()) ?? notePlan.onsetDivisions
+                            let gapDivisions = min(nextOnset, notePlan.onsetDivisions) - onset
+                            let divisions = notePlan.divisions
+                            if gapDivisions > 0, divisions > 0 {
+                                let ghostDuration = noteDurationSpec(
+                                    durationDivisions: gapDivisions,
+                                    divisions: divisions,
+                                    isRest: true
+                                )
+                                let ghost = factory.GhostNote(duration: ghostDuration.value, dots: ghostDuration.dots)
+                                voiceTickables.append(ghost)
+                            }
+                        }
+                    }
+
+                    // Prefer explicit stem direction from MusicXML when available.
+                    let stemDirection: StemDirection?
+                    if let parsed = notePlan.stemDirection {
+                        switch parsed {
+                        case .up:
+                            stemDirection = .up
+                        case .down:
+                            stemDirection = .down
+                        case .none, .double:
+                            stemDirection = voiceStemDirection
+                        }
+                    } else {
+                        stemDirection = voiceStemDirection
+                    }
                     let entryKey = NoteEntryKey(
                         systemIndex: notePlan.systemIndex,
                         partIndex: notePlan.partIndex,
@@ -2212,16 +2609,142 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         from: notePlan,
                         factory: factory,
                         stave: stave,
+                        clefName: notePlan.clef.flatMap(ClefName.init(parsing:)),
                         stemDirection: stemDirection
                     ) else {
                         continue
                     }
+
+                    // Attach explicit accidentals from MusicXML <accidental> element.
+                    if let accidentalValue = notePlan.accidental,
+                       let accidentalType = vexAccidentalType(for: accidentalValue) {
+                        let accidental = factory.Accidental(type: accidentalType)
+                        _ = note.addModifier(accidental, index: 0)
+                    }
+
+                    // Attach grace notes as a GraceNoteGroup modifier.
+                    if !notePlan.graceNotes.isEmpty {
+                        let graceNotes: [StemmableNote] = notePlan.graceNotes.compactMap { gracePlan in
+                            let keys: [StaffKeySpec] = gracePlan.keyTokens.compactMap { token in
+                                try? StaffKeySpec(parsing: token)
+                            }
+                            guard let nonEmptyKeys = NonEmptyArray(validating: keys) else {
+                                return nil
+                            }
+                            let duration: NoteDurationSpec
+                            if let noteType = gracePlan.noteType, let vexValue = vexNoteValue(for: noteType) {
+                                duration = NoteDurationSpec(uncheckedValue: vexValue, type: .note)
+                            } else {
+                                duration = .eighth
+                            }
+                            return factory.GraceNote(
+                                GraceNoteStruct(
+                                    keys: nonEmptyKeys,
+                                    duration: duration,
+                                    slash: gracePlan.slash
+                                )
+                            )
+                        }
+                        if !graceNotes.isEmpty {
+                            let group = factory.GraceNoteGroup(notes: graceNotes, slur: true)
+                            _ = group.beamNotes()
+                            _ = note.addModifier(group, index: 0)
+                        }
+                    }
+
+                    // Attach ornaments (trill, mordent, turn, etc.).
+                    for ornament in notePlan.ornaments {
+                        if let vexOrnamentType = vexOrnamentType(for: ornament.kind) {
+                            let ornamentMod = Ornament(vexOrnamentType)
+                            _ = ornamentMod.setPosition(
+                                ornament.placement == "below" ? .below : .above
+                            )
+                            _ = note.addModifier(ornamentMod, index: 0)
+                        }
+                    }
+
+                    // Attach arpeggio stroke.
+                    if let arpeggiate = notePlan.arpeggiate {
+                        let strokeType: StrokeType
+                        switch arpeggiate.direction {
+                        case .up: strokeType = .rollUp
+                        case .down: strokeType = .rollDown
+                        case .none: strokeType = .arpeggioDirectionless
+                        }
+                        _ = note.addModifier(Stroke(type: strokeType), index: 0)
+                    }
+
+                    // Attach tremolo bars.
+                    if let tremolo = notePlan.tremolo, tremolo.type == .single {
+                        _ = note.addModifier(Tremolo(tremolo.bars), index: 0)
+                    }
+
+                    // Attach note-level dynamics (from <notations><dynamics>).
+                    for dynamic in notePlan.dynamics {
+                        if let text = directionTextValue(for: dynamic) {
+                            let annotation = factory.Annotation(text: text)
+                            _ = annotation.setFont(FontInfo(
+                                family: VexFont.SERIF,
+                                size: 12,
+                                weight: VexFontWeight.bold.rawValue,
+                                style: VexFontStyle.italic.rawValue
+                            ))
+                            _ = annotation.setVerticalJustification(AnnotationVerticalJustify.bottom)
+                            _ = note.addModifier(annotation, index: 0)
+                        }
+                    }
+
+                    // Apply note color if specified in MusicXML.
+                    if let color = notePlan.color {
+                        _ = note.setStyle(ElementStyle(
+                            fillStyle: color,
+                            strokeStyle: color
+                        ))
+                    }
+
                     voiceTickables.append(note)
                     voiceNotes.append(note)
                     notesByEntryKey[entryKey] = note
                     anchorNotesByEntryKey[entryKey] = note
                     allAnchorNotesByEntryKey[entryKey] = note
+                    noteSourceInfoByEntryKey[entryKey] = NoteSourceInfo(
+                        entryKey: entryKey,
+                        partIndex: notePlan.partIndex,
+                        measureIndexInPart: notePlan.measureIndexInPart,
+                        sourceOrder: notePlan.sourceOrder,
+                        crossStaffTarget: notePlan.crossStaffTarget
+                    )
                 }
+
+                // Insert trailing ghost notes after the last note for any remaining
+                // global onsets that this voice doesn't cover.
+                if needsGhostNotes, let lastPlan = sortedVoicePlans.last {
+                    let lastEnd = lastPlan.onsetDivisions + lastPlan.durationDivisions
+                    let trailingOnsets = globalOnsets
+                        .filter { $0 >= lastEnd && !voiceOnsetSet.contains($0) }
+                        .sorted()
+                    for onset in trailingOnsets {
+                        let nextOnset = globalOnsets.filter { $0 > onset }.min()
+                        let gapDivisions: Int
+                        if let next = nextOnset {
+                            gapDivisions = next - onset
+                        } else {
+                            // Last global onset — use a quarter-note-equivalent.
+                            gapDivisions = lastPlan.divisions
+                        }
+                        let divisions = lastPlan.divisions
+                        if gapDivisions > 0, divisions > 0 {
+                            let ghostDuration = noteDurationSpec(
+                                durationDivisions: gapDivisions,
+                                divisions: divisions,
+                                isRest: true
+                            )
+                            let ghost = factory.GhostNote(duration: ghostDuration.value, dots: ghostDuration.dots)
+                            voiceTickables.append(ghost)
+                        }
+                    }
+                }
+
                 guard !voiceTickables.isEmpty else {
                     continue
                 }
@@ -2590,38 +3113,95 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 }
             }
 
+            let anchorPlan = sortedPlans.min { lhs, rhs in
+                if lhs.onsetDivisions != rhs.onsetDivisions {
+                    return lhs.onsetDivisions < rhs.onsetDivisions
+                }
+                if lhs.voice != rhs.voice {
+                    return lhs.voice < rhs.voice
+                }
+                return lhs.sourceOrder < rhs.sourceOrder
+            } ?? sortedPlans[0]
+            let desiredAbsoluteStartX: Double
+            if anchorPlan.isFirstMeasureInSystem {
+                desiredAbsoluteStartX = max(
+                    anchorPlan.measureFrame.x + 6,
+                    stave.getNoteStartX() + 2
+                )
+            } else {
+                desiredAbsoluteStartX = anchorPlan.measureFrame.x + 6
+            }
+            let leadingInset = max(desiredAbsoluteStartX - anchorPlan.measureFrame.x, 0)
+            let trailingInset = 4.0
+            let justifyWidth = max(
+                12,
+                anchorPlan.measureFrame.width - leadingInset - trailingInset
+            )
+
+            // Cross-staff note reassignment (4.14): reassign notes to their
+            // target stave when crossStaffTarget is set.
+            for (entryKey, sourceInfo) in noteSourceInfoByEntryKey {
+                guard entryKey.systemIndex == groupKey.systemIndex,
+                      entryKey.partIndex == groupKey.partIndex,
+                      entryKey.measureIndexInPart == groupKey.measureIndexInPart,
+                      let targetStaff = sourceInfo.crossStaffTarget,
+                      let note = allAnchorNotesByEntryKey[entryKey] as? StaveNote else {
+                    continue
+                }
+                // crossStaffTarget is 1-based MusicXML staff number.
+                // Staff 1 = current partIndex, staff 2 = partIndex+1, etc.
+                let targetPartIndex = groupKey.partIndex + (targetStaff - 1)
+                let targetLookupKey = StaveLookupKey(
+                    systemIndex: groupKey.systemIndex,
+                    partIndex: targetPartIndex
+                )
+                if let targetStave = stavesByLookupKey[targetLookupKey], targetStave !== stave {
+                    _ = note.setStave(targetStave)
+                }
+            }
+
             let formatter = factory.Formatter()
             _ = formatter.joinVoices(measureVoices).format(
                 measureVoices,
-                justifyWidth: max(12, sortedPlans[0].measureFrame.width - 10),
+                justifyWidth: justifyWidth,
                 options: FormatParams(alignRests: true, stave: stave)
             )
 
             let contexts = formatter.getTickContexts().array
             if let minX = contexts.map({ $0.getX() }).min() {
-                let anchorPlan = sortedPlans.min { lhs, rhs in
-                    if lhs.onsetDivisions != rhs.onsetDivisions {
-                        return lhs.onsetDivisions < rhs.onsetDivisions
-                    }
-                    if lhs.voice != rhs.voice {
-                        return lhs.voice < rhs.voice
-                    }
-                    return lhs.sourceOrder < rhs.sourceOrder
-                } ?? sortedPlans[0]
-                let desiredAbsoluteStartX: Double
-                if anchorPlan.isFirstMeasureInSystem {
-                    desiredAbsoluteStartX = max(
-                        anchorPlan.measureFrame.x + 6,
-                        stave.getNoteStartX() + 2
-                    )
-                } else {
-                    desiredAbsoluteStartX = anchorPlan.measureFrame.x + 6
-                }
                 let desiredRelativeStartX = desiredAbsoluteStartX - stave.getNoteStartX() - stavePadding
                 let delta = desiredRelativeStartX - minX
                 for context in contexts {
                     _ = context.setX(context.getX() + delta)
                 }
+            }
+            var tickContextsByOnset: [Int: TickContext] = [:]
+            for notePlan in sortedPlans {
+                let entryKey = NoteEntryKey(
+                    systemIndex: notePlan.systemIndex,
+                    partIndex: notePlan.partIndex,
+                    measureIndexInPart: notePlan.measureIndexInPart,
+                    voice: notePlan.voice,
+                    entryIndexInVoice: notePlan.entryIndexInVoice
+                )
+                guard anchorNotesByEntryKey[entryKey] != nil else {
+                    continue
+                }
+                if tickContextsByOnset[notePlan.onsetDivisions] == nil,
+                   let anchorNote = anchorNotesByEntryKey[entryKey] {
+                    tickContextsByOnset[notePlan.onsetDivisions] = anchorNote.checkTickContext()
+                }
+            }
+            if !tickContextsByOnset.isEmpty {
+                let measureColumnKey = MeasureColumnKey(
+                    measureIndexInPart: groupKey.measureIndexInPart
+                )
+                measureColumnAlignmentRecords[measureColumnKey, default: []].append(
+                    MeasureColumnAlignmentRecord(
+                        stave: stave,
+                        tickContextsByOnset: tickContextsByOnset
+                    )
+                )
             }
 
             if let tempoPlans = groupedTempoMarks[groupKey] {
@@ -2635,33 +3215,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     return lhs.sourceOrder < rhs.sourceOrder
                 }
                 for tempoPlan in sortedTempoPlans {
-                    guard let anchorNote = anchorNotesByEntryKey[
-                        NoteEntryKey(
-                            systemIndex: tempoPlan.systemIndex,
-                            partIndex: tempoPlan.partIndex,
-                            measureIndexInPart: tempoPlan.measureIndexInPart,
-                            voice: tempoPlan.voice,
-                            entryIndexInVoice: tempoPlan.entryIndexInVoice
-                        )
-                    ] else {
-                        continue
-                    }
-
-                    let shiftBase = stave.getNoteStartX() - stave.getX()
-                    let x = anchorNote.getAbsoluteX() - shiftBase
-                    let tempoOptions = StaveTempoOptions(
-                        bpm: tempoPlan.bpm,
-                        duration: tempoPlan.duration,
-                        dots: tempoPlan.dots
+                    deferredTempoMarks.append(
+                        DeferredTempoMark(groupKey: groupKey, plan: tempoPlan)
                     )
-                    let tempoMark = StaveTempo(
-                        tempo: tempoOptions,
-                        x: x,
-                        shiftY: -15
-                    )
-                    _ = tempoMark.setShiftX(0)
-                    _ = stave.addModifier(tempoMark)
-                    createdTempoMarks.append(tempoMark)
                 }
             }
 
@@ -2674,38 +3230,20 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         < roadmapRepetitionSortValue(for: rhs.kind)
                 }
                 for roadmapPlan in sortedRoadmapPlans {
-                    let shiftBase = stave.getNoteStartX() - stave.getX()
-                    let x: Double
-                    switch roadmapPlan.anchor {
-                    case .leftEdge:
-                        x = stave.getX() - shiftBase
-                    case .rightEdge:
-                        x = stave.getX()
-                    case .entry(let voice, let entryIndexInVoice):
-                        guard let anchorNote = anchorNotesByEntryKey[
-                            NoteEntryKey(
-                                systemIndex: groupKey.systemIndex,
-                                partIndex: groupKey.partIndex,
-                                measureIndexInPart: groupKey.measureIndexInPart,
-                                voice: voice,
-                                entryIndexInVoice: entryIndexInVoice
-                            )
-                        ] else {
-                            continue
-                        }
-                        x = anchorNote.getAbsoluteX() - shiftBase
-                    }
-                    let repetition = StaveRepetition(
-                        type: roadmapRepetitionType(for: roadmapPlan.kind),
-                        x: x,
-                        yShift: 0
+                    deferredRoadmapRepetitions.append(
+                        DeferredRoadmapRepetition(groupKey: groupKey, plan: roadmapPlan)
                     )
-                    _ = stave.addModifier(repetition)
-                    createdRoadmapRepetitions.append(repetition)
                 }
             }
 
-            if let beamPlans = groupedBeams[groupKey] {
+            if plan.autoBeam {
+                // Auto-beam: use VexFoundation's beam generator on each voice.
+                for voice in measureVoices {
+                    if let autoBeams = try? Beam.applyAndGetBeams(voice) {
+                        createdBeams.append(contentsOf: autoBeams)
+                    }
+                }
+            } else if let beamPlans = groupedBeams[groupKey] {
                 let sortedBeamPlans = beamPlans.sorted { lhs, rhs in
                     if lhs.voice != rhs.voice {
                         return lhs.voice < rhs.voice
@@ -2835,6 +3373,116 @@ public struct VexFoundationRenderer: ScoreRenderer {
             createdNotes.append(contentsOf: measureNotes)
         }
 
+        let sortedMeasureColumnKeys = measureColumnAlignmentRecords.keys.sorted { lhs, rhs in
+            return lhs.measureIndexInPart < rhs.measureIndexInPart
+        }
+        for measureColumnKey in sortedMeasureColumnKeys {
+            guard let records = measureColumnAlignmentRecords[measureColumnKey],
+                  records.count > 1 else {
+                continue
+            }
+            let sortedOnsets = Set(records.flatMap { $0.tickContextsByOnset.keys }).sorted()
+            var previousTargetAbsoluteX = -Double.greatestFiniteMagnitude
+            for onset in sortedOnsets {
+                guard let maxAbsoluteX = records.compactMap({ record -> Double? in
+                    guard let context = record.tickContextsByOnset[onset] else {
+                        return nil
+                    }
+                    return context.getX() + record.stave.getNoteStartX() + stavePadding
+                }).max() else {
+                    continue
+                }
+                let targetAbsoluteX = max(maxAbsoluteX, previousTargetAbsoluteX)
+                previousTargetAbsoluteX = targetAbsoluteX
+                for record in records {
+                    guard let context = record.tickContextsByOnset[onset] else {
+                        continue
+                    }
+                    let targetRelativeX = targetAbsoluteX - record.stave.getNoteStartX() - stavePadding
+                    _ = context.setX(targetRelativeX)
+                }
+            }
+        }
+
+        for deferredTempoMark in deferredTempoMarks {
+            let tempoPlan = deferredTempoMark.plan
+            guard let stave = stavesByLookupKey[
+                StaveLookupKey(
+                    systemIndex: tempoPlan.systemIndex,
+                    partIndex: tempoPlan.partIndex
+                )
+            ],
+            let anchorNote = allAnchorNotesByEntryKey[
+                NoteEntryKey(
+                    systemIndex: tempoPlan.systemIndex,
+                    partIndex: tempoPlan.partIndex,
+                    measureIndexInPart: tempoPlan.measureIndexInPart,
+                    voice: tempoPlan.voice,
+                    entryIndexInVoice: tempoPlan.entryIndexInVoice
+                )
+            ] else {
+                continue
+            }
+
+            let shiftBase = stave.getNoteStartX() - stave.getX()
+            let x = anchorNote.getAbsoluteX() - shiftBase
+            let tempoOptions = StaveTempoOptions(
+                bpm: tempoPlan.bpm,
+                duration: tempoPlan.duration,
+                dots: tempoPlan.dots
+            )
+            let tempoMark = StaveTempo(
+                tempo: tempoOptions,
+                x: x,
+                shiftY: -15
+            )
+            _ = tempoMark.setShiftX(0)
+            _ = stave.addModifier(tempoMark)
+            createdTempoMarks.append(tempoMark)
+        }
+
+        for deferredRoadmapRepetition in deferredRoadmapRepetitions {
+            let groupKey = deferredRoadmapRepetition.groupKey
+            let roadmapPlan = deferredRoadmapRepetition.plan
+            guard let stave = stavesByLookupKey[
+                StaveLookupKey(
+                    systemIndex: groupKey.systemIndex,
+                    partIndex: groupKey.partIndex
+                )
+            ] else {
+                continue
+            }
+
+            let shiftBase = stave.getNoteStartX() - stave.getX()
+            let x: Double
+            switch roadmapPlan.anchor {
+            case .leftEdge:
+                x = stave.getX() - shiftBase
+            case .rightEdge:
+                x = stave.getX()
+            case .entry(let voice, let entryIndexInVoice):
+                guard let anchorNote = allAnchorNotesByEntryKey[
+                    NoteEntryKey(
+                        systemIndex: roadmapPlan.systemIndex,
+                        partIndex: roadmapPlan.partIndex,
+                        measureIndexInPart: roadmapPlan.measureIndexInPart,
+                        voice: voice,
+                        entryIndexInVoice: entryIndexInVoice
+                    )
+                ] else {
+                    continue
+                }
+                x = anchorNote.getAbsoluteX() - shiftBase
+            }
+            let repetition = StaveRepetition(
+                type: roadmapRepetitionType(for: roadmapPlan.kind),
+                x: x,
+                yShift: 0
+            )
+            _ = stave.addModifier(repetition)
+            createdRoadmapRepetitions.append(repetition)
+        }
+
         let sortedSlurPlans = plan.slurs.sorted { lhs, rhs in
             if lhs.systemIndex != rhs.systemIndex {
                 return lhs.systemIndex < rhs.systemIndex
@@ -2894,6 +3542,61 @@ public struct VexFoundationRenderer: ScoreRenderer {
             }
             let slur = factory.Curve(from: startNote, to: endNote, options: options)
             createdSlurs.append(slur)
+        }
+
+        // Render glissando lines.
+        // Collect notes with glissando start markers and pair with stop markers.
+        struct GlissandoOpenKey: Hashable {
+            let partIndex: Int
+            let voice: Int
+            let number: Int
+        }
+        var glissandoStartNotes: [GlissandoOpenKey: (StaveNote, GlissandoMarker)] = [:]
+        for notePlan in plan.notes {
+            let entryKey = NoteEntryKey(
+                systemIndex: notePlan.systemIndex,
+                partIndex: notePlan.partIndex,
+                measureIndexInPart: notePlan.measureIndexInPart,
+                voice: notePlan.voice,
+                entryIndexInVoice: notePlan.entryIndexInVoice
+            )
+            guard let staveNote = allAnchorNotesByEntryKey[entryKey] as? StaveNote else {
+                continue
+            }
+            for gliss in notePlan.glissandos {
+                let key = GlissandoOpenKey(
+                    partIndex: notePlan.partIndex,
+                    voice: notePlan.voice,
+                    number: gliss.number
+                )
+                switch gliss.type {
+                case .start:
+                    glissandoStartNotes[key] = (staveNote, gliss)
+                case .stop:
+                    if let (startNote, startGliss) = glissandoStartNotes.removeValue(forKey: key) {
+                        let line = StaveLine(notes: StaveLineNotes(
+                            firstNote: startNote,
+                            lastNote: staveNote
+                        ))
+                        if let text = startGliss.text {
+                            _ = line.setText(text)
+                        }
+                        switch startGliss.lineType {
+                        case .wavy:
+                            line.lineRenderOptions.lineDash = [5, 5]
+                        case .dashed:
+                            line.lineRenderOptions.lineDash = [8, 4]
+                        case .dotted:
+                            line.lineRenderOptions.lineDash = [2, 3]
+                        case .solid:
+                            break
+                        }
+                        createdGlissandos.append(line)
+                    }
+                default:
+                    break
+                }
+            }
         }
 
         let sortedLyricConnectors = plan.lyricConnectors.sorted { lhs, rhs in
@@ -3087,6 +3790,31 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return connector
         }
 
+        // Extract per-note positions post-format (3.9).
+        var extractedNotePositions: [VexNotePosition] = []
+        for (entryKey, sourceInfo) in noteSourceInfoByEntryKey {
+            guard let note = allAnchorNotesByEntryKey[entryKey] as? StaveNote else { continue }
+            let x = note.getAbsoluteX()
+            let ys = note.getYs()
+            var bbox: MDKBoundingBox?
+            if let vexBBox = note.getBoundingBox() {
+                bbox = MDKBoundingBox(
+                    x: vexBBox.x,
+                    y: vexBBox.y,
+                    width: vexBBox.w,
+                    height: vexBBox.h
+                )
+            }
+            extractedNotePositions.append(VexNotePosition(
+                partIndex: sourceInfo.partIndex,
+                measureIndexInPart: sourceInfo.measureIndexInPart,
+                sourceOrder: sourceInfo.sourceOrder,
+                x: x,
+                ys: ys,
+                boundingBox: bbox
+            ))
+        }
+
         return VexFactoryExecution(
             factory: factory,
             staves: createdStaves,
@@ -3097,6 +3825,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
             tuplets: createdTuplets,
             ties: createdTies,
             slurs: createdSlurs,
+            glissandos: createdGlissandos,
             articulations: createdArticulations,
             fingerings: createdFingerings,
             stringNumbers: createdStringNumbers,
@@ -3111,8 +3840,34 @@ public struct VexFoundationRenderer: ScoreRenderer {
             lyricConnectors: createdLyricConnectors,
             measureBarlineConnectors: measureBarlineConnectors,
             partGroupConnectors: partGroupConnectors,
-            barlineConnectors: barlineConnectors
+            barlineConnectors: barlineConnectors,
+            notePositions: extractedNotePositions
         )
+    }
+
+    /// Converts extracted note positions to `NotePositionKey`/`NotePositionData` pairs
+    /// suitable for the `ScoreCalculator`.
+    public func notePositionMap(from execution: VexFactoryExecution) -> [NotePositionKey: NotePositionData] {
+        var result: [NotePositionKey: NotePositionData] = [:]
+        for pos in execution.notePositions {
+            let key = NotePositionKey(
+                partIndex: pos.partIndex,
+                measureIndex: pos.measureIndexInPart,
+                noteIndex: pos.sourceOrder
+            )
+            let firstY = pos.ys.first ?? 0
+            let data = NotePositionData(
+                position: MDKPoint(x: pos.x, y: firstY),
+                boundingBox: pos.boundingBox ?? MDKBoundingBox(
+                    x: pos.x - 5,
+                    y: firstY - 10,
+                    width: 10,
+                    height: 20
+                )
+            )
+            result[key] = data
+        }
+        return result
     }
 
     public func render(_ score: LaidOutScore, target: RenderTarget) throws {
@@ -3170,6 +3925,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
         let clefAnnotation: String?
         let keySignature: String?
         let timeSignature: String?
+        let multipleRestCount: Int?
         let beginBarline: VexStaveBarlineKind?
         let endBarline: VexStaveBarlineKind?
     }
@@ -3219,6 +3975,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 clefAnnotation: nil,
                 keySignature: nil,
                 timeSignature: nil,
+                multipleRestCount: nil,
                 beginBarline: nil,
                 endBarline: nil
             )
@@ -3235,6 +3992,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 clefAnnotation: nil,
                 keySignature: nil,
                 timeSignature: nil,
+                multipleRestCount: nil,
                 beginBarline: nil,
                 endBarline: nil
             )
@@ -3249,20 +4007,27 @@ public struct VexFoundationRenderer: ScoreRenderer {
         let clefAnnotation = effectiveAttributes.clef.flatMap(vexClefAnnotation(for:))?.rawValue
         let keySignature = effectiveAttributes.key.flatMap(vexKeySignature(for:))
         let timeSignature = effectiveAttributes.time.flatMap(vexTimeSignature(for:))
-        let beginBarline = (laidOutMeasure.measureIndexInPart >= 0
+        let firstSourceMeasure = (laidOutMeasure.measureIndexInPart >= 0
             && laidOutMeasure.measureIndexInPart < part.measures.count)
-            ? beginBarlineKind(for: part.measures[laidOutMeasure.measureIndexInPart].repetitionInstructions)
+            ? part.measures[laidOutMeasure.measureIndexInPart]
             : nil
-        let endBarline = (lastLaidOutMeasure.measureIndexInPart >= 0
+        let lastSourceMeasure = (lastLaidOutMeasure.measureIndexInPart >= 0
             && lastLaidOutMeasure.measureIndexInPart < part.measures.count)
-            ? endBarlineKind(for: part.measures[lastLaidOutMeasure.measureIndexInPart].repetitionInstructions)
+            ? part.measures[lastLaidOutMeasure.measureIndexInPart]
             : nil
+        let beginBarline = firstSourceMeasure.flatMap { beginBarlineKind(for: $0.repetitionInstructions) }
+        let endBarline = lastSourceMeasure.flatMap { endBarlineKind(for: $0.repetitionInstructions) }
+        let displayMeasureNumber: Int? = (firstSourceMeasure?.implicit == true)
+            ? nil
+            : laidOutMeasure.measureNumber
+        let multipleRestCount = firstSourceMeasure?.attributes?.multipleRestCount
         return InitialStaveState(
-            measureNumber: laidOutMeasure.measureNumber,
+            measureNumber: displayMeasureNumber,
             clefName: clefName?.rawValue,
             clefAnnotation: clefAnnotation,
             keySignature: keySignature,
             timeSignature: timeSignature,
+            multipleRestCount: multipleRestCount,
             beginBarline: beginBarline,
             endBarline: endBarline
         )
@@ -3927,6 +4692,39 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         voice: voice,
                         entryIndexInVoice: entryIndex,
                         articulationCode: articulationCode,
+                        position: position,
+                        sourceOrder: sourceOrder
+                    )
+                )
+                sourceOrder += 1
+            }
+            for fermata in note.fermatas {
+                let code: String
+                let position: VexArticulationPositionPlan?
+                if fermata.placement == "below" || fermata.placement == "inverted" {
+                    code = "a@u"
+                    position = .below
+                } else {
+                    code = "a@a"
+                    position = .above
+                }
+                let key = PlanKey(
+                    entryIndexInVoice: entryIndex,
+                    articulationCode: code,
+                    position: position
+                )
+                if seen.contains(key) {
+                    continue
+                }
+                seen.insert(key)
+                plans.append(
+                    VexArticulationPlan(
+                        systemIndex: systemIndex,
+                        partIndex: partIndex,
+                        measureIndexInPart: measureIndexInPart,
+                        voice: voice,
+                        entryIndexInVoice: entryIndex,
+                        articulationCode: code,
                         position: position,
                         sourceOrder: sourceOrder
                     )
@@ -5447,6 +6245,18 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return "a,"
         case .caesura:
             return "a,"
+        case .upBow:
+            return "a|"
+        case .downBow:
+            return "am"
+        case .harmonicTechnical:
+            return "ah"
+        case .openString:
+            return "ah"
+        case .snapPizzicato:
+            return "ao"
+        case .stopped:
+            return "a+"
         case .scoop, .plop, .doit, .falloff:
             return nil
         case .unknown(let raw):
@@ -6313,7 +7123,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return nil
         }
         let accidentalToken: String
-        switch pitch.alter {
+        let roundedAlter = Int(pitch.alter.rounded())
+        switch roundedAlter {
         case let alter where alter > 0:
             accidentalToken = String(repeating: "#", count: min(2, alter))
         case let alter where alter < 0:
@@ -6437,12 +7248,15 @@ public struct VexFoundationRenderer: ScoreRenderer {
         from notePlan: VexNotePlan,
         factory: Factory,
         stave: Stave,
+        clefName: ClefName? = nil,
         stemDirection: StemDirection? = nil
     ) -> StaveNote? {
         let duration = noteDurationSpec(
             durationDivisions: notePlan.durationDivisions,
             divisions: notePlan.divisions,
-            isRest: notePlan.isRest
+            isRest: notePlan.isRest,
+            noteType: notePlan.noteType,
+            dotCount: notePlan.dotCount
         )
         let keys: [StaffKeySpec] = notePlan.keyTokens.compactMap { token in
             try? StaffKeySpec(parsing: token)
@@ -6451,10 +7265,23 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return nil
         }
 
+        let resolvedNoteType: NoteType?
+        if let noteheadType = notePlan.noteheadType {
+            resolvedNoteType = vexNoteType(for: noteheadType)
+        } else {
+            resolvedNoteType = nil
+        }
+
+        let cueScale: Double? = notePlan.isCue
+            ? (Tables.NOTATION_FONT_SCALE / 5.0) * 3.0
+            : nil
         let note = factory.StaveNote(
             StaveNoteStruct(
                 keys: nonEmptyKeys,
-                duration: duration
+                duration: duration,
+                type: resolvedNoteType,
+                glyphFontScale: cueScale,
+                clef: clefName
             )
         )
         if let stemDirection {
@@ -6474,7 +7301,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
         let duration = noteDurationSpec(
             durationDivisions: notePlan.durationDivisions,
             divisions: notePlan.divisions,
-            isRest: notePlan.isRest
+            isRest: notePlan.isRest,
+            noteType: notePlan.noteType,
+            dotCount: notePlan.dotCount
         )
         let positions: [TabNotePosition] = tabPositions.compactMap { positionPlan in
             let stringToken = positionPlan.stringNumber.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -6509,8 +7338,19 @@ public struct VexFoundationRenderer: ScoreRenderer {
     private func noteDurationSpec(
         durationDivisions: Int,
         divisions: Int,
-        isRest: Bool
+        isRest: Bool,
+        noteType: NoteTypeValue? = nil,
+        dotCount: Int = 0
     ) -> NoteDurationSpec {
+        // Prefer explicit note type from MusicXML <type> element when available.
+        if let noteType, let vexValue = vexNoteValue(for: noteType) {
+            return NoteDurationSpec(
+                uncheckedValue: vexValue,
+                dots: dotCount,
+                type: isRest ? .rest : .note
+            )
+        }
+
         guard durationDivisions > 0, divisions > 0 else {
             return NoteDurationSpec(
                 uncheckedValue: .quarter,
@@ -6538,6 +7378,114 @@ public struct VexFoundationRenderer: ScoreRenderer {
             dots: best.dots,
             type: isRest ? .rest : .note
         )
+    }
+
+    private func vexNoteValue(for noteType: NoteTypeValue) -> NoteValue? {
+        switch noteType {
+        case .breve, .maxima, .long:
+            return .doubleWhole
+        case .whole:
+            return .whole
+        case .half:
+            return .half
+        case .quarter:
+            return .quarter
+        case .eighth:
+            return .eighth
+        case .sixteenth:
+            return .sixteenth
+        case .thirtySecond:
+            return .thirtySecond
+        case .sixtyFourth:
+            return .sixtyFourth
+        case .oneHundredTwentyEighth:
+            return .oneTwentyEighth
+        case .twoHundredFiftySixth:
+            return .twoFiftySixth
+        case .fiveHundredTwelfth, .oneThousandTwentyFourth:
+            return nil
+        }
+    }
+
+    private func vexNoteType(for notehead: NoteheadType) -> NoteType? {
+        switch notehead {
+        case .normal:
+            return nil
+        case .diamond:
+            return .diamond
+        case .x, .cross:
+            return .x
+        case .triangleUp:
+            return .triangleUp
+        case .triangleDown:
+            return .triangleDown
+        case .slash:
+            return .slash
+        case .square:
+            return .square
+        case .circleX:
+            return .circleX
+        case .backSlashed:
+            return .slashedBackward
+        case .slashed:
+            return .slashed
+        case .none:
+            return .ghost
+        case .doNotation, .re, .mi, .fa, .faUp, .so, .la, .ti:
+            return nil
+        }
+    }
+
+    private func vexOrnamentType(for kind: OrnamentKind) -> String? {
+        switch kind {
+        case .trillMark:
+            return "tr"
+        case .mordent:
+            return "mordent"
+        case .invertedMordent:
+            return "mordent_inverted"
+        case .turn:
+            return "turn"
+        case .invertedTurn:
+            return "turn_inverted"
+        case .delayedTurn:
+            return "turn"
+        case .delayedInvertedTurn:
+            return "turn_inverted"
+        case .shake:
+            return "prallprall"
+        case .wavyLine:
+            return "tr"
+        }
+    }
+
+    private func vexAccidentalType(for accidental: AccidentalValue) -> AccidentalType? {
+        switch accidental {
+        case .sharp:
+            return .sharp
+        case .flat:
+            return .flat
+        case .natural:
+            return .natural
+        case .doubleSharp, .sharpSharp:
+            return .doubleSharp
+        case .doubleFlat, .flatFlat:
+            return .doubleFlat
+        case .naturalSharp:
+            return .sharp
+        case .naturalFlat:
+            return .flat
+        case .quarterFlat:
+            return .quarterFlat
+        case .quarterSharp:
+            return .quarterSharp
+        case .threeQuartersFlat:
+            return .threeQuarterFlat
+        case .threeQuartersSharp:
+            return .threeQuarterSharp
+        case .unknown:
+            return nil
+        }
     }
 
     private func durationWholeValue(for value: NoteValue, dots: Int) -> Double {

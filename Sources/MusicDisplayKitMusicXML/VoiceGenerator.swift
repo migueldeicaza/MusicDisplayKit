@@ -7,6 +7,9 @@ public struct VoiceGeneratedEntry: Equatable, Sendable {
     public var noteIndices: [Int]
     public var durationDivisions: Int?
     public var isGrace: Bool
+    /// When non-nil, indicates this entry should be rendered on a different
+    /// staff (cross-staff notation). The value is the target staff number (1-based).
+    public var crossStaffTarget: Int?
 
     public init(
         voice: Int,
@@ -14,7 +17,8 @@ public struct VoiceGeneratedEntry: Equatable, Sendable {
         onsetDivisions: Int,
         noteIndices: [Int],
         durationDivisions: Int?,
-        isGrace: Bool
+        isGrace: Bool,
+        crossStaffTarget: Int? = nil
     ) {
         self.voice = voice
         self.staff = staff
@@ -22,6 +26,7 @@ public struct VoiceGeneratedEntry: Equatable, Sendable {
         self.noteIndices = noteIndices
         self.durationDivisions = durationDivisions
         self.isGrace = isGrace
+        self.crossStaffTarget = crossStaffTarget
     }
 }
 
@@ -209,13 +214,28 @@ public struct VoiceGenerator: Sendable {
                         let durations = entryNoteIndices.compactMap { noteEvents[$0].durationDivisions }
                         let duration = durations.max()
                         let isGrace = entryNoteIndices.allSatisfy { noteEvents[$0].isGrace }
+
+                        // Detect cross-staff notes: if any note in this entry
+                        // has a staff attribute that differs from the voice's
+                        // primary staff, mark it as cross-staff.
+                        let crossStaffTarget: Int? = {
+                            for idx in entryNoteIndices {
+                                if let noteStaff = noteEvents[idx].staff,
+                                   noteStaff != (key.staff ?? noteStaff) {
+                                    return noteStaff
+                                }
+                            }
+                            return nil
+                        }()
+
                         let entry = VoiceGeneratedEntry(
                             voice: key.voice,
                             staff: key.staff,
                             onsetDivisions: onset,
                             noteIndices: entryNoteIndices,
                             durationDivisions: duration,
-                            isGrace: isGrace
+                            isGrace: isGrace,
+                            crossStaffTarget: crossStaffTarget
                         )
                         let entryIndex = entries.count
                         entries.append(entry)

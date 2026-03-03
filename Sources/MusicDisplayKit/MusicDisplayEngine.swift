@@ -22,6 +22,12 @@ public final class MusicDisplayEngine {
 
     private var loadedScore: Score?
 
+    /// Cursor for navigating through the loaded score.
+    public var cursor: ScoreCursor = ScoreCursor()
+
+    /// The graphical model populated after rendering (available for hit testing and cursor).
+    public private(set) var graphicalScore: GraphicalScore?
+
     public init(
         parser: ScoreParser = MusicXMLParser(),
         loaderOptions: MusicXMLLoaderOptions = MusicXMLLoaderOptions(),
@@ -70,6 +76,33 @@ public final class MusicDisplayEngine {
         try renderer.render(laidOut, target: target)
     }
 
+    /// Renders the score to an SVG string.
+    public func renderSVG(options: LayoutOptions = LayoutOptions()) throws -> String {
+        guard let loadedScore else {
+            throw MusicDisplayEngineError.noScoreLoaded
+        }
+        guard let vexRenderer = renderer as? VexFoundationRenderer else {
+            throw MusicDisplayEngineError.rendererDoesNotSupportImageExport
+        }
+        let laidOut = try layoutEngine.layout(score: loadedScore, options: options)
+        return try vexRenderer.renderSVG(laidOut)
+    }
+
+    /// Renders the score and builds the graphical model for hit testing / cursor.
+    public func renderWithGraphicalModel(
+        target: RenderTarget,
+        options: LayoutOptions = LayoutOptions()
+    ) throws {
+        guard let loadedScore else {
+            throw MusicDisplayEngineError.noScoreLoaded
+        }
+        let laidOut = try layoutEngine.layout(score: loadedScore, options: options)
+        try renderer.render(laidOut, target: target)
+
+        let calculator = ScoreCalculator()
+        graphicalScore = calculator.populateGraphicalModel(score: loadedScore, laidOutScore: laidOut)
+    }
+
     #if canImport(SwiftUI)
     @available(iOS 17.0, macOS 14.0, *)
     @MainActor
@@ -86,6 +119,20 @@ public final class MusicDisplayEngine {
         }
         let laidOut = try layoutEngine.layout(score: loadedScore, options: options)
         return try imageRenderer.renderPNGData(from: laidOut, target: target, scale: scale)
+    }
+    #endif
+
+    #if canImport(CoreGraphics)
+    /// Renders the score to PDF data using CoreGraphics.
+    public func renderPDF(options: LayoutOptions = LayoutOptions()) throws -> Data {
+        guard let loadedScore else {
+            throw MusicDisplayEngineError.noScoreLoaded
+        }
+        guard let vexRenderer = renderer as? VexFoundationRenderer else {
+            throw MusicDisplayEngineError.rendererDoesNotSupportImageExport
+        }
+        let laidOut = try layoutEngine.layout(score: loadedScore, options: options)
+        return try VexPDFRenderer.renderPDF(score: laidOut, renderer: vexRenderer)
     }
     #endif
 }

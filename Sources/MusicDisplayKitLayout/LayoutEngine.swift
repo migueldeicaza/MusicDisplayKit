@@ -1,3 +1,4 @@
+import Foundation
 import MusicDisplayKitCore
 import MusicDisplayKitModel
 
@@ -24,6 +25,23 @@ public struct LayoutOptions: Sendable {
     public var partGroupBracketHookLength: Double
     public var partGroupSquareCornerRadius: Double
 
+    /// When non-nil, only the parts at these indices are rendered.
+    /// All other parts are hidden from layout and rendering.
+    public var visiblePartIndices: IndexSet?
+
+    /// When non-nil, only measures in this range are rendered.
+    /// Measure indices are 0-based and refer to position in the part's measure array.
+    public var measureRange: Range<Int>?
+
+    /// Zoom scale factor (1.0 = 100%). Applies uniformly to the entire output.
+    public var zoom: Double
+
+    /// When true, uses VexFoundation's automatic beaming instead of MusicXML beam markers.
+    public var autoBeam: Bool
+
+    /// Engraving rules controlling spacing, collision avoidance, and visibility.
+    public var engravingRules: EngravingRules
+
     public init(
         pageWidth: Double = 1200,
         pageHeight: Double? = nil,
@@ -45,7 +63,12 @@ public struct LayoutOptions: Sendable {
         partGroupStrokeWidth: Double = 1.4,
         partGroupBraceStrokeWidth: Double = 1.8,
         partGroupBracketHookLength: Double = 8,
-        partGroupSquareCornerRadius: Double = 1.5
+        partGroupSquareCornerRadius: Double = 1.5,
+        visiblePartIndices: IndexSet? = nil,
+        measureRange: Range<Int>? = nil,
+        zoom: Double = 1.0,
+        autoBeam: Bool = false,
+        engravingRules: EngravingRules = .default
     ) {
         self.pageWidth = pageWidth
         self.pageHeight = pageHeight
@@ -68,6 +91,62 @@ public struct LayoutOptions: Sendable {
         self.partGroupBraceStrokeWidth = partGroupBraceStrokeWidth
         self.partGroupBracketHookLength = partGroupBracketHookLength
         self.partGroupSquareCornerRadius = partGroupSquareCornerRadius
+        self.visiblePartIndices = visiblePartIndices
+        self.measureRange = measureRange
+        self.zoom = zoom
+        self.autoBeam = autoBeam
+        self.engravingRules = engravingRules
+    }
+
+    /// Returns a copy of these options with values overridden by MusicXML `<defaults>`.
+    public func applying(defaults: ScoreDefaults) -> LayoutOptions {
+        var options = self
+        let convert: (Double) -> Double? = defaults.tenthsToPixels
+        if let pageWidth = defaults.pageWidth.flatMap(convert) {
+            options.pageWidth = pageWidth
+        }
+        if let pageHeight = defaults.pageHeight.flatMap(convert) {
+            options.pageHeight = pageHeight
+        }
+        if let margin = defaults.pageMarginLeft.flatMap(convert) {
+            options.pageMargin = margin
+        }
+        if let systemDistance = defaults.systemDistance.flatMap(convert) {
+            options.systemSpacing = systemDistance
+        }
+        if let staffDistance = defaults.staffDistance.flatMap(convert) {
+            options.partSpacing = staffDistance
+        }
+        return options
+    }
+
+    /// Default layout preset — balanced spacing for general-purpose rendering.
+    public static var `default`: LayoutOptions { LayoutOptions() }
+
+    /// Compact preset — tighter spacing for dense scores or smaller displays.
+    public static var compact: LayoutOptions {
+        LayoutOptions(
+            systemSpacing: 16,
+            partSpacing: 32,
+            staffHeight: 60,
+            measureGap: 8,
+            measureMinWidth: 56,
+            durationWidthScale: 32,
+            partGroupGap: 4
+        )
+    }
+
+    /// Leadsheet preset — generous spacing for lead sheets and simple arrangements.
+    public static var leadsheet: LayoutOptions {
+        LayoutOptions(
+            pageWidth: 1200,
+            systemSpacing: 40,
+            partSpacing: 56,
+            staffHeight: 80,
+            measureGap: 16,
+            measureMinWidth: 96,
+            durationWidthScale: 52
+        )
     }
 }
 
@@ -75,6 +154,7 @@ public struct LaidOutScore: Sendable {
     public let score: Score
     public let pageWidth: Double
     public let pageHeight: Double?
+    public let autoBeam: Bool
     public let systems: [LaidOutSystem]
     public let measures: [LaidOutMeasure]
     public let partGroups: [LaidOutPartGroup]
@@ -84,6 +164,7 @@ public struct LaidOutScore: Sendable {
         score: Score,
         pageWidth: Double,
         pageHeight: Double?,
+        autoBeam: Bool = false,
         systems: [LaidOutSystem],
         measures: [LaidOutMeasure],
         partGroups: [LaidOutPartGroup],
@@ -92,6 +173,7 @@ public struct LaidOutScore: Sendable {
         self.score = score
         self.pageWidth = pageWidth
         self.pageHeight = pageHeight
+        self.autoBeam = autoBeam
         self.systems = systems
         self.measures = measures
         self.partGroups = partGroups
@@ -278,11 +360,25 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
     public init() {}
 
     public func layout(score: Score, options: LayoutOptions) throws -> LaidOutScore {
-        guard !score.parts.isEmpty else {
+        let options = score.defaults.map { options.applying(defaults: $0) } ?? options
+        let zoom = max(0.1, options.zoom)
+
+        // Determine which part indices are visible.
+        let visibleParts: [(index: Int, part: Part)]
+        if let visibleIndices = options.visiblePartIndices {
+            visibleParts = score.parts.enumerated().compactMap { index, part in
+                visibleIndices.contains(index) ? (index, part) : nil
+            }
+        } else {
+            visibleParts = score.parts.enumerated().map { ($0, $1) }
+        }
+
+        guard !visibleParts.isEmpty else {
             return LaidOutScore(
                 score: score,
-                pageWidth: options.pageWidth,
-                pageHeight: options.pageHeight,
+                pageWidth: options.pageWidth * zoom,
+                pageHeight: options.pageHeight.map { $0 * zoom },
+                autoBeam: options.autoBeam,
                 systems: [],
                 measures: [],
                 partGroups: [],
@@ -290,18 +386,26 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
             )
         }
 
-        let usableWidth = max(1, options.pageWidth - (options.pageMargin * 2))
-        let maxSystemBottom = options.pageHeight.map { $0 - options.pageMargin }
+        let usableWidth = max(1, (options.pageWidth - (options.pageMargin * 2)) * zoom)
+        let maxSystemBottom = options.pageHeight.map { ($0 - options.pageMargin) * zoom }
 
-        let partMeasureWidths: [[Double]] = score.parts.map { part in
-            measuredWidths(for: part, usableWidth: usableWidth, options: options)
+        let partMeasureWidths: [[Double]] = visibleParts.map { _, part in
+            measuredWidths(for: part, usableWidth: usableWidth, options: options, zoom: zoom)
         }
-        let maxMeasureCount = partMeasureWidths.map(\.count).max() ?? 0
-        guard maxMeasureCount > 0 else {
+        let maxMeasureCount: Int
+        let fullMaxMeasureCount = partMeasureWidths.map(\.count).max() ?? 0
+        if let measureRange = options.measureRange {
+            maxMeasureCount = min(fullMaxMeasureCount, measureRange.upperBound)
+        } else {
+            maxMeasureCount = fullMaxMeasureCount
+        }
+        let measureStart = options.measureRange?.lowerBound ?? 0
+        guard maxMeasureCount > measureStart else {
             return LaidOutScore(
                 score: score,
-                pageWidth: options.pageWidth,
-                pageHeight: options.pageHeight,
+                pageWidth: options.pageWidth * zoom,
+                pageHeight: options.pageHeight.map { $0 * zoom },
+                autoBeam: options.autoBeam,
                 systems: [],
                 measures: [],
                 partGroups: [],
@@ -309,73 +413,114 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
             )
         }
 
-        let columnWidths: [Double] = (0..<maxMeasureCount).map { measureIndex in
+        let scaledMinWidth = options.measureMinWidth * zoom
+        let columnWidths: [Double] = (measureStart..<maxMeasureCount).map { measureIndex in
             let intrinsic = partMeasureWidths.compactMap { widths in
                 measureIndex < widths.count ? widths[measureIndex] : nil
-            }.max() ?? options.measureMinWidth
-            return max(options.measureMinWidth, intrinsic)
+            }.max() ?? scaledMinWidth
+            return max(scaledMinWidth, intrinsic)
         }
+        // Collect system/page break hints from the first visible part's measures.
+        let firstVisiblePart = visibleParts[0].part
+        let breakHints: [Bool] = (measureStart..<maxMeasureCount).map { measureIndex in
+            guard measureIndex < firstVisiblePart.measures.count else { return false }
+            return firstVisiblePart.measures[measureIndex].newSystem
+                || firstVisiblePart.measures[measureIndex].newPage
+        }
+
         let columnRanges = buildColumnRanges(
             columnWidths: columnWidths,
             usableWidth: usableWidth,
-            measureGap: options.measureGap
+            measureGap: options.measureGap * zoom,
+            breakHints: breakHints
         )
 
-        let rowHeight = (Double(score.parts.count) * options.staffHeight)
-            + (Double(max(0, score.parts.count - 1)) * options.partSpacing)
+        // Pass 2 (3.8): Proportional spacing — redistribute column widths
+        // within each system so measures expand to fill the usable width.
+        // Only active when noteSpacingMultiplier != 1.0 (opt-in).
+        var adjustedColumnWidths = columnWidths
+        let spacingMultiplier = options.engravingRules.noteSpacingMultiplier
+        if spacingMultiplier != 1.0 {
+            for columnRange in columnRanges {
+                let scaledGap = options.measureGap * zoom
+                let measuresInSystem = columnRange.count
+                let totalGap = scaledGap * Double(max(0, measuresInSystem - 1))
+                let naturalWidth = columnRange.reduce(0.0) { $0 + adjustedColumnWidths[$1] }
+                let availableForContent = usableWidth - totalGap
+                guard naturalWidth > 0, availableForContent > 0 else { continue }
+                let scale = (availableForContent / naturalWidth) * spacingMultiplier
+                for col in columnRange {
+                    adjustedColumnWidths[col] = adjustedColumnWidths[col] * scale
+                }
+            }
+        }
+
+        let scaledStaffHeight = options.staffHeight * zoom
+        let scaledPartSpacing = options.partSpacing * zoom
+        let scaledPageMargin = options.pageMargin * zoom
+        let scaledSystemSpacing = options.systemSpacing * zoom
+        let rowHeight = (Double(visibleParts.count) * scaledStaffHeight)
+            + (Double(max(0, visibleParts.count - 1)) * scaledPartSpacing)
 
         var systems: [LaidOutSystem] = []
         var measures: [LaidOutMeasure] = []
         var laidOutPartGroups: [LaidOutPartGroup] = []
         var barlineConnectors: [LaidOutBarlineConnector] = []
         var pageIndex = 0
-        var rowTopY = options.pageMargin
+        var rowTopY = scaledPageMargin
         let resolvedPartGroups = resolvePartGroups(score: score)
 
         for columnRange in columnRanges {
+            // Force page break from MusicXML <print new-page="yes">.
+            let firstMeasureInRange = columnRange.lowerBound + measureStart
+            let hasPageBreakHint = firstMeasureInRange < firstVisiblePart.measures.count
+                && firstVisiblePart.measures[firstMeasureInRange].newPage
             if let maxSystemBottom,
-               rowTopY > options.pageMargin,
-               rowTopY + rowHeight > maxSystemBottom {
+               rowTopY > scaledPageMargin,
+               (hasPageBreakHint || rowTopY + rowHeight > maxSystemBottom) {
                 pageIndex += 1
-                rowTopY = options.pageMargin
+                rowTopY = scaledPageMargin
             }
 
             var columnX: [Double] = []
-            var currentX = options.pageMargin
+            var currentX = scaledPageMargin
             for column in columnRange {
                 columnX.append(currentX)
-                currentX += columnWidths[column] + options.measureGap
+                currentX += adjustedColumnWidths[column] + options.measureGap * zoom
             }
 
-            var rowSystemIndices: [Int] = []
-            for (partIndex, part) in score.parts.enumerated() {
+            var rowSystemIndicesByPartIndex: [Int: Int] = [:]
+            for (visibleIndex, visibleEntry) in visibleParts.enumerated() {
+                let partIndex = visibleEntry.index
+                let part = visibleEntry.part
                 let systemIndex = systems.count
-                rowSystemIndices.append(systemIndex)
-                let systemY = rowTopY + (Double(partIndex) * (options.staffHeight + options.partSpacing))
+                rowSystemIndicesByPartIndex[partIndex] = systemIndex
+                let systemY = rowTopY + (Double(visibleIndex) * (scaledStaffHeight + scaledPartSpacing))
                 let systemFrame = LayoutRect(
-                    x: options.pageMargin,
+                    x: scaledPageMargin,
                     y: systemY,
                     width: usableWidth,
-                    height: options.staffHeight
+                    height: scaledStaffHeight
                 )
 
                 var systemMeasureIndices: [Int] = []
                 for (offset, column) in columnRange.enumerated() {
-                    guard column < part.measures.count else {
+                    let sourceMeasureIndex = column + measureStart
+                    guard sourceMeasureIndex < part.measures.count else {
                         continue
                     }
 
-                    let measure = part.measures[column]
+                    let measure = part.measures[sourceMeasureIndex]
                     let frame = LayoutRect(
                         x: columnX[offset],
                         y: systemY,
-                        width: columnWidths[column],
-                        height: options.staffHeight
+                        width: adjustedColumnWidths[column],
+                        height: scaledStaffHeight
                     )
                     let laidOutMeasure = LaidOutMeasure(
                         index: measures.count,
                         partIndex: partIndex,
-                        measureIndexInPart: column,
+                        measureIndexInPart: sourceMeasureIndex,
                         measureNumber: measure.number,
                         systemIndex: systemIndex,
                         pageIndex: pageIndex,
@@ -396,24 +541,40 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
                 )
             }
 
+            // Use zoomed options for part group geometry.
+            var zoomedOptions = options
+            zoomedOptions.pageMargin = scaledPageMargin
+            zoomedOptions.staffHeight = scaledStaffHeight
+            zoomedOptions.partSpacing = scaledPartSpacing
+            zoomedOptions.partGroupGap *= zoom
+            zoomedOptions.partGroupWidth *= zoom
+            zoomedOptions.partGroupBraceWidth *= zoom
+            zoomedOptions.partGroupBracketWidth *= zoom
+            zoomedOptions.partGroupLineWidth *= zoom
+            zoomedOptions.partGroupSquareWidth *= zoom
+            zoomedOptions.partGroupNestingOffset *= zoom
+            zoomedOptions.partGroupStrokeWidth *= zoom
+            zoomedOptions.partGroupBraceStrokeWidth *= zoom
+            zoomedOptions.partGroupBracketHookLength *= zoom
             let rowGroups = buildLaidOutPartGroupsForRow(
                 resolvedGroups: resolvedPartGroups,
-                rowSystemIndices: rowSystemIndices,
+                rowSystemIndicesByPartIndex: rowSystemIndicesByPartIndex,
                 systems: systems,
                 measures: measures,
-                options: options,
+                options: zoomedOptions,
                 pageIndex: pageIndex
             )
             laidOutPartGroups.append(contentsOf: rowGroups.groups)
             barlineConnectors.append(contentsOf: rowGroups.connectors)
 
-            rowTopY += rowHeight + options.systemSpacing
+            rowTopY += rowHeight + scaledSystemSpacing
         }
 
         return LaidOutScore(
             score: score,
-            pageWidth: options.pageWidth,
-            pageHeight: options.pageHeight,
+            pageWidth: options.pageWidth * zoom,
+            pageHeight: options.pageHeight.map { $0 * zoom },
+            autoBeam: options.autoBeam,
             systems: systems,
             measures: measures,
             partGroups: laidOutPartGroups,
@@ -432,7 +593,8 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
     private func measuredWidths(
         for part: Part,
         usableWidth: Double,
-        options: LayoutOptions
+        options: LayoutOptions,
+        zoom: Double = 1.0
     ) -> [Double] {
         var widths: [Double] = []
         var effectiveDivisions: Int?
@@ -453,7 +615,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
                     effectiveDivisions: effectiveDivisions,
                     effectiveTime: effectiveTime,
                     options: options
-                )
+                ) * zoom
             )
             widths.append(width)
         }
@@ -544,7 +706,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
 
     private func buildLaidOutPartGroupsForRow(
         resolvedGroups: [ResolvedPartGroup],
-        rowSystemIndices: [Int],
+        rowSystemIndicesByPartIndex: [Int: Int],
         systems: [LaidOutSystem],
         measures: [LaidOutMeasure],
         options: LayoutOptions,
@@ -575,13 +737,10 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
         }
 
         for (renderOrder, resolved) in orderedGroups.enumerated() {
-            guard resolved.startPartIndex < rowSystemIndices.count,
-                  resolved.endPartIndex < rowSystemIndices.count else {
+            guard let startSystemIndex = rowSystemIndicesByPartIndex[resolved.startPartIndex],
+                  let endSystemIndex = rowSystemIndicesByPartIndex[resolved.endPartIndex] else {
                 continue
             }
-
-            let startSystemIndex = rowSystemIndices[resolved.startPartIndex]
-            let endSystemIndex = rowSystemIndices[resolved.endPartIndex]
             let startFrame = systems[startSystemIndex].frame
             let endFrame = systems[endSystemIndex].frame
             let groupWidth = partGroupWidth(for: resolved.group.symbol, options: options)
@@ -619,7 +778,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
 
             if resolved.group.barline == true {
                 if let leftX = rowMeasureBoundaryX(
-                    rowSystemIndices: rowSystemIndices,
+                    rowSystemIndicesByPartIndex: rowSystemIndicesByPartIndex,
                     partStartIndex: resolved.startPartIndex,
                     partEndIndex: resolved.endPartIndex,
                     systems: systems,
@@ -646,7 +805,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
                 }
 
                 if let rightX = rowMeasureBoundaryX(
-                    rowSystemIndices: rowSystemIndices,
+                    rowSystemIndicesByPartIndex: rowSystemIndicesByPartIndex,
                     partStartIndex: resolved.startPartIndex,
                     partEndIndex: resolved.endPartIndex,
                     systems: systems,
@@ -743,7 +902,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
     }
 
     private func rowMeasureBoundaryX(
-        rowSystemIndices: [Int],
+        rowSystemIndicesByPartIndex: [Int: Int],
         partStartIndex: Int,
         partEndIndex: Int,
         systems: [LaidOutSystem],
@@ -752,7 +911,9 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
     ) -> Double? {
         var values: [Double] = []
         for partIndex in partStartIndex...partEndIndex {
-            let systemIndex = rowSystemIndices[partIndex]
+            guard let systemIndex = rowSystemIndicesByPartIndex[partIndex] else {
+                continue
+            }
             let system = systems[systemIndex]
             for measureIndex in system.measureIndices {
                 let frame = measures[measureIndex].frame
@@ -765,7 +926,8 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
     private func buildColumnRanges(
         columnWidths: [Double],
         usableWidth: Double,
-        measureGap: Double
+        measureGap: Double,
+        breakHints: [Bool] = []
     ) -> [Range<Int>] {
         guard !columnWidths.isEmpty else {
             return []
@@ -776,13 +938,15 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
         var accumulatedWidth = columnWidths[0]
 
         for index in 1..<columnWidths.count {
+            // Force a system break if MusicXML has new-system or new-page hint.
+            let forceBreak = index < breakHints.count && breakHints[index]
             let proposedWidth = accumulatedWidth + measureGap + columnWidths[index]
-            if proposedWidth <= usableWidth {
-                accumulatedWidth = proposedWidth
-            } else {
+            if forceBreak || proposedWidth > usableWidth {
                 ranges.append(rangeStart..<index)
                 rangeStart = index
                 accumulatedWidth = columnWidths[index]
+            } else {
+                accumulatedWidth = proposedWidth
             }
         }
 

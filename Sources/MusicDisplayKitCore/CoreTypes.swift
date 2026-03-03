@@ -56,10 +56,10 @@ public struct MDKFraction: Equatable, Hashable, Sendable {
 }
 
 public struct MDKPoint: Equatable, Hashable, Sendable {
-    public let x: Double
-    public let y: Double
+    public var x: Double
+    public var y: Double
 
-    public init(x: Double, y: Double) {
+    public init(x: Double = 0, y: Double = 0) {
         self.x = x
         self.y = y
     }
