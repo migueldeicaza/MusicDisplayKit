@@ -489,12 +489,13 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
                 currentX += adjustedColumnWidths[column] + options.measureGap * zoom
             }
 
-            var rowSystemIndicesByPartIndex: [Int: Int] = [:]
+            let rowSystemIndex = (systems.last?.systemIndex ?? -1) + 1
+            var rowSystemArrayIndicesByPartIndex: [Int: Int] = [:]
             for (visibleIndex, visibleEntry) in visibleParts.enumerated() {
                 let partIndex = visibleEntry.index
                 let part = visibleEntry.part
-                let systemIndex = systems.count
-                rowSystemIndicesByPartIndex[partIndex] = systemIndex
+                let systemArrayIndex = systems.count
+                rowSystemArrayIndicesByPartIndex[partIndex] = systemArrayIndex
                 let systemY = rowTopY + (Double(visibleIndex) * (scaledStaffHeight + scaledPartSpacing))
                 let systemFrame = LayoutRect(
                     x: scaledPageMargin,
@@ -522,7 +523,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
                         partIndex: partIndex,
                         measureIndexInPart: sourceMeasureIndex,
                         measureNumber: measure.number,
-                        systemIndex: systemIndex,
+                        systemIndex: rowSystemIndex,
                         pageIndex: pageIndex,
                         frame: frame
                     )
@@ -532,7 +533,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
 
                 systems.append(
                     LaidOutSystem(
-                        systemIndex: systemIndex,
+                        systemIndex: rowSystemIndex,
                         partIndex: partIndex,
                         pageIndex: pageIndex,
                         frame: systemFrame,
@@ -558,7 +559,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
             zoomedOptions.partGroupBracketHookLength *= zoom
             let rowGroups = buildLaidOutPartGroupsForRow(
                 resolvedGroups: resolvedPartGroups,
-                rowSystemIndicesByPartIndex: rowSystemIndicesByPartIndex,
+                rowSystemArrayIndicesByPartIndex: rowSystemArrayIndicesByPartIndex,
                 systems: systems,
                 measures: measures,
                 options: zoomedOptions,
@@ -706,7 +707,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
 
     private func buildLaidOutPartGroupsForRow(
         resolvedGroups: [ResolvedPartGroup],
-        rowSystemIndicesByPartIndex: [Int: Int],
+        rowSystemArrayIndicesByPartIndex: [Int: Int],
         systems: [LaidOutSystem],
         measures: [LaidOutMeasure],
         options: LayoutOptions,
@@ -737,12 +738,16 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
         }
 
         for (renderOrder, resolved) in orderedGroups.enumerated() {
-            guard let startSystemIndex = rowSystemIndicesByPartIndex[resolved.startPartIndex],
-                  let endSystemIndex = rowSystemIndicesByPartIndex[resolved.endPartIndex] else {
+            guard let startSystemArrayIndex = rowSystemArrayIndicesByPartIndex[resolved.startPartIndex],
+                  let endSystemArrayIndex = rowSystemArrayIndicesByPartIndex[resolved.endPartIndex] else {
                 continue
             }
-            let startFrame = systems[startSystemIndex].frame
-            let endFrame = systems[endSystemIndex].frame
+            let startSystem = systems[startSystemArrayIndex]
+            let endSystem = systems[endSystemArrayIndex]
+            let startFrame = startSystem.frame
+            let endFrame = endSystem.frame
+            let startSystemIndex = startSystem.systemIndex
+            let endSystemIndex = endSystem.systemIndex
             let groupWidth = partGroupWidth(for: resolved.group.symbol, options: options)
             let frame = LayoutRect(
                 x: options.pageMargin
@@ -778,7 +783,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
 
             if resolved.group.barline == true {
                 if let leftX = rowMeasureBoundaryX(
-                    rowSystemIndicesByPartIndex: rowSystemIndicesByPartIndex,
+                    rowSystemArrayIndicesByPartIndex: rowSystemArrayIndicesByPartIndex,
                     partStartIndex: resolved.startPartIndex,
                     partEndIndex: resolved.endPartIndex,
                     systems: systems,
@@ -805,7 +810,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
                 }
 
                 if let rightX = rowMeasureBoundaryX(
-                    rowSystemIndicesByPartIndex: rowSystemIndicesByPartIndex,
+                    rowSystemArrayIndicesByPartIndex: rowSystemArrayIndicesByPartIndex,
                     partStartIndex: resolved.startPartIndex,
                     partEndIndex: resolved.endPartIndex,
                     systems: systems,
@@ -902,7 +907,7 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
     }
 
     private func rowMeasureBoundaryX(
-        rowSystemIndicesByPartIndex: [Int: Int],
+        rowSystemArrayIndicesByPartIndex: [Int: Int],
         partStartIndex: Int,
         partEndIndex: Int,
         systems: [LaidOutSystem],
@@ -911,10 +916,10 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
     ) -> Double? {
         var values: [Double] = []
         for partIndex in partStartIndex...partEndIndex {
-            guard let systemIndex = rowSystemIndicesByPartIndex[partIndex] else {
+            guard let systemArrayIndex = rowSystemArrayIndicesByPartIndex[partIndex] else {
                 continue
             }
-            let system = systems[systemIndex]
+            let system = systems[systemArrayIndex]
             for measureIndex in system.measureIndices {
                 let frame = measures[measureIndex].frame
                 values.append(useRightBoundary ? (frame.x + frame.width) : frame.x)
@@ -966,7 +971,9 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
             effectiveTime: effectiveTime,
             defaultUnits: options.defaultMeasureDurationUnits
         )
-        return max(options.measureMinWidth, durationUnits * options.durationWidthScale)
+        let densityUnits = inferredDensityUnits(measure: measure)
+        let widthUnits = max(durationUnits, densityUnits)
+        return max(options.measureMinWidth, widthUnits * options.durationWidthScale)
     }
 
     private func inferredDurationUnits(
@@ -997,5 +1004,34 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
         }
 
         return max(0.25, defaultUnits)
+    }
+
+    private func inferredDensityUnits(measure: Measure) -> Double {
+        struct VoiceOnsetKey: Hashable {
+            let voice: Int
+            let onsetDivisions: Int
+        }
+
+        let nonGraceNotes = measure.noteEvents.filter { !$0.isGrace }
+        guard !nonGraceNotes.isEmpty else {
+            return 0
+        }
+
+        var uniqueEntries: Set<VoiceOnsetKey> = []
+        var voices: Set<Int> = []
+        for note in nonGraceNotes {
+            let normalizedVoice = max(1, note.voice)
+            uniqueEntries.insert(
+                VoiceOnsetKey(
+                    voice: normalizedVoice,
+                    onsetDivisions: max(0, note.onsetDivisions)
+                )
+            )
+            voices.insert(normalizedVoice)
+        }
+
+        let entryUnits = Double(uniqueEntries.count) * 0.5
+        let voiceUnits = Double(max(0, voices.count - 1)) * 0.5
+        return max(0.25, entryUnits + voiceUnits)
     }
 }
