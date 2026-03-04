@@ -17995,3 +17995,266 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
     #expect(!laidOut.systems.isEmpty)
 }
+
+// MARK: - Note Position Coverage Tests
+
+private let twoPartDenseAlignmentXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Treble</part-name></score-part>
+    <score-part id="P2"><part-name>Bass</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <note><rest/><duration>2</duration><voice>1</voice></note>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>F</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>G</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>A</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><rest/><duration>2</duration><voice>1</voice></note>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>F</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>G</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>A</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>F</sign><line>4</line></clef>
+      </attributes>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>8</duration><voice>1</voice></note>
+      <note><pitch><step>G</step><octave>3</octave></pitch><duration>8</duration><voice>1</voice></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private struct MockContextProvider: VexRenderContextProvider {
+    func makeContext(width: Double, height: Double, target: RenderTarget) -> RenderContext {
+        fatalError("Not needed for execution-only test")
+    }
+}
+
+/// Verify that notes fill the measure width and don't overflow in a 2-part score.
+@Test func notePositionsStayWithinMeasureBoundsTwoPart() throws {
+    let score = try MusicXMLParser().parse(data: Data(twoPartDenseAlignmentXML.utf8))
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 800))
+    let renderer = VexFoundationRenderer(contextProvider: MockContextProvider())
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 400))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(!execution.notePositions.isEmpty)
+
+    // Last treble note should be within the measure frame (not overflowing)
+    let treblePositions = execution.notePositions.filter { $0.partIndex == 0 }.sorted { $0.x < $1.x }
+    if let lastTreble = treblePositions.last, let trebleMeasure = plan.measures.first(where: { $0.partIndex == 0 }) {
+        let measureRight = trebleMeasure.frame.x + trebleMeasure.frame.width
+        #expect(lastTreble.x <= measureRight, "Last treble note should not overflow measure")
+        #expect(lastTreble.x >= measureRight - trebleMeasure.frame.width * 0.15,
+                "Last treble note should be near measure right edge (within 15%)")
+    }
+}
+
+private let singlePartDenseSixteenthsXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Treble</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <note><rest/><duration>2</duration><voice>1</voice></note>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>F</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>G</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>A</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><rest/><duration>2</duration><voice>1</voice></note>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>F</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>G</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>A</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+    </measure>
+    <measure number="2">
+      <note><rest/><duration>2</duration><voice>1</voice></note>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>F</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>G</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>A</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>B</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><rest/><duration>2</duration><voice>1</voice></note>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>F</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>G</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>A</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><pitch><step>B</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+/// Verify that dense 16th-note measures allocate enough width for notes.
+@Test func denseNotesMeasureWidthSufficientForContent() throws {
+    let score = try MusicXMLParser().parse(data: Data(singlePartDenseSixteenthsXML.utf8))
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 800))
+    let renderer = VexFoundationRenderer(contextProvider: MockContextProvider())
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 400))
+    let execution = renderer.executeRenderPlan(plan)
+
+    #expect(!execution.notePositions.isEmpty)
+
+    // All notes should be within their measure frames (no overflow)
+    for measure in plan.measures {
+        let notesInMeasure = execution.notePositions
+            .filter { $0.measureIndexInPart == measure.measureIndexInPart }
+            .sorted { $0.x < $1.x }
+        guard let lastNote = notesInMeasure.last else { continue }
+        let measureRight = measure.frame.x + measure.frame.width
+        #expect(lastNote.x <= measureRight,
+                "Notes in measure \(measure.measureIndexInPart) should not overflow (lastX=\(lastNote.x), right=\(measureRight))")
+    }
+}
+
+// MARK: - print-object="no" support
+
+@Test func parsePrintObjectNoOnNotes() throws {
+    let xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+    <score-partwise version="4.0">
+      <part-list>
+        <score-part id="P1"><part-name>P</part-name></score-part>
+      </part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes>
+            <divisions>4</divisions>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>G</sign><line>2</line></clef>
+          </attributes>
+          <note print-object="no">
+            <rest/>
+            <duration>1</duration>
+            <voice>1</voice>
+            <type>16th</type>
+          </note>
+          <note>
+            <pitch><step>C</step><octave>4</octave></pitch>
+            <duration>4</duration>
+            <voice>1</voice>
+            <type>quarter</type>
+          </note>
+          <note print-object="no">
+            <pitch><step>D</step><octave>4</octave></pitch>
+            <duration>4</duration>
+            <voice>1</voice>
+            <type>quarter</type>
+          </note>
+          <note>
+            <pitch><step>E</step><octave>4</octave></pitch>
+            <duration>4</duration>
+            <voice>1</voice>
+            <type>quarter</type>
+          </note>
+          <note>
+            <rest/>
+            <duration>3</duration>
+            <voice>1</voice>
+            <type>eighth</type>
+            <dot/>
+          </note>
+        </measure>
+      </part>
+    </score-partwise>
+    """
+    let score = try MusicXMLParser().parse(data: Data(xml.utf8))
+    let notes = score.parts[0].measures[0].noteEvents
+
+    // All 5 notes should be parsed.
+    #expect(notes.count == 5)
+
+    // First note (rest) and third note (D4) have print-object="no".
+    #expect(notes[0].printObject == false)
+    #expect(notes[1].printObject == nil)
+    #expect(notes[2].printObject == false)
+    #expect(notes[3].printObject == nil)
+    #expect(notes[4].printObject == nil)
+}
+
+@Test func printObjectNoNotesRenderedInGray() throws {
+    let xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+    <score-partwise version="4.0">
+      <part-list>
+        <score-part id="P1"><part-name>P</part-name></score-part>
+      </part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes>
+            <divisions>4</divisions>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>G</sign><line>2</line></clef>
+          </attributes>
+          <note print-object="no">
+            <rest/>
+            <duration>4</duration>
+            <voice>1</voice>
+            <type>quarter</type>
+          </note>
+          <note>
+            <pitch><step>C</step><octave>4</octave></pitch>
+            <duration>4</duration>
+            <voice>1</voice>
+            <type>quarter</type>
+          </note>
+          <note>
+            <pitch><step>D</step><octave>4</octave></pitch>
+            <duration>4</duration>
+            <voice>1</voice>
+            <type>quarter</type>
+          </note>
+          <note>
+            <pitch><step>E</step><octave>4</octave></pitch>
+            <duration>4</duration>
+            <voice>1</voice>
+            <type>quarter</type>
+          </note>
+        </measure>
+      </part>
+    </score-partwise>
+    """
+    let score = try MusicXMLParser().parse(data: Data(xml.utf8))
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 800, height: 0))
+
+    // The hidden rest should get a gray color in the render plan.
+    let hiddenNotes = plan.notes.filter { $0.color == "#CCCCCC" }
+    let visibleNotes = plan.notes.filter { $0.color == nil }
+    #expect(hiddenNotes.count == 1, "Expected 1 gray note for print-object=no, got \(hiddenNotes.count)")
+    #expect(visibleNotes.count == 3, "Expected 3 visible notes without color override, got \(visibleNotes.count)")
+}

@@ -447,6 +447,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var stringNumbers: [StringNumberMarker] = []
         var fretNumbers: [FretNumberMarker] = []
         var color: String?
+        var printObject: Bool?
 
         private func buildTabPositions() -> [TabPositionMarker] {
             let pairCount = min(stringNumbers.count, fretNumbers.count)
@@ -513,7 +514,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     stringNumbers: stringNumbers,
                     fretNumbers: fretNumbers,
                     tabPositions: tabPositions,
-                    color: color
+                    color: color,
+                    printObject: printObject
                 )
             }
 
@@ -548,7 +550,8 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 stringNumbers: stringNumbers,
                 fretNumbers: fretNumbers,
                 tabPositions: tabPositions,
-                color: color
+                color: color,
+                printObject: printObject
             )
         }
     }
@@ -987,6 +990,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         case "note":
             currentNote = NoteBuilder()
             currentNote?.color = attributeDict["color"]?.trimmedNonEmpty
+            currentNote?.printObject = yesNoToBool(attributeDict["print-object"])
             currentLyricBuilder = nil
             currentFingeringBuilder = nil
             currentStringNumberBuilder = nil

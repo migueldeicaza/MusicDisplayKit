@@ -417,6 +417,8 @@ public struct NoteEvent: Equatable, Sendable {
     public var tabPositions: [TabPositionMarker]
     /// CSS/MusicXML color string (e.g., "#FF0000").
     public var color: String?
+    /// When `false`, the note/rest should not be displayed (MusicXML `print-object="no"`).
+    public var printObject: Bool?
     /// When set, indicates this note should be rendered on a different staff
     /// (cross-staff notation). The value is the target staff number (1-based).
     public var crossStaffTarget: Int?
@@ -455,6 +457,7 @@ public struct NoteEvent: Equatable, Sendable {
         fretNumbers: [FretNumberMarker] = [],
         tabPositions: [TabPositionMarker] = [],
         color: String? = nil,
+        printObject: Bool? = nil,
         crossStaffTarget: Int? = nil
     ) {
         self.kind = kind
@@ -490,6 +493,7 @@ public struct NoteEvent: Equatable, Sendable {
         self.fretNumbers = fretNumbers
         self.tabPositions = tabPositions
         self.color = color
+        self.printObject = printObject
         self.crossStaffTarget = crossStaffTarget
     }
 }

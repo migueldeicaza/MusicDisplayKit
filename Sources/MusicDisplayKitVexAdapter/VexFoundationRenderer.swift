@@ -2,6 +2,7 @@ import MusicDisplayKitCore
 import MusicDisplayKitLayout
 import MusicDisplayKitModel
 import VexFoundation
+import Foundation
 
 /// Position data extracted from VexFoundation objects post-format.
 public struct VexNotePosition: Sendable {
@@ -13,7 +14,7 @@ public struct VexNotePosition: Sendable {
     public let boundingBox: MDKBoundingBox?
 }
 
-public enum RenderTarget: Sendable {
+public enum RenderTarget: Equatable, Sendable {
     case view(identifier: String)
     case image(width: Int, height: Int)
 }
@@ -1682,7 +1683,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     glissandos: firstEvent?.glissandos ?? [],
                     isCue: firstEvent?.isCue ?? false,
                     noteheadType: firstEvent?.noteheadType,
-                    color: firstEvent?.color,
+                    color: firstEvent?.color ?? (firstEvent?.printObject == false ? "#CCCCCC" : nil),
                     graceNotes: graceNotesByVoiceOnset[key] ?? [],
                     crossStaffTarget: firstEvent?.crossStaffTarget
                 )
@@ -3172,6 +3173,23 @@ public struct VexFoundationRenderer: ScoreRenderer {
             )
 
             let contexts = formatter.getTickContexts().array
+
+            // Safety-net: when the formatter's minimum-width layout exceeds the
+            // available measure width, compress all tick context positions
+            // proportionally so notes fit within the measure.
+            if contexts.count >= 2,
+               let ctxMinX = contexts.map({ $0.getX() }).min(),
+               let ctxMaxX = contexts.map({ $0.getX() }).max() {
+                let formatterSpan = ctxMaxX - ctxMinX
+                if formatterSpan > justifyWidth && justifyWidth > 0 {
+                    let scale = justifyWidth / formatterSpan
+                    for context in contexts {
+                        let relativeX = context.getX() - ctxMinX
+                        _ = context.setX(ctxMinX + relativeX * scale)
+                    }
+                }
+            }
+
             if let minX = contexts.map({ $0.getX() }).min() {
                 let desiredRelativeStartX = desiredAbsoluteStartX - stave.getNoteStartX() - stavePadding
                 let delta = desiredRelativeStartX - minX

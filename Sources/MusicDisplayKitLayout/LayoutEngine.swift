@@ -2,7 +2,7 @@ import Foundation
 import MusicDisplayKitCore
 import MusicDisplayKitModel
 
-public struct LayoutOptions: Sendable {
+public struct LayoutOptions: Equatable, Sendable {
     public var pageWidth: Double
     public var pageHeight: Double?
     public var pageMargin: Double
@@ -150,7 +150,7 @@ public struct LayoutOptions: Sendable {
     }
 }
 
-public struct LaidOutScore: Sendable {
+public struct LaidOutScore: Equatable, Sendable {
     public let score: Score
     public let pageWidth: Double
     public let pageHeight: Double?
@@ -195,7 +195,7 @@ public struct LayoutRect: Equatable, Sendable {
     }
 }
 
-public struct LaidOutSystem: Sendable {
+public struct LaidOutSystem: Equatable, Sendable {
     public let systemIndex: Int
     public let partIndex: Int
     public let pageIndex: Int
@@ -217,7 +217,7 @@ public struct LaidOutSystem: Sendable {
     }
 }
 
-public struct LaidOutMeasure: Sendable {
+public struct LaidOutMeasure: Equatable, Sendable {
     public let index: Int
     public let partIndex: Int
     public let measureIndexInPart: Int
@@ -245,7 +245,7 @@ public struct LaidOutMeasure: Sendable {
     }
 }
 
-public struct LaidOutPartGroup: Sendable {
+public struct LaidOutPartGroup: Equatable, Sendable {
     public let sourceGroupIndex: Int
     public let number: Int?
     public let symbol: PartGroupSymbol?
@@ -294,7 +294,7 @@ public struct LaidOutPartGroup: Sendable {
     }
 }
 
-public struct PartGroupRenderStyle: Sendable {
+public struct PartGroupRenderStyle: Equatable, Sendable {
     public let strokeWidth: Double
     public let hookLength: Double
     public let cornerRadius: Double
@@ -321,7 +321,7 @@ public enum BarlineConnectorSide: Equatable, Sendable {
     case right
 }
 
-public struct LaidOutBarlineConnector: Sendable {
+public struct LaidOutBarlineConnector: Equatable, Sendable {
     public let sourceGroupIndex: Int
     public let pageIndex: Int
     public let side: BarlineConnectorSide
@@ -971,7 +971,24 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
             effectiveTime: effectiveTime,
             defaultUnits: options.defaultMeasureDurationUnits
         )
-        return max(options.measureMinWidth, durationUnits * options.durationWidthScale)
+        let durationWidth = durationUnits * options.durationWidthScale
+
+        // Estimate minimum content width based on the number of unique onset
+        // positions.  VexFoundation's formatter reserves roughly 22 px per tick
+        // context (notehead + padding).  When a measure has many short notes
+        // (e.g. 16th-note figurations) this content floor prevents the layout
+        // from assigning a width the formatter cannot compress into.
+        let contentWidth: Double
+        if !measure.noteEvents.isEmpty {
+            let uniqueOnsets = Set(measure.noteEvents.map(\.onsetDivisions)).count
+            let minPerOnset: Double = 22
+            let padding: Double = 20 // leading + trailing
+            contentWidth = Double(uniqueOnsets) * minPerOnset + padding
+        } else {
+            contentWidth = 0
+        }
+
+        return max(options.measureMinWidth, durationWidth, contentWidth)
     }
 
     private func inferredDurationUnits(
