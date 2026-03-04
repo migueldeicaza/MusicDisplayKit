@@ -3,6 +3,9 @@ import MusicDisplayKitLayout
 import MusicDisplayKitModel
 import VexFoundation
 import Foundation
+#if canImport(OSLog)
+import OSLog
+#endif
 
 /// Position data extracted from VexFoundation objects post-format.
 public struct VexNotePosition: Sendable {
@@ -1401,6 +1404,138 @@ public struct VexFactoryExecution {
     }
 }
 
+public struct VexRenderMetricsSnapshot: Sendable {
+    public let makeRenderPlanCount: Int
+    public let executeRenderPlanCount: Int
+    public let totalMakeRenderPlanDurationMS: Double
+    public let totalExecuteRenderPlanDurationMS: Double
+    public let maxMakeRenderPlanDurationMS: Double
+    public let maxExecuteRenderPlanDurationMS: Double
+    public let totalExecutedElementCount: Int
+
+    public var averageMakeRenderPlanDurationMS: Double {
+        guard makeRenderPlanCount > 0 else { return 0 }
+        return totalMakeRenderPlanDurationMS / Double(makeRenderPlanCount)
+    }
+
+    public var averageExecuteRenderPlanDurationMS: Double {
+        guard executeRenderPlanCount > 0 else { return 0 }
+        return totalExecuteRenderPlanDurationMS / Double(executeRenderPlanCount)
+    }
+}
+
+public enum VexRenderMetrics {
+    private static let lock = NSLock()
+
+    private struct State {
+        var makeRenderPlanCount = 0
+        var executeRenderPlanCount = 0
+        var totalMakeRenderPlanDurationMS = 0.0
+        var totalExecuteRenderPlanDurationMS = 0.0
+        var maxMakeRenderPlanDurationMS = 0.0
+        var maxExecuteRenderPlanDurationMS = 0.0
+        var totalExecutedElementCount = 0
+    }
+    nonisolated(unsafe) private static var state = State()
+
+    static func recordMakeRenderPlan(durationMS: Double) {
+        lock.lock()
+        defer { lock.unlock() }
+        state.makeRenderPlanCount += 1
+        state.totalMakeRenderPlanDurationMS += durationMS
+        state.maxMakeRenderPlanDurationMS = max(state.maxMakeRenderPlanDurationMS, durationMS)
+    }
+
+    static func recordExecuteRenderPlan(durationMS: Double, elementCount: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        state.executeRenderPlanCount += 1
+        state.totalExecuteRenderPlanDurationMS += durationMS
+        state.maxExecuteRenderPlanDurationMS = max(state.maxExecuteRenderPlanDurationMS, durationMS)
+        state.totalExecutedElementCount += elementCount
+    }
+
+    public static func snapshot() -> VexRenderMetricsSnapshot {
+        lock.lock()
+        defer { lock.unlock() }
+        return VexRenderMetricsSnapshot(
+            makeRenderPlanCount: state.makeRenderPlanCount,
+            executeRenderPlanCount: state.executeRenderPlanCount,
+            totalMakeRenderPlanDurationMS: state.totalMakeRenderPlanDurationMS,
+            totalExecuteRenderPlanDurationMS: state.totalExecuteRenderPlanDurationMS,
+            maxMakeRenderPlanDurationMS: state.maxMakeRenderPlanDurationMS,
+            maxExecuteRenderPlanDurationMS: state.maxExecuteRenderPlanDurationMS,
+            totalExecutedElementCount: state.totalExecutedElementCount
+        )
+    }
+
+    public static func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        state = State()
+    }
+}
+
+private extension VexRenderPlan {
+    var renderedElementEstimate: Int {
+        let notesAndRhythm = staves.count +
+            measures.count +
+            notes.count +
+            beams.count +
+            tuplets.count +
+            ties.count +
+            slurs.count
+
+        let modifiers = articulations.count +
+            fingerings.count +
+            stringNumbers.count +
+            tabPositions.count +
+            lyrics.count +
+            chordSymbols.count +
+            directionTexts.count
+
+        let directionsAndConnectors = tempoMarks.count +
+            roadmapRepetitions.count +
+            directionWedges.count +
+            octaveShiftSpanners.count +
+            pedalMarkings.count +
+            lyricConnectors.count +
+            partGroupConnectors.count +
+            barlineConnectors.count
+
+        return notesAndRhythm + modifiers + directionsAndConnectors
+    }
+}
+
+private enum VexRendererSignpost {
+    #if canImport(OSLog)
+    private static let signposter = OSSignposter(
+        subsystem: "MusicDisplayKit",
+        category: "VexFoundationRenderer"
+    )
+    typealias IntervalState = OSSignpostIntervalState
+    #else
+    struct IntervalState {}
+    #endif
+
+    static func begin(_ name: StaticString) -> IntervalState {
+        #if canImport(OSLog)
+        signposter.beginInterval(name)
+        #else
+        IntervalState()
+        #endif
+    }
+
+    static func end(_ name: StaticString, _ state: IntervalState) {
+        #if canImport(OSLog)
+        signposter.endInterval(name, state)
+        #else
+        _ = name
+        _ = state
+        #endif
+    }
+}
+
 /// Cache for incremental re-rendering (8.2).
 /// Tracks the previously executed render plan and factory execution per system.
 /// When a score is re-rendered with only a subset of systems changed (dirty),
@@ -1450,6 +1585,14 @@ public struct VexFoundationRenderer: ScoreRenderer {
     }
 
     public func makeRenderPlan(from score: LaidOutScore, target: RenderTarget) -> VexRenderPlan {
+        let startedAt = ProcessInfo.processInfo.systemUptime
+        let signpost = VexRendererSignpost.begin("makeRenderPlan")
+        defer {
+            let elapsedMS = (ProcessInfo.processInfo.systemUptime - startedAt) * 1_000
+            VexRenderMetrics.recordMakeRenderPlan(durationMS: elapsedMS)
+            VexRendererSignpost.end("makeRenderPlan", signpost)
+        }
+
         let staves = score.systems.map { system in
             let initialState = initialStaveState(for: system, score: score)
             return VexStavePlan(
@@ -2039,6 +2182,17 @@ public struct VexFoundationRenderer: ScoreRenderer {
     }
 
     public func executeRenderPlan(_ plan: VexRenderPlan) -> VexFactoryExecution {
+        let startedAt = ProcessInfo.processInfo.systemUptime
+        let signpost = VexRendererSignpost.begin("executeRenderPlan")
+        defer {
+            let elapsedMS = (ProcessInfo.processInfo.systemUptime - startedAt) * 1_000
+            VexRenderMetrics.recordExecuteRenderPlan(
+                durationMS: elapsedMS,
+                elementCount: plan.renderedElementEstimate
+            )
+            VexRendererSignpost.end("executeRenderPlan", signpost)
+        }
+
         FontLoader.loadDefaultFonts()
 
         let factory = Factory(
@@ -2058,6 +2212,46 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 partIndex: tabPositionPlan.partIndex
             )
         })
+        var keySignatureAvailabilityCache: [String: Bool] = [:]
+        var parsedClefNameCache: [String: ClefName?] = [:]
+        var parsedTimeSignatureSpecCache: [String: TimeSignatureSpec?] = [:]
+        var parsedStaffKeySpecCache: [String: StaffKeySpec?] = [:]
+
+        func hasKeySignature(_ keySignature: String) -> Bool {
+            if let cached = keySignatureAvailabilityCache[keySignature] {
+                return cached
+            }
+            let resolved = Tables.hasKeySignature(keySignature)
+            keySignatureAvailabilityCache[keySignature] = resolved
+            return resolved
+        }
+
+        func clefName(from rawClef: String) -> ClefName? {
+            if let cached = parsedClefNameCache[rawClef] {
+                return cached
+            }
+            let resolved = ClefName(parsing: rawClef)
+            parsedClefNameCache[rawClef] = resolved
+            return resolved
+        }
+
+        func timeSignatureSpec(from rawTimeSignature: String) -> TimeSignatureSpec? {
+            if let cached = parsedTimeSignatureSpecCache[rawTimeSignature] {
+                return cached
+            }
+            let resolved = TimeSignatureSpec(parsing: rawTimeSignature, validate: false)
+            parsedTimeSignatureSpecCache[rawTimeSignature] = resolved
+            return resolved
+        }
+
+        func staffKeySpec(from rawToken: String) -> StaffKeySpec? {
+            if let cached = parsedStaffKeySpecCache[rawToken] {
+                return cached
+            }
+            let resolved = try? StaffKeySpec(parsing: rawToken)
+            parsedStaffKeySpecCache[rawToken] = resolved
+            return resolved
+        }
 
         let createdStaves = sortedStavePlans
             .map { stavePlan in
@@ -2108,7 +2302,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
             }
 
             if let clefRaw = stavePlan.initialClef,
-               let clefName = ClefName(parsing: clefRaw) {
+               let clefName = clefName(from: clefRaw) {
                 let annotation = stavePlan.initialClefAnnotation.flatMap {
                     ClefAnnotation(rawValue: $0)
                 }
@@ -2116,12 +2310,12 @@ public struct VexFoundationRenderer: ScoreRenderer {
             }
 
             if let keySignature = stavePlan.initialKeySignature,
-               Tables.hasKeySignature(keySignature) {
+               hasKeySignature(keySignature) {
                 _ = stave.addKeySignature(keySignature)
             }
 
             if let timeSignature = stavePlan.initialTimeSignature,
-               let timeSignatureSpec = TimeSignatureSpec(parsing: timeSignature, validate: false) {
+               let timeSignatureSpec = timeSignatureSpec(from: timeSignature) {
                 _ = stave.addTimeSignature(timeSignatureSpec)
             }
 
@@ -2614,7 +2808,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         from: notePlan,
                         factory: factory,
                         stave: stave,
-                        clefName: notePlan.clef.flatMap(ClefName.init(parsing:)),
+                        keys: notePlan.keyTokens.compactMap(staffKeySpec(from:)),
+                        clefName: notePlan.clef.flatMap(clefName(from:)),
                         stemDirection: stemDirection
                     ) else {
                         continue
@@ -2631,7 +2826,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     if !notePlan.graceNotes.isEmpty {
                         let graceNotes: [StemmableNote] = notePlan.graceNotes.compactMap { gracePlan in
                             let keys: [StaffKeySpec] = gracePlan.keyTokens.compactMap { token in
-                                try? StaffKeySpec(parsing: token)
+                                staffKeySpec(from: token)
                             }
                             guard let nonEmptyKeys = NonEmptyArray(validating: keys) else {
                                 return nil
@@ -7286,6 +7481,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
         from notePlan: VexNotePlan,
         factory: Factory,
         stave: Stave,
+        keys providedKeys: [StaffKeySpec]? = nil,
         clefName: ClefName? = nil,
         stemDirection: StemDirection? = nil
     ) -> StaveNote? {
@@ -7296,8 +7492,13 @@ public struct VexFoundationRenderer: ScoreRenderer {
             noteType: notePlan.noteType,
             dotCount: notePlan.dotCount
         )
-        let keys: [StaffKeySpec] = notePlan.keyTokens.compactMap { token in
-            try? StaffKeySpec(parsing: token)
+        let keys: [StaffKeySpec]
+        if let providedKeys {
+            keys = providedKeys
+        } else {
+            keys = notePlan.keyTokens.compactMap { token in
+                try? StaffKeySpec(parsing: token)
+            }
         }
         guard let nonEmptyKeys = NonEmptyArray(validating: keys) else {
             return nil

@@ -3,6 +3,7 @@ import MusicDisplayKitModel
 
 #if canImport(SwiftUI)
 import SwiftUI
+import Observation
 import VexFoundation
 #if canImport(AppKit)
 import AppKit
@@ -30,24 +31,17 @@ private struct ScoreLayoutInput: Equatable {
 }
 
 private struct ScoreRenderInput: Equatable {
-    let laidOutScore: LaidOutScore
-    let target: RenderTarget
-}
-
-private struct LazyScoreInput: Equatable {
-    let score: Score
-    let layoutOptions: LayoutOptions
+    let laidOutScoreRevision: UInt64
     let target: RenderTarget
 }
 
 private struct LazyLaidOutScoreInput: Equatable {
-    let laidOutScore: LaidOutScore
+    let laidOutScoreRevision: UInt64
     let target: RenderTarget
 }
 
 private struct PreparedScoreRender {
     let renderPlan: VexRenderPlan
-    let execution: VexFactoryExecution
 }
 
 private struct LazySystemGroup: Identifiable, Equatable {
@@ -60,6 +54,7 @@ private struct LazySystemGroup: Identifiable, Equatable {
 private struct PreparedLazyScoreRender {
     let renderPlan: VexRenderPlan
     let systemGroups: [LazySystemGroup]
+    let systemRenderPlansByIndex: [Int: VexRenderPlan]
 }
 
 private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySystemGroup] {
@@ -90,8 +85,107 @@ private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySyste
     return groups
 }
 
+private func makeLazySystemRenderPlans(
+    from renderPlan: VexRenderPlan,
+    systemGroups: [LazySystemGroup]
+) -> [Int: VexRenderPlan] {
+    Dictionary(uniqueKeysWithValues: systemGroups.map { group in
+        (group.systemIndex, renderPlan.systemSlice(for: group))
+    })
+}
+
+enum LazyMeasureWindowing {
+    static func clamp(
+        _ range: Range<Int>?,
+        totalMeasures: Int
+    ) -> Range<Int>? {
+        guard totalMeasures > 0, let range else { return nil }
+        let lower = max(0, min(totalMeasures - 1, range.lowerBound))
+        let upper = max(lower + 1, min(totalMeasures, range.upperBound))
+        return lower..<upper
+    }
+
+    static func initialRange(
+        totalMeasures: Int,
+        preferredRange: Range<Int>?,
+        windowLength: Int
+    ) -> Range<Int>? {
+        guard totalMeasures > 0 else { return nil }
+        if let preferredRange {
+            return clamp(preferredRange, totalMeasures: totalMeasures)
+        }
+        return 0..<min(totalMeasures, max(1, windowLength))
+    }
+
+    static func expandedRangeIfNeeded(
+        currentRange: Range<Int>,
+        visibleRange: Range<Int>?,
+        totalMeasures: Int,
+        windowLength: Int,
+        threshold: Int
+    ) -> Range<Int>? {
+        guard totalMeasures > 0 else { return nil }
+        guard let visibleRange else { return nil }
+        guard currentRange.upperBound < totalMeasures else { return nil }
+        guard visibleRange.upperBound >= currentRange.upperBound - max(1, threshold) else {
+            return nil
+        }
+
+        let expandedUpperBound = min(totalMeasures, currentRange.upperBound + max(1, windowLength))
+        guard expandedUpperBound > currentRange.upperBound else { return nil }
+        return currentRange.lowerBound..<expandedUpperBound
+    }
+}
+
+enum LazySystemVisibility {
+    static func recordVisibleSystem(
+        currentHighestVisibleSystemIndex: Int?,
+        appearedSystemIndex: Int
+    ) -> Int {
+        max(currentHighestVisibleSystemIndex ?? appearedSystemIndex, appearedSystemIndex)
+    }
+
+    static func clampedHighestVisibleSystemIndex(
+        currentHighestVisibleSystemIndex: Int?,
+        availableSystemRange: ClosedRange<Int>?
+    ) -> Int? {
+        guard let availableSystemRange else { return nil }
+        let seed = currentHighestVisibleSystemIndex ?? availableSystemRange.lowerBound
+        return min(
+            availableSystemRange.upperBound,
+            max(availableSystemRange.lowerBound, seed)
+        )
+    }
+}
+
 @MainActor
-private final class ScoreLayoutCache: ObservableObject {
+@Observable
+private final class LazyVisibleSystemTracker {
+    private(set) var highestVisibleSystemIndex: Int?
+
+    func recordVisibleSystem(_ systemIndex: Int) -> Bool {
+        let nextHighest = LazySystemVisibility.recordVisibleSystem(
+            currentHighestVisibleSystemIndex: highestVisibleSystemIndex,
+            appearedSystemIndex: systemIndex
+        )
+        guard nextHighest != highestVisibleSystemIndex else {
+            return false
+        }
+        highestVisibleSystemIndex = nextHighest
+        return true
+    }
+
+    func clamp(to availableSystemRange: ClosedRange<Int>?) {
+        highestVisibleSystemIndex = LazySystemVisibility.clampedHighestVisibleSystemIndex(
+            currentHighestVisibleSystemIndex: highestVisibleSystemIndex,
+            availableSystemRange: availableSystemRange
+        )
+    }
+}
+
+@MainActor
+@Observable
+private final class ScoreLayoutCache {
     private var cachedInput: ScoreLayoutInput?
     private var cachedResult: Result<LaidOutScore, Error>?
 
@@ -111,20 +205,23 @@ private final class ScoreLayoutCache: ObservableObject {
 }
 
 @MainActor
-private final class ScoreRenderCache: ObservableObject {
+@Observable
+private final class ScoreRenderCache {
     private var cachedInput: ScoreRenderInput?
     private var cachedRender: PreparedScoreRender?
 
     func resolve(laidOutScore: LaidOutScore, target: RenderTarget) -> PreparedScoreRender {
-        let input = ScoreRenderInput(laidOutScore: laidOutScore, target: target)
+        let input = ScoreRenderInput(
+            laidOutScoreRevision: laidOutScore.renderRevision,
+            target: target
+        )
         if let cachedInput, cachedInput == input, let cachedRender {
             return cachedRender
         }
 
         let renderer = VexFoundationRenderer()
         let renderPlan = renderer.makeRenderPlan(from: laidOutScore, target: target)
-        let execution = renderer.executeRenderPlan(renderPlan)
-        let prepared = PreparedScoreRender(renderPlan: renderPlan, execution: execution)
+        let prepared = PreparedScoreRender(renderPlan: renderPlan)
         cachedInput = input
         cachedRender = prepared
         return prepared
@@ -132,82 +229,34 @@ private final class ScoreRenderCache: ObservableObject {
 }
 
 @MainActor
-private final class LazyScoreRenderCache: ObservableObject {
-    private var cachedInput: LazyScoreInput?
-    private var cachedPreparedResult: Result<PreparedLazyScoreRender, Error>?
-    private var cachedExecutionsBySystemIndex: [Int: VexFactoryExecution] = [:]
-
-    func resolve(
-        score: Score,
-        layoutOptions: LayoutOptions,
-        target: RenderTarget
-    ) -> Result<PreparedLazyScoreRender, Error> {
-        let input = LazyScoreInput(score: score, layoutOptions: layoutOptions, target: target)
-        if let cachedInput, cachedInput == input, let cachedPreparedResult {
-            return cachedPreparedResult
-        }
-
-        let preparedResult = Result {
-            let laidOutScore = try MusicLayoutEngine().layout(score: score, options: layoutOptions)
-            let renderPlan = VexFoundationRenderer().makeRenderPlan(from: laidOutScore, target: target)
-            let systemGroups = makeLazySystemGroups(from: laidOutScore)
-            return PreparedLazyScoreRender(
-                renderPlan: renderPlan,
-                systemGroups: systemGroups
-            )
-        }
-
-        cachedInput = input
-        cachedPreparedResult = preparedResult
-        cachedExecutionsBySystemIndex.removeAll()
-        return preparedResult
-    }
-
-    func execution(for group: LazySystemGroup, in renderPlan: VexRenderPlan) -> VexFactoryExecution {
-        if let cached = cachedExecutionsBySystemIndex[group.systemIndex] {
-            return cached
-        }
-
-        let slicedPlan = renderPlan.systemSlice(for: group)
-        let execution = VexFoundationRenderer().executeRenderPlan(slicedPlan)
-        cachedExecutionsBySystemIndex[group.systemIndex] = execution
-        return execution
-    }
-}
-
-@MainActor
-private final class LazyLaidOutScoreRenderCache: ObservableObject {
+@Observable
+private final class LazyLaidOutScoreRenderCache {
     private var cachedInput: LazyLaidOutScoreInput?
     private var cachedPrepared: PreparedLazyScoreRender?
-    private var cachedExecutionsBySystemIndex: [Int: VexFactoryExecution] = [:]
 
     func resolve(laidOutScore: LaidOutScore, target: RenderTarget) -> PreparedLazyScoreRender {
-        let input = LazyLaidOutScoreInput(laidOutScore: laidOutScore, target: target)
+        let input = LazyLaidOutScoreInput(
+            laidOutScoreRevision: laidOutScore.renderRevision,
+            target: target
+        )
         if let cachedInput, cachedInput == input, let cachedPrepared {
             return cachedPrepared
         }
 
         let renderer = VexFoundationRenderer()
         let renderPlan = renderer.makeRenderPlan(from: laidOutScore, target: target)
+        let systemGroups = makeLazySystemGroups(from: laidOutScore)
         let prepared = PreparedLazyScoreRender(
             renderPlan: renderPlan,
-            systemGroups: makeLazySystemGroups(from: laidOutScore)
+            systemGroups: systemGroups,
+            systemRenderPlansByIndex: makeLazySystemRenderPlans(
+                from: renderPlan,
+                systemGroups: systemGroups
+            )
         )
         cachedInput = input
         cachedPrepared = prepared
-        cachedExecutionsBySystemIndex.removeAll()
         return prepared
-    }
-
-    func execution(for group: LazySystemGroup, in renderPlan: VexRenderPlan) -> VexFactoryExecution {
-        if let cached = cachedExecutionsBySystemIndex[group.systemIndex] {
-            return cached
-        }
-
-        let slicedPlan = renderPlan.systemSlice(for: group)
-        let execution = VexFoundationRenderer().executeRenderPlan(slicedPlan)
-        cachedExecutionsBySystemIndex[group.systemIndex] = execution
-        return execution
     }
 }
 
@@ -340,7 +389,7 @@ private struct LayoutFailureView: View {
 public struct VexScoreView: View {
     private let laidOutScore: LaidOutScore
     private let target: RenderTarget
-    @StateObject private var renderCache = ScoreRenderCache()
+    @State private var renderCache = ScoreRenderCache()
 
     public init(laidOutScore: LaidOutScore, target: RenderTarget = .view(identifier: "music-display-view")) {
         self.laidOutScore = laidOutScore
@@ -360,7 +409,9 @@ public struct VexScoreView: View {
         ) { context in
             context.clear()
             do {
-                try drawExecution(prepared.execution, on: context)
+                // Factory.draw() resets the factory queue, so executions are single-use.
+                let execution = VexFoundationRenderer().executeRenderPlan(prepared.renderPlan)
+                try drawExecution(execution, on: context)
             } catch {
                 context.setFillStyle("#B00020")
                 context.setFont("Menlo", 12, "normal", "normal")
@@ -377,7 +428,9 @@ public struct MusicDisplayScoreView: View {
     private let target: RenderTarget
     /// When true, the view re-layouts when its width changes (auto-resize).
     private let autoResize: Bool
-    @StateObject private var layoutCache = ScoreLayoutCache()
+    @State private var layoutCache = ScoreLayoutCache()
+    @State private var debouncedPageWidth: Double?
+    @State private var pendingWidthCommitTask: Task<Void, Never>?
 
     public init(
         score: Score,
@@ -403,15 +456,43 @@ public struct MusicDisplayScoreView: View {
     public var body: some View {
         if autoResize {
             GeometryReader { geometry in
-                let adjustedOptions: LayoutOptions = {
-                    var options = layoutOptions
-                    options.pageWidth = max(200, geometry.size.width)
-                    return options
-                }()
-                content(for: adjustedOptions)
+                let measuredWidth = max(200, geometry.size.width)
+                let pageWidth = debouncedPageWidth ?? measuredWidth
+                content(for: layoutOptionsWithPageWidth(pageWidth))
+                    .onAppear {
+                        if debouncedPageWidth == nil {
+                            debouncedPageWidth = measuredWidth
+                        }
+                        scheduleWidthCommit(measuredWidth)
+                    }
+                    .onChange(of: measuredWidth) { _, newWidth in
+                        scheduleWidthCommit(newWidth)
+                    }
+                    .onDisappear {
+                        pendingWidthCommitTask?.cancel()
+                        pendingWidthCommitTask = nil
+                    }
             }
         } else {
             content(for: layoutOptions)
+        }
+    }
+
+    private func layoutOptionsWithPageWidth(_ pageWidth: Double) -> LayoutOptions {
+        var options = layoutOptions
+        options.pageWidth = max(200, pageWidth)
+        return options
+    }
+
+    private func scheduleWidthCommit(_ pageWidth: Double) {
+        let clampedWidth = max(200, pageWidth)
+        pendingWidthCommitTask?.cancel()
+        pendingWidthCommitTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled else { return }
+            if debouncedPageWidth != clampedWidth {
+                debouncedPageWidth = clampedWidth
+            }
         }
     }
 
@@ -433,7 +514,7 @@ public struct MusicDisplayScrollableScoreView: View {
     private let layoutOptions: LayoutOptions
     private let target: RenderTarget
     private let cursorMeasureIndex: Int?
-    @StateObject private var layoutCache = ScoreLayoutCache()
+    @State private var layoutCache = ScoreLayoutCache()
 
     public init(
         score: Score,
@@ -538,9 +619,10 @@ public struct MusicDisplayLazyScoreView: View {
     private let target: RenderTarget
     private let embedInScrollView: Bool
     private let renderBufferSystems: Int
-    @State private var visibleSystemIndices: Set<Int> = []
-    @StateObject private var lazyRenderCache = LazyScoreRenderCache()
-    @StateObject private var lazyLaidOutRenderCache = LazyLaidOutScoreRenderCache()
+    @State private var lazyMeasureRangeOverride: Range<Int>?
+    @State private var visibleSystemTracker = LazyVisibleSystemTracker()
+    @State private var layoutCache = ScoreLayoutCache()
+    @State private var lazyLaidOutRenderCache = LazyLaidOutScoreRenderCache()
 
     public init(
         score: Score,
@@ -601,68 +683,73 @@ public struct MusicDisplayLazyScoreView: View {
     public var body: some View {
         switch source {
         case .score(let score, let layoutOptions):
-            let preparedResult = lazyRenderCache.resolve(
+            let effectiveLayoutOptions = layoutOptionsForScoreSource(
                 score: score,
-                layoutOptions: layoutOptions,
-                target: target
+                baseOptions: layoutOptions
             )
-            content(preparedResult: preparedResult) { group, renderPlan in
-                lazyRenderCache.execution(for: group, in: renderPlan)
+            switch layoutCache.resolve(score: score, layoutOptions: effectiveLayoutOptions) {
+            case .success(let laidOutScore):
+                let prepared = lazyLaidOutRenderCache.resolve(
+                    laidOutScore: laidOutScore,
+                    target: target
+                )
+                content(preparedResult: .success(prepared))
+                    .onAppear {
+                        initializeLazyMeasureRangeIfNeeded(
+                            score: score,
+                            baseOptions: layoutOptions
+                        )
+                        clampHighestVisibleSystemIndex(prepared: prepared)
+                        maybeExpandLazyMeasureWindow(
+                            score: score,
+                            baseOptions: layoutOptions,
+                            prepared: prepared
+                        )
+                    }
+            case .failure(let error):
+                content(preparedResult: .failure(error))
             }
         case .laidOutScore(let laidOutScore):
             let prepared = lazyLaidOutRenderCache.resolve(
                 laidOutScore: laidOutScore,
                 target: target
             )
-            content(preparedResult: .success(prepared)) { group, renderPlan in
-                lazyLaidOutRenderCache.execution(for: group, in: renderPlan)
-            }
+            content(preparedResult: .success(prepared))
         }
     }
 
     @ViewBuilder
-    private func content(
-        preparedResult: Result<PreparedLazyScoreRender, Error>,
-        executionProvider: @escaping (LazySystemGroup, VexRenderPlan) -> VexFactoryExecution
-    ) -> some View {
+    private func content(preparedResult: Result<PreparedLazyScoreRender, Error>) -> some View {
         if embedInScrollView {
             ScrollView {
-                systemRows(preparedResult: preparedResult, executionProvider: executionProvider)
+                systemRows(preparedResult: preparedResult)
             }
         } else {
-            systemRows(preparedResult: preparedResult, executionProvider: executionProvider)
+            systemRows(preparedResult: preparedResult)
         }
     }
 
     @ViewBuilder
-    private func systemRows(
-        preparedResult: Result<PreparedLazyScoreRender, Error>,
-        executionProvider: @escaping (LazySystemGroup, VexRenderPlan) -> VexFactoryExecution
-    ) -> some View {
+    private func systemRows(preparedResult: Result<PreparedLazyScoreRender, Error>) -> some View {
         switch preparedResult {
         case .success(let prepared):
-            let renderWindow = currentRenderWindow(for: prepared.systemGroups)
             LazyVStack(spacing: 0) {
                 ForEach(prepared.systemGroups) { group in
-                    let shouldRender = renderWindow?.contains(group.systemIndex) ?? true
-                    Group {
-                        if shouldRender {
-                            let execution = executionProvider(group, prepared.renderPlan)
-                            VexCanvas(
-                                width: max(1, prepared.renderPlan.canvasWidth),
-                                height: max(1, group.height)
-                            ) { context in
-                                context.clear()
-                                do {
-                                    try drawExecution(execution, on: context)
-                                } catch {
-                                    context.setFillStyle("#B00020")
-                                    context.setFont("Menlo", 12, "normal", "normal")
-                                    context.fillText("MusicDisplay render failed: \(error)", 12, 20)
-                                }
-                            }
-                        } else {
-                            Color.clear
+                    let systemRenderPlan = prepared.systemRenderPlansByIndex[group.systemIndex]
+                        ?? prepared.renderPlan.systemSlice(for: group)
+                    VexCanvas(
+                        width: max(1, prepared.renderPlan.canvasWidth),
+                        height: max(1, group.height)
+                    ) { context in
+                        context.clear()
+                        do {
+                            // Factory.draw() resets the factory queue, so executions are single-use.
+                            let execution = VexFoundationRenderer().executeRenderPlan(systemRenderPlan)
+                            try drawExecution(execution, on: context)
+                        } catch {
+                            context.setFillStyle("#B00020")
+                            context.setFont("Menlo", 12, "normal", "normal")
+                            context.fillText("MusicDisplay render failed: \(error)", 12, 20)
                         }
                     }
                     .frame(
@@ -672,10 +759,15 @@ public struct MusicDisplayLazyScoreView: View {
                     .clipped()
                     .id("system-\(group.systemIndex)")
                     .onAppear {
-                        visibleSystemIndices.insert(group.systemIndex)
-                    }
-                    .onDisappear {
-                        visibleSystemIndices.remove(group.systemIndex)
+                        let didAdvanceVisibleRange = visibleSystemTracker.recordVisibleSystem(group.systemIndex)
+                        if didAdvanceVisibleRange,
+                           case .score(let score, let layoutOptions) = source {
+                            maybeExpandLazyMeasureWindow(
+                                score: score,
+                                baseOptions: layoutOptions,
+                                prepared: prepared
+                            )
+                        }
                     }
                 }
             }
@@ -685,22 +777,132 @@ public struct MusicDisplayLazyScoreView: View {
         }
     }
 
-    private func currentRenderWindow(for groups: [LazySystemGroup]) -> ClosedRange<Int>? {
-        let systemIndices = groups.map(\.systemIndex)
-        guard let minimumSystemIndex = systemIndices.min(),
-              let maximumSystemIndex = systemIndices.max() else {
+    private var lazyMeasureWindowLength: Int {
+        max(8, 24 + (renderBufferSystems * 8))
+    }
+
+    private var lazyMeasureExpansionThreshold: Int {
+        max(2, lazyMeasureWindowLength / 4)
+    }
+
+    private func totalMeasureCount(in score: Score) -> Int {
+        score.parts.map { $0.measures.count }.max() ?? 0
+    }
+
+    private func clampedMeasureRange(
+        _ range: Range<Int>?,
+        totalMeasures: Int
+    ) -> Range<Int>? {
+        LazyMeasureWindowing.clamp(range, totalMeasures: totalMeasures)
+    }
+
+    private func initialMeasureRange(
+        for score: Score,
+        baseOptions: LayoutOptions
+    ) -> Range<Int>? {
+        let total = totalMeasureCount(in: score)
+        return LazyMeasureWindowing.initialRange(
+            totalMeasures: total,
+            preferredRange: baseOptions.measureRange,
+            windowLength: lazyMeasureWindowLength
+        )
+    }
+
+    private func layoutOptionsForScoreSource(
+        score: Score,
+        baseOptions: LayoutOptions
+    ) -> LayoutOptions {
+        guard baseOptions.measureRange == nil else {
+            return baseOptions
+        }
+        let total = totalMeasureCount(in: score)
+        guard total > 0 else {
+            return baseOptions
+        }
+        let activeRange = clampedMeasureRange(
+            lazyMeasureRangeOverride ?? initialMeasureRange(for: score, baseOptions: baseOptions),
+            totalMeasures: total
+        )
+        guard let activeRange else {
+            return baseOptions
+        }
+        var options = baseOptions
+        options.measureRange = activeRange
+        return options
+    }
+
+    private func initializeLazyMeasureRangeIfNeeded(
+        score: Score,
+        baseOptions: LayoutOptions
+    ) {
+        guard baseOptions.measureRange == nil else {
+            lazyMeasureRangeOverride = nil
+            return
+        }
+        let total = totalMeasureCount(in: score)
+        guard total > 0 else {
+            lazyMeasureRangeOverride = nil
+            return
+        }
+        if let current = clampedMeasureRange(lazyMeasureRangeOverride, totalMeasures: total) {
+            lazyMeasureRangeOverride = current
+        } else {
+            lazyMeasureRangeOverride = initialMeasureRange(for: score, baseOptions: baseOptions)
+        }
+    }
+
+    private func clampHighestVisibleSystemIndex(prepared: PreparedLazyScoreRender) {
+        guard let minimumSystemIndex = prepared.systemGroups.map(\.systemIndex).min(),
+              let maximumSystemIndex = prepared.systemGroups.map(\.systemIndex).max() else {
+            visibleSystemTracker.clamp(to: nil)
+            return
+        }
+        visibleSystemTracker.clamp(to: minimumSystemIndex...maximumSystemIndex)
+    }
+
+    private func visibleMeasureRange(for renderPlan: VexRenderPlan) -> Range<Int>? {
+        guard let visibleSystemIndex = visibleSystemTracker.highestVisibleSystemIndex else { return nil }
+        let maximumSystemIndex = renderPlan.measures.map(\.systemIndex).max() ?? visibleSystemIndex
+        let clampedVisibleSystemIndex = min(maximumSystemIndex, max(0, visibleSystemIndex))
+        let lowerSystemIndex = max(0, clampedVisibleSystemIndex - renderBufferSystems)
+        var minimumMeasureIndex = Int.max
+        var maximumMeasureIndex = Int.min
+        for measurePlan in renderPlan.measures
+        where measurePlan.systemIndex >= lowerSystemIndex
+            && measurePlan.systemIndex <= clampedVisibleSystemIndex {
+            minimumMeasureIndex = min(minimumMeasureIndex, measurePlan.measureIndexInPart)
+            maximumMeasureIndex = max(maximumMeasureIndex, measurePlan.measureIndexInPart)
+        }
+        guard minimumMeasureIndex != Int.max, maximumMeasureIndex >= minimumMeasureIndex else {
             return nil
         }
+        return minimumMeasureIndex..<(maximumMeasureIndex + 1)
+    }
 
-        let validVisible = visibleSystemIndices.filter { systemIndex in
-            systemIndex >= minimumSystemIndex && systemIndex <= maximumSystemIndex
+    private func maybeExpandLazyMeasureWindow(
+        score: Score,
+        baseOptions: LayoutOptions,
+        prepared: PreparedLazyScoreRender
+    ) {
+        guard baseOptions.measureRange == nil else { return }
+        clampHighestVisibleSystemIndex(prepared: prepared)
+        let total = totalMeasureCount(in: score)
+        guard total > 0 else { return }
+        guard let visibleRange = visibleMeasureRange(for: prepared.renderPlan) else { return }
+
+        let currentRange = clampedMeasureRange(
+            lazyMeasureRangeOverride ?? initialMeasureRange(for: score, baseOptions: baseOptions),
+            totalMeasures: total
+        ) ?? (0..<min(total, lazyMeasureWindowLength))
+        if let expandedRange = LazyMeasureWindowing.expandedRangeIfNeeded(
+            currentRange: currentRange,
+            visibleRange: visibleRange,
+            totalMeasures: total,
+            windowLength: lazyMeasureWindowLength,
+            threshold: lazyMeasureExpansionThreshold
+        ) {
+            lazyMeasureRangeOverride = expandedRange
         }
-        let minVisible = validVisible.min() ?? minimumSystemIndex
-        let maxVisible = validVisible.max() ?? minVisible
-
-        let lowerBound = max(minimumSystemIndex, minVisible - renderBufferSystems)
-        let upperBound = min(maximumSystemIndex, maxVisible + renderBufferSystems)
-        return lowerBound...upperBound
     }
 }
 

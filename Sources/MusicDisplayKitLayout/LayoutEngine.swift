@@ -151,6 +151,9 @@ public struct LayoutOptions: Equatable, Sendable {
 }
 
 public struct LaidOutScore: Equatable, Sendable {
+    /// Opaque revision token used by render caches to invalidate prepared state
+    /// without deep value comparisons on every SwiftUI body recomputation.
+    public let renderRevision: UInt64
     public let score: Score
     public let pageWidth: Double
     public let pageHeight: Double?
@@ -161,6 +164,7 @@ public struct LaidOutScore: Equatable, Sendable {
     public let barlineConnectors: [LaidOutBarlineConnector]
 
     public init(
+        renderRevision: UInt64 = UInt64.random(in: UInt64.min...UInt64.max),
         score: Score,
         pageWidth: Double,
         pageHeight: Double?,
@@ -170,6 +174,7 @@ public struct LaidOutScore: Equatable, Sendable {
         partGroups: [LaidOutPartGroup],
         barlineConnectors: [LaidOutBarlineConnector]
     ) {
+        self.renderRevision = renderRevision
         self.score = score
         self.pageWidth = pageWidth
         self.pageHeight = pageHeight
@@ -178,6 +183,17 @@ public struct LaidOutScore: Equatable, Sendable {
         self.measures = measures
         self.partGroups = partGroups
         self.barlineConnectors = barlineConnectors
+    }
+
+    public static func == (lhs: LaidOutScore, rhs: LaidOutScore) -> Bool {
+        lhs.score == rhs.score &&
+            lhs.pageWidth == rhs.pageWidth &&
+            lhs.pageHeight == rhs.pageHeight &&
+            lhs.autoBeam == rhs.autoBeam &&
+            lhs.systems == rhs.systems &&
+            lhs.measures == rhs.measures &&
+            lhs.partGroups == rhs.partGroups &&
+            lhs.barlineConnectors == rhs.barlineConnectors
     }
 }
 

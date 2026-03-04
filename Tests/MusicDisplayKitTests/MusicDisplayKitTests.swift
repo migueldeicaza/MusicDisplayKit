@@ -7,7 +7,7 @@ import MusicDisplayKitCore
 import MusicDisplayKitLayout
 import MusicDisplayKitModel
 import MusicDisplayKitMusicXML
-import MusicDisplayKitVexAdapter
+@testable import MusicDisplayKitVexAdapter
 import VexFoundation
 #if canImport(SwiftUI)
 import SwiftUI
@@ -17867,6 +17867,188 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
 
     let posMap = renderer.notePositionMap(from: execution)
     #expect(!posMap.isEmpty)
+}
+
+@Test func laidOutScoreEqualityIgnoresRenderRevision() {
+    let score = Score(title: "Revision Equality", parts: [])
+    let a = LaidOutScore(
+        renderRevision: 1,
+        score: score,
+        pageWidth: 400,
+        pageHeight: nil,
+        systems: [],
+        measures: [],
+        partGroups: [],
+        barlineConnectors: []
+    )
+    let b = LaidOutScore(
+        renderRevision: 2,
+        score: score,
+        pageWidth: 400,
+        pageHeight: nil,
+        systems: [],
+        measures: [],
+        partGroups: [],
+        barlineConnectors: []
+    )
+
+    #expect(a.renderRevision != b.renderRevision)
+    #expect(a == b)
+}
+
+@Test func vexRenderMetricsSnapshotIncrementsAfterRender() throws {
+    let before = VexRenderMetrics.snapshot()
+
+    let score = Score(
+        title: "Metrics",
+        parts: [
+            Part(
+                id: "P1",
+                measures: [
+                    Measure(
+                        number: 1,
+                        divisions: 4,
+                        attributes: MeasureAttributes(
+                            time: TimeSignature(beats: 4, beatType: 4),
+                            clefs: [ClefSetting(sign: "G", line: 2)]
+                        ),
+                        noteEvents: [
+                            NoteEvent(
+                                kind: .pitched,
+                                pitch: PitchValue(step: "C", octave: 4),
+                                onsetDivisions: 0,
+                                durationDivisions: 4,
+                                voice: 1
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+        ]
+    )
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 360))
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 360, height: 160))
+    _ = renderer.executeRenderPlan(plan)
+
+    let after = VexRenderMetrics.snapshot()
+    #expect(after.makeRenderPlanCount >= before.makeRenderPlanCount + 1)
+    #expect(after.executeRenderPlanCount >= before.executeRenderPlanCount + 1)
+}
+
+@Test func lazyMeasureWindowingInitialRangeAndClamp() {
+    #expect(
+        LazyMeasureWindowing.initialRange(
+            totalMeasures: 100,
+            preferredRange: nil,
+            windowLength: 24
+        ) == 0..<24
+    )
+    #expect(
+        LazyMeasureWindowing.initialRange(
+            totalMeasures: 10,
+            preferredRange: nil,
+            windowLength: 24
+        ) == 0..<10
+    )
+    #expect(
+        LazyMeasureWindowing.initialRange(
+            totalMeasures: 12,
+            preferredRange: 5..<20,
+            windowLength: 24
+        ) == 5..<12
+    )
+    #expect(
+        LazyMeasureWindowing.initialRange(
+            totalMeasures: 0,
+            preferredRange: nil,
+            windowLength: 24
+        ) == nil
+    )
+}
+
+@Test func lazyMeasureWindowingExpandsNearVisibleEdge() {
+    #expect(
+        LazyMeasureWindowing.expandedRangeIfNeeded(
+            currentRange: 0..<24,
+            visibleRange: 20..<23,
+            totalMeasures: 100,
+            windowLength: 24,
+            threshold: 6
+        ) == 0..<48
+    )
+    #expect(
+        LazyMeasureWindowing.expandedRangeIfNeeded(
+            currentRange: 0..<24,
+            visibleRange: 4..<8,
+            totalMeasures: 100,
+            windowLength: 24,
+            threshold: 6
+        ) == nil
+    )
+    #expect(
+        LazyMeasureWindowing.expandedRangeIfNeeded(
+            currentRange: 0..<24,
+            visibleRange: 22..<24,
+            totalMeasures: 30,
+            windowLength: 24,
+            threshold: 6
+        ) == 0..<30
+    )
+}
+
+@Test func lazySystemVisibilityRecordsMonotonicHighestVisibleSystemIndex() {
+    var highest: Int?
+    highest = LazySystemVisibility.recordVisibleSystem(
+        currentHighestVisibleSystemIndex: highest,
+        appearedSystemIndex: 2
+    )
+    #expect(highest == 2)
+
+    highest = LazySystemVisibility.recordVisibleSystem(
+        currentHighestVisibleSystemIndex: highest,
+        appearedSystemIndex: 1
+    )
+    #expect(highest == 2)
+
+    highest = LazySystemVisibility.recordVisibleSystem(
+        currentHighestVisibleSystemIndex: highest,
+        appearedSystemIndex: 7
+    )
+    #expect(highest == 7)
+}
+
+@Test func lazySystemVisibilityClampsAndSeedsFromAvailableRange() {
+    #expect(
+        LazySystemVisibility.clampedHighestVisibleSystemIndex(
+            currentHighestVisibleSystemIndex: nil,
+            availableSystemRange: 4...9
+        ) == 4
+    )
+    #expect(
+        LazySystemVisibility.clampedHighestVisibleSystemIndex(
+            currentHighestVisibleSystemIndex: 12,
+            availableSystemRange: 4...9
+        ) == 9
+    )
+    #expect(
+        LazySystemVisibility.clampedHighestVisibleSystemIndex(
+            currentHighestVisibleSystemIndex: 2,
+            availableSystemRange: 4...9
+        ) == 4
+    )
+    #expect(
+        LazySystemVisibility.clampedHighestVisibleSystemIndex(
+            currentHighestVisibleSystemIndex: 6,
+            availableSystemRange: 4...9
+        ) == 6
+    )
+    #expect(
+        LazySystemVisibility.clampedHighestVisibleSystemIndex(
+            currentHighestVisibleSystemIndex: 6,
+            availableSystemRange: nil
+        ) == nil
+    )
 }
 
 // MARK: - OSMD Fixture Parity Baseline (9.1)
