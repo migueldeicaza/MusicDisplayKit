@@ -40,8 +40,14 @@ private struct LazyScoreInput: Equatable {
     let target: RenderTarget
 }
 
+private struct LazyLaidOutScoreInput: Equatable {
+    let laidOutScore: LaidOutScore
+    let target: RenderTarget
+}
+
 private struct PreparedScoreRender {
     let renderPlan: VexRenderPlan
+    let execution: VexFactoryExecution
 }
 
 private struct LazySystemGroup: Identifiable, Equatable {
@@ -117,7 +123,8 @@ private final class ScoreRenderCache: ObservableObject {
 
         let renderer = VexFoundationRenderer()
         let renderPlan = renderer.makeRenderPlan(from: laidOutScore, target: target)
-        let prepared = PreparedScoreRender(renderPlan: renderPlan)
+        let execution = renderer.executeRenderPlan(renderPlan)
+        let prepared = PreparedScoreRender(renderPlan: renderPlan, execution: execution)
         cachedInput = input
         cachedRender = prepared
         return prepared
@@ -128,7 +135,7 @@ private final class ScoreRenderCache: ObservableObject {
 private final class LazyScoreRenderCache: ObservableObject {
     private var cachedInput: LazyScoreInput?
     private var cachedPreparedResult: Result<PreparedLazyScoreRender, Error>?
-    private var cachedSystemPlansBySystemIndex: [Int: VexRenderPlan] = [:]
+    private var cachedExecutionsBySystemIndex: [Int: VexFactoryExecution] = [:]
 
     func resolve(
         score: Score,
@@ -152,18 +159,55 @@ private final class LazyScoreRenderCache: ObservableObject {
 
         cachedInput = input
         cachedPreparedResult = preparedResult
-        cachedSystemPlansBySystemIndex.removeAll()
+        cachedExecutionsBySystemIndex.removeAll()
         return preparedResult
     }
 
-    func systemRenderPlan(for group: LazySystemGroup, in renderPlan: VexRenderPlan) -> VexRenderPlan {
-        if let cached = cachedSystemPlansBySystemIndex[group.systemIndex] {
+    func execution(for group: LazySystemGroup, in renderPlan: VexRenderPlan) -> VexFactoryExecution {
+        if let cached = cachedExecutionsBySystemIndex[group.systemIndex] {
             return cached
         }
 
         let slicedPlan = renderPlan.systemSlice(for: group)
-        cachedSystemPlansBySystemIndex[group.systemIndex] = slicedPlan
-        return slicedPlan
+        let execution = VexFoundationRenderer().executeRenderPlan(slicedPlan)
+        cachedExecutionsBySystemIndex[group.systemIndex] = execution
+        return execution
+    }
+}
+
+@MainActor
+private final class LazyLaidOutScoreRenderCache: ObservableObject {
+    private var cachedInput: LazyLaidOutScoreInput?
+    private var cachedPrepared: PreparedLazyScoreRender?
+    private var cachedExecutionsBySystemIndex: [Int: VexFactoryExecution] = [:]
+
+    func resolve(laidOutScore: LaidOutScore, target: RenderTarget) -> PreparedLazyScoreRender {
+        let input = LazyLaidOutScoreInput(laidOutScore: laidOutScore, target: target)
+        if let cachedInput, cachedInput == input, let cachedPrepared {
+            return cachedPrepared
+        }
+
+        let renderer = VexFoundationRenderer()
+        let renderPlan = renderer.makeRenderPlan(from: laidOutScore, target: target)
+        let prepared = PreparedLazyScoreRender(
+            renderPlan: renderPlan,
+            systemGroups: makeLazySystemGroups(from: laidOutScore)
+        )
+        cachedInput = input
+        cachedPrepared = prepared
+        cachedExecutionsBySystemIndex.removeAll()
+        return prepared
+    }
+
+    func execution(for group: LazySystemGroup, in renderPlan: VexRenderPlan) -> VexFactoryExecution {
+        if let cached = cachedExecutionsBySystemIndex[group.systemIndex] {
+            return cached
+        }
+
+        let slicedPlan = renderPlan.systemSlice(for: group)
+        let execution = VexFoundationRenderer().executeRenderPlan(slicedPlan)
+        cachedExecutionsBySystemIndex[group.systemIndex] = execution
+        return execution
     }
 }
 
@@ -316,8 +360,7 @@ public struct VexScoreView: View {
         ) { context in
             context.clear()
             do {
-                let execution = VexFoundationRenderer().executeRenderPlan(prepared.renderPlan)
-                try drawExecution(execution, on: context)
+                try drawExecution(prepared.execution, on: context)
             } catch {
                 context.setFillStyle("#B00020")
                 context.setFont("Menlo", 12, "normal", "normal")
@@ -486,62 +529,178 @@ public struct MusicDisplayScrollableScoreView: View {
 /// initial render time for long scores.
 @available(iOS 17.0, macOS 14.0, *)
 public struct MusicDisplayLazyScoreView: View {
-    private let score: Score
-    private let layoutOptions: LayoutOptions
+    private enum Source {
+        case score(score: Score, layoutOptions: LayoutOptions)
+        case laidOutScore(LaidOutScore)
+    }
+
+    private let source: Source
     private let target: RenderTarget
+    private let embedInScrollView: Bool
+    private let renderBufferSystems: Int
+    @State private var visibleSystemIndices: Set<Int> = []
     @StateObject private var lazyRenderCache = LazyScoreRenderCache()
+    @StateObject private var lazyLaidOutRenderCache = LazyLaidOutScoreRenderCache()
 
     public init(
         score: Score,
         layoutOptions: LayoutOptions = LayoutOptions(),
-        target: RenderTarget = .view(identifier: "music-display-view")
+        target: RenderTarget = .view(identifier: "music-display-view"),
+        embedInScrollView: Bool = true,
+        renderBufferSystems: Int = 2
     ) {
-        self.score = score
-        self.layoutOptions = layoutOptions
+        self.source = .score(score: score, layoutOptions: layoutOptions)
         self.target = target
+        self.embedInScrollView = embedInScrollView
+        self.renderBufferSystems = max(0, renderBufferSystems)
     }
 
-    public var body: some View {
-        let preparedResult = lazyRenderCache.resolve(
+    public init(
+        score: Score,
+        layoutOptions: LayoutOptions = LayoutOptions(),
+        targetIdentifier: String,
+        embedInScrollView: Bool = true,
+        renderBufferSystems: Int = 2
+    ) {
+        self.init(
             score: score,
             layoutOptions: layoutOptions,
-            target: target
+            target: .view(identifier: targetIdentifier),
+            embedInScrollView: embedInScrollView,
+            renderBufferSystems: renderBufferSystems
         )
+    }
 
-        ScrollView {
-            switch preparedResult {
-            case .success(let prepared):
-                LazyVStack(spacing: 0) {
-                    ForEach(prepared.systemGroups) { group in
-                        let systemRenderPlan = lazyRenderCache.systemRenderPlan(for: group, in: prepared.renderPlan)
+    public init(
+        laidOutScore: LaidOutScore,
+        target: RenderTarget = .view(identifier: "music-display-view"),
+        embedInScrollView: Bool = true,
+        renderBufferSystems: Int = 2
+    ) {
+        self.source = .laidOutScore(laidOutScore)
+        self.target = target
+        self.embedInScrollView = embedInScrollView
+        self.renderBufferSystems = max(0, renderBufferSystems)
+    }
 
-                        VexCanvas(
-                            width: max(1, prepared.renderPlan.canvasWidth),
-                            height: max(1, group.height)
-                        ) { context in
-                            context.clear()
-                            do {
-                                let execution = VexFoundationRenderer().executeRenderPlan(systemRenderPlan)
-                                try drawExecution(execution, on: context)
-                            } catch {
-                                context.setFillStyle("#B00020")
-                                context.setFont("Menlo", 12, "normal", "normal")
-                                context.fillText("MusicDisplay render failed: \(error)", 12, 20)
-                            }
-                        }
-                            .frame(
-                                width: max(1, prepared.renderPlan.canvasWidth),
-                                height: max(1, group.height)
-                            )
-                            .clipped()
-                            .id("system-\(group.systemIndex)")
-                    }
-                }
-                .frame(width: max(1, prepared.renderPlan.canvasWidth))
-            case .failure:
-                LayoutFailureView()
+    public init(
+        laidOutScore: LaidOutScore,
+        targetIdentifier: String,
+        embedInScrollView: Bool = true,
+        renderBufferSystems: Int = 2
+    ) {
+        self.init(
+            laidOutScore: laidOutScore,
+            target: .view(identifier: targetIdentifier),
+            embedInScrollView: embedInScrollView,
+            renderBufferSystems: renderBufferSystems
+        )
+    }
+
+    @ViewBuilder
+    public var body: some View {
+        switch source {
+        case .score(let score, let layoutOptions):
+            let preparedResult = lazyRenderCache.resolve(
+                score: score,
+                layoutOptions: layoutOptions,
+                target: target
+            )
+            content(preparedResult: preparedResult) { group, renderPlan in
+                lazyRenderCache.execution(for: group, in: renderPlan)
+            }
+        case .laidOutScore(let laidOutScore):
+            let prepared = lazyLaidOutRenderCache.resolve(
+                laidOutScore: laidOutScore,
+                target: target
+            )
+            content(preparedResult: .success(prepared)) { group, renderPlan in
+                lazyLaidOutRenderCache.execution(for: group, in: renderPlan)
             }
         }
+    }
+
+    @ViewBuilder
+    private func content(
+        preparedResult: Result<PreparedLazyScoreRender, Error>,
+        executionProvider: @escaping (LazySystemGroup, VexRenderPlan) -> VexFactoryExecution
+    ) -> some View {
+        if embedInScrollView {
+            ScrollView {
+                systemRows(preparedResult: preparedResult, executionProvider: executionProvider)
+            }
+        } else {
+            systemRows(preparedResult: preparedResult, executionProvider: executionProvider)
+        }
+    }
+
+    @ViewBuilder
+    private func systemRows(
+        preparedResult: Result<PreparedLazyScoreRender, Error>,
+        executionProvider: @escaping (LazySystemGroup, VexRenderPlan) -> VexFactoryExecution
+    ) -> some View {
+        switch preparedResult {
+        case .success(let prepared):
+            let renderWindow = currentRenderWindow(for: prepared.systemGroups)
+            LazyVStack(spacing: 0) {
+                ForEach(prepared.systemGroups) { group in
+                    let shouldRender = renderWindow?.contains(group.systemIndex) ?? true
+                    Group {
+                        if shouldRender {
+                            let execution = executionProvider(group, prepared.renderPlan)
+                            VexCanvas(
+                                width: max(1, prepared.renderPlan.canvasWidth),
+                                height: max(1, group.height)
+                            ) { context in
+                                context.clear()
+                                do {
+                                    try drawExecution(execution, on: context)
+                                } catch {
+                                    context.setFillStyle("#B00020")
+                                    context.setFont("Menlo", 12, "normal", "normal")
+                                    context.fillText("MusicDisplay render failed: \(error)", 12, 20)
+                                }
+                            }
+                        } else {
+                            Color.clear
+                        }
+                    }
+                    .frame(
+                        width: max(1, prepared.renderPlan.canvasWidth),
+                        height: max(1, group.height)
+                    )
+                    .clipped()
+                    .id("system-\(group.systemIndex)")
+                    .onAppear {
+                        visibleSystemIndices.insert(group.systemIndex)
+                    }
+                    .onDisappear {
+                        visibleSystemIndices.remove(group.systemIndex)
+                    }
+                }
+            }
+            .frame(width: max(1, prepared.renderPlan.canvasWidth))
+        case .failure:
+            LayoutFailureView()
+        }
+    }
+
+    private func currentRenderWindow(for groups: [LazySystemGroup]) -> ClosedRange<Int>? {
+        let systemIndices = groups.map(\.systemIndex)
+        guard let minimumSystemIndex = systemIndices.min(),
+              let maximumSystemIndex = systemIndices.max() else {
+            return nil
+        }
+
+        let validVisible = visibleSystemIndices.filter { systemIndex in
+            systemIndex >= minimumSystemIndex && systemIndex <= maximumSystemIndex
+        }
+        let minVisible = validVisible.min() ?? minimumSystemIndex
+        let maxVisible = validVisible.max() ?? minVisible
+
+        let lowerBound = max(minimumSystemIndex, minVisible - renderBufferSystems)
+        let upperBound = min(maximumSystemIndex, maxVisible + renderBufferSystems)
+        return lowerBound...upperBound
     }
 }
 
