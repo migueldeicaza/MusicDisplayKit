@@ -3921,33 +3921,81 @@ public struct VexFoundationRenderer: ScoreRenderer {
             createdLyricConnectors.append(annotation)
         }
 
-        let measureBarlineConnectors: [StaveConnector] = plan.measureBoundaries.compactMap { boundaryPlan in
-            guard let stave = stavesByLookupKey[
-                StaveLookupKey(
-                    systemIndex: boundaryPlan.systemIndex,
-                    partIndex: boundaryPlan.partIndex
+        struct MeasureBoundaryGroupKey: Hashable {
+            let systemIndex: Int
+            let measureIndexInPart: Int
+        }
+        struct MeasureBoundaryGroupValue {
+            var minPartIndex: Int
+            var maxPartIndex: Int
+            var xSum: Double
+            var count: Int
+        }
+
+        var measureBoundaryGroups: [MeasureBoundaryGroupKey: MeasureBoundaryGroupValue] = [:]
+        for boundaryPlan in plan.measureBoundaries {
+            let key = MeasureBoundaryGroupKey(
+                systemIndex: boundaryPlan.systemIndex,
+                measureIndexInPart: boundaryPlan.measureIndexInPart
+            )
+            if var existing = measureBoundaryGroups[key] {
+                existing.minPartIndex = min(existing.minPartIndex, boundaryPlan.partIndex)
+                existing.maxPartIndex = max(existing.maxPartIndex, boundaryPlan.partIndex)
+                existing.xSum += boundaryPlan.x
+                existing.count += 1
+                measureBoundaryGroups[key] = existing
+            } else {
+                measureBoundaryGroups[key] = MeasureBoundaryGroupValue(
+                    minPartIndex: boundaryPlan.partIndex,
+                    maxPartIndex: boundaryPlan.partIndex,
+                    xSum: boundaryPlan.x,
+                    count: 1
                 )
-            ] else {
+            }
+        }
+
+        let sortedMeasureBoundaryGroups = measureBoundaryGroups.sorted { lhs, rhs in
+            if lhs.key.systemIndex != rhs.key.systemIndex {
+                return lhs.key.systemIndex < rhs.key.systemIndex
+            }
+            return lhs.key.measureIndexInPart < rhs.key.measureIndexInPart
+        }
+
+        let measureBarlineConnectors: [StaveConnector] = sortedMeasureBoundaryGroups.compactMap { group in
+            guard let topStave = stavesByLookupKey[
+                StaveLookupKey(
+                    systemIndex: group.key.systemIndex,
+                    partIndex: group.value.minPartIndex
+                )
+            ],
+                  let bottomStave = stavesByLookupKey[
+                    StaveLookupKey(
+                        systemIndex: group.key.systemIndex,
+                        partIndex: group.value.maxPartIndex
+                    )
+                  ] else {
                 return nil
             }
 
-            // Avoid doubling the stave's own terminal barline.
-            let staveRightBoundaryX = stave.getX() + stave.getWidth()
-            if abs(boundaryPlan.x - staveRightBoundaryX) < 0.5 {
+            let boundaryX = group.value.xSum / Double(max(group.value.count, 1))
+
+            // Avoid doubling the terminal barline at the stave's right boundary.
+            let topStaveRightBoundaryX = topStave.getX() + topStave.getWidth()
+            if abs(boundaryX - topStaveRightBoundaryX) < 0.5 {
                 return nil
             }
 
             let connector = factory.StaveConnector(
-                topStave: stave,
-                bottomStave: stave,
+                topStave: topStave,
+                bottomStave: bottomStave,
                 type: .singleLeft
             )
             connector.connectorWidth = 1
             connector.thickness = 1
             _ = connector.setXShift(
                 connectorXShift(
-                    targetX: boundaryPlan.x,
-                    topStave: stave,
+                    targetX: boundaryX,
+                    topStave: topStave,
                     kind: .singleLeft
                 )
             )

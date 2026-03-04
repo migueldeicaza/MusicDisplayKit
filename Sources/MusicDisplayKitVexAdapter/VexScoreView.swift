@@ -51,27 +51,88 @@ private struct LazySystemGroup: Identifiable, Equatable {
     var id: Int { systemIndex }
 }
 
+private struct PreparedLazySystemRender: Identifiable {
+    let group: LazySystemGroup
+    let renderPlan: VexRenderPlan
+    var id: Int { group.systemIndex }
+}
+
 private struct PreparedLazyScoreRender {
     let renderPlan: VexRenderPlan
-    let systemGroups: [LazySystemGroup]
-    let systemRenderPlansByIndex: [Int: VexRenderPlan]
+    let systems: [PreparedLazySystemRender]
+    let availableSystemIndexRange: ClosedRange<Int>?
+    let measureRangeBySystem: [Int: Range<Int>]
 }
 
 private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySystemGroup] {
-    var bottomsBySystemIndex: [Int: Double] = [:]
+    var verticalBoundsBySystemIndex: [Int: (minimumY: Double, maximumY: Double)] = [:]
     for system in laidOutScore.systems {
-        let bottom = system.frame.y + system.frame.height
-        bottomsBySystemIndex[system.systemIndex] = max(
-            bottomsBySystemIndex[system.systemIndex, default: 0],
-            bottom
-        )
+        let minimumY = system.frame.y
+        let maximumY = system.frame.y + system.frame.height
+        if let existing = verticalBoundsBySystemIndex[system.systemIndex] {
+            verticalBoundsBySystemIndex[system.systemIndex] = (
+                minimumY: min(existing.minimumY, minimumY),
+                maximumY: max(existing.maximumY, maximumY)
+            )
+        } else {
+            verticalBoundsBySystemIndex[system.systemIndex] = (
+                minimumY: minimumY,
+                maximumY: maximumY
+            )
+        }
+    }
+
+    let sortedSystemIndices = verticalBoundsBySystemIndex.keys.sorted()
+    guard !sortedSystemIndices.isEmpty else { return [] }
+
+    // Keep more of the inter-system gap below the preceding system because
+    // stave-level glyphs (e.g. time signatures) descend below staff bounds.
+    let preferredCurrentTopGapRatio: Double = 0.2
+    let minimumCurrentTopGap: Double = 2
+    let trailingBleed: Double = 40
+
+    var systemBoundaries: [Double] = []
+    if sortedSystemIndices.count > 1 {
+        systemBoundaries.reserveCapacity(sortedSystemIndices.count - 1)
+        for index in 0..<(sortedSystemIndices.count - 1) {
+            let previousSystemIndex = sortedSystemIndices[index]
+            let nextSystemIndex = sortedSystemIndices[index + 1]
+            guard let previousBounds = verticalBoundsBySystemIndex[previousSystemIndex],
+                  let nextBounds = verticalBoundsBySystemIndex[nextSystemIndex] else {
+                continue
+            }
+
+            let gapStart = previousBounds.maximumY
+            let gapEnd = nextBounds.minimumY
+            guard gapEnd > gapStart else {
+                systemBoundaries.append(gapStart)
+                continue
+            }
+
+            let gap = gapEnd - gapStart
+            let currentTopGap = min(
+                gap,
+                max(minimumCurrentTopGap, gap * preferredCurrentTopGapRatio)
+            )
+            systemBoundaries.append(gapEnd - currentTopGap)
+        }
     }
 
     var groups: [LazySystemGroup] = []
     var previousBottom: Double = 0
-    for systemIndex in bottomsBySystemIndex.keys.sorted() {
-        let bottom = bottomsBySystemIndex[systemIndex] ?? previousBottom
-        let top = previousBottom
+    for (offset, systemIndex) in sortedSystemIndices.enumerated() {
+        guard let bounds = verticalBoundsBySystemIndex[systemIndex] else { continue }
+        let rawTop: Double = offset == 0 ? 0 : systemBoundaries[offset - 1]
+
+        let rawBottom: Double
+        if offset < systemBoundaries.count {
+            rawBottom = systemBoundaries[offset]
+        } else {
+            rawBottom = bounds.maximumY + trailingBleed
+        }
+
+        let top = max(previousBottom, rawTop)
+        let bottom = max(top + 40, max(bounds.maximumY, rawBottom))
         let height = max(40, bottom - top)
         groups.append(
             LazySystemGroup(
@@ -85,13 +146,49 @@ private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySyste
     return groups
 }
 
-private func makeLazySystemRenderPlans(
+private func makePreparedLazySystems(
     from renderPlan: VexRenderPlan,
     systemGroups: [LazySystemGroup]
-) -> [Int: VexRenderPlan] {
-    Dictionary(uniqueKeysWithValues: systemGroups.map { group in
-        (group.systemIndex, renderPlan.systemSlice(for: group))
-    })
+) -> [PreparedLazySystemRender] {
+    systemGroups.map { group in
+        PreparedLazySystemRender(
+            group: group,
+            renderPlan: renderPlan.systemSlice(for: group)
+        )
+    }
+}
+
+private func makeSystemIndexRange(from systems: [PreparedLazySystemRender]) -> ClosedRange<Int>? {
+    guard let first = systems.first else { return nil }
+    var minimum = first.group.systemIndex
+    var maximum = first.group.systemIndex
+    for system in systems.dropFirst() {
+        minimum = min(minimum, system.group.systemIndex)
+        maximum = max(maximum, system.group.systemIndex)
+    }
+    return minimum...maximum
+}
+
+private func makeMeasureRangeBySystem(from renderPlan: VexRenderPlan) -> [Int: Range<Int>] {
+    var boundsBySystem: [Int: (minimum: Int, maximum: Int)] = [:]
+    for measure in renderPlan.measures {
+        let systemIndex = measure.systemIndex
+        if let bounds = boundsBySystem[systemIndex] {
+            boundsBySystem[systemIndex] = (
+                minimum: min(bounds.minimum, measure.measureIndexInPart),
+                maximum: max(bounds.maximum, measure.measureIndexInPart)
+            )
+        } else {
+            boundsBySystem[systemIndex] = (
+                minimum: measure.measureIndexInPart,
+                maximum: measure.measureIndexInPart
+            )
+        }
+    }
+
+    return boundsBySystem.mapValues { bounds in
+        bounds.minimum..<(bounds.maximum + 1)
+    }
 }
 
 enum LazyMeasureWindowing {
@@ -246,13 +343,12 @@ private final class LazyLaidOutScoreRenderCache {
         let renderer = VexFoundationRenderer()
         let renderPlan = renderer.makeRenderPlan(from: laidOutScore, target: target)
         let systemGroups = makeLazySystemGroups(from: laidOutScore)
+        let systems = makePreparedLazySystems(from: renderPlan, systemGroups: systemGroups)
         let prepared = PreparedLazyScoreRender(
             renderPlan: renderPlan,
-            systemGroups: systemGroups,
-            systemRenderPlansByIndex: makeLazySystemRenderPlans(
-                from: renderPlan,
-                systemGroups: systemGroups
-            )
+            systems: systems,
+            availableSystemIndexRange: makeSystemIndexRange(from: systems),
+            measureRangeBySystem: makeMeasureRangeBySystem(from: renderPlan)
         )
         cachedInput = input
         cachedPrepared = prepared
@@ -299,6 +395,78 @@ private extension VexMeasurePlan {
     }
 }
 
+private extension VexNotePlan {
+    func offsetting(y delta: Double) -> VexNotePlan {
+        VexNotePlan(
+            systemIndex: systemIndex,
+            partIndex: partIndex,
+            measureIndexInPart: measureIndexInPart,
+            measureNumber: measureNumber,
+            pageIndex: pageIndex,
+            measureFrame: measureFrame.offsetting(y: delta),
+            isFirstMeasureInSystem: isFirstMeasureInSystem,
+            voice: voice,
+            staff: staff,
+            clef: clef,
+            entryIndexInVoice: entryIndexInVoice,
+            onsetDivisions: onsetDivisions,
+            durationDivisions: durationDivisions,
+            divisions: divisions,
+            isRest: isRest,
+            keyTokens: keyTokens,
+            sourceOrder: sourceOrder,
+            noteType: noteType,
+            dotCount: dotCount,
+            accidental: accidental,
+            stemDirection: stemDirection,
+            ornaments: ornaments,
+            fermatas: fermatas,
+            arpeggiate: arpeggiate,
+            tremolo: tremolo,
+            dynamics: dynamics,
+            glissandos: glissandos,
+            isCue: isCue,
+            noteheadType: noteheadType,
+            color: color,
+            graceNotes: graceNotes,
+            crossStaffTarget: crossStaffTarget
+        )
+    }
+}
+
+private extension VexPartGroupConnectorPlan {
+    func offsetting(y delta: Double) -> VexPartGroupConnectorPlan {
+        VexPartGroupConnectorPlan(
+            sourceGroupIndex: sourceGroupIndex,
+            pageIndex: pageIndex,
+            startSystemIndex: startSystemIndex,
+            endSystemIndex: endSystemIndex,
+            startPartIndex: startPartIndex,
+            endPartIndex: endPartIndex,
+            kind: kind,
+            renderOrder: renderOrder,
+            style: style,
+            label: label,
+            frame: frame.offsetting(y: delta)
+        )
+    }
+}
+
+private extension VexBarlineConnectorPlan {
+    func offsetting(y delta: Double) -> VexBarlineConnectorPlan {
+        VexBarlineConnectorPlan(
+            sourceGroupIndex: sourceGroupIndex,
+            pageIndex: pageIndex,
+            startSystemIndex: startSystemIndex,
+            endSystemIndex: endSystemIndex,
+            startPartIndex: startPartIndex,
+            endPartIndex: endPartIndex,
+            kind: kind,
+            frame: frame.offsetting(y: delta)
+        )
+    }
+}
+
 private extension VexRenderPlan {
     func systemSlice(for group: LazySystemGroup) -> VexRenderPlan {
         let systemIndex = group.systemIndex
@@ -324,7 +492,8 @@ private extension VexRenderPlan {
             measureBoundaries: measureBoundaries
                 .filter { $0.systemIndex == systemIndex },
             notes: notes
-                .filter { $0.systemIndex == systemIndex },
+                .filter { $0.systemIndex == systemIndex }
+                .map { $0.offsetting(y: yOffset) },
             beams: beams
                 .filter { $0.systemIndex == systemIndex },
             tuplets: tuplets
@@ -360,9 +529,11 @@ private extension VexRenderPlan {
             lyricConnectors: lyricConnectors
                 .filter { $0.startSystemIndex == systemIndex && $0.endSystemIndex == systemIndex },
             partGroupConnectors: partGroupConnectors
-                .filter { $0.startSystemIndex == systemIndex && $0.endSystemIndex == systemIndex },
+                .filter { $0.startSystemIndex == systemIndex && $0.endSystemIndex == systemIndex }
+                .map { $0.offsetting(y: yOffset) },
             barlineConnectors: barlineConnectors
                 .filter { $0.startSystemIndex == systemIndex && $0.endSystemIndex == systemIndex }
+                .map { $0.offsetting(y: yOffset) }
         )
     }
 }
@@ -734,46 +905,58 @@ public struct MusicDisplayLazyScoreView: View {
         switch preparedResult {
         case .success(let prepared):
             LazyVStack(spacing: 0) {
-                ForEach(prepared.systemGroups) { group in
-                    let systemRenderPlan = prepared.systemRenderPlansByIndex[group.systemIndex]
-                        ?? prepared.renderPlan.systemSlice(for: group)
-                    VexCanvas(
-                        width: max(1, prepared.renderPlan.canvasWidth),
-                        height: max(1, group.height)
-                    ) { context in
-                        context.clear()
-                        do {
-                            // Factory.draw() resets the factory queue, so executions are single-use.
-                            let execution = VexFoundationRenderer().executeRenderPlan(systemRenderPlan)
-                            try drawExecution(execution, on: context)
-                        } catch {
-                            context.setFillStyle("#B00020")
-                            context.setFont("Menlo", 12, "normal", "normal")
-                            context.fillText("MusicDisplay render failed: \(error)", 12, 20)
-                        }
-                    }
-                    .frame(
-                        width: max(1, prepared.renderPlan.canvasWidth),
-                        height: max(1, group.height)
-                    )
-                    .clipped()
-                    .id("system-\(group.systemIndex)")
-                    .onAppear {
-                        let didAdvanceVisibleRange = visibleSystemTracker.recordVisibleSystem(group.systemIndex)
-                        if didAdvanceVisibleRange,
-                           case .score(let score, let layoutOptions) = source {
-                            maybeExpandLazyMeasureWindow(
-                                score: score,
-                                baseOptions: layoutOptions,
-                                prepared: prepared
-                            )
-                        }
-                    }
+                ForEach(prepared.systems) { system in
+                    systemRow(system, prepared: prepared)
                 }
             }
             .frame(width: max(1, prepared.renderPlan.canvasWidth))
         case .failure:
             LayoutFailureView()
+        }
+    }
+
+    @ViewBuilder
+    private func systemRow(
+        _ system: PreparedLazySystemRender,
+        prepared: PreparedLazyScoreRender
+    ) -> some View {
+        let group = system.group
+        let row = VexCanvas(
+            width: max(1, prepared.renderPlan.canvasWidth),
+            height: max(1, group.height)
+        ) { context in
+            context.clear()
+            do {
+                // Factory.draw() resets the factory queue, so executions are single-use.
+                let execution = VexFoundationRenderer().executeRenderPlan(system.renderPlan)
+                try drawExecution(execution, on: context)
+            } catch {
+                context.setFillStyle("#B00020")
+                context.setFont("Menlo", 12, "normal", "normal")
+                context.fillText("MusicDisplay render failed: \(error)", 12, 20)
+            }
+        }
+        .frame(
+            width: max(1, prepared.renderPlan.canvasWidth),
+            height: max(1, group.height)
+        )
+        .clipped()
+        .id("system-\(group.systemIndex)")
+
+        switch source {
+        case .score(let score, let layoutOptions):
+            row.onAppear {
+                let didAdvanceVisibleRange = visibleSystemTracker.recordVisibleSystem(group.systemIndex)
+                if didAdvanceVisibleRange {
+                    maybeExpandLazyMeasureWindow(
+                        score: score,
+                        baseOptions: layoutOptions,
+                        prepared: prepared
+                    )
+                }
+            }
+        case .laidOutScore:
+            row
         }
     }
 
@@ -852,31 +1035,31 @@ public struct MusicDisplayLazyScoreView: View {
     }
 
     private func clampHighestVisibleSystemIndex(prepared: PreparedLazyScoreRender) {
-        guard let minimumSystemIndex = prepared.systemGroups.map(\.systemIndex).min(),
-              let maximumSystemIndex = prepared.systemGroups.map(\.systemIndex).max() else {
-            visibleSystemTracker.clamp(to: nil)
-            return
-        }
-        visibleSystemTracker.clamp(to: minimumSystemIndex...maximumSystemIndex)
+        visibleSystemTracker.clamp(to: prepared.availableSystemIndexRange)
     }
 
-    private func visibleMeasureRange(for renderPlan: VexRenderPlan) -> Range<Int>? {
+    private func visibleMeasureRange(for prepared: PreparedLazyScoreRender) -> Range<Int>? {
         guard let visibleSystemIndex = visibleSystemTracker.highestVisibleSystemIndex else { return nil }
-        let maximumSystemIndex = renderPlan.measures.map(\.systemIndex).max() ?? visibleSystemIndex
-        let clampedVisibleSystemIndex = min(maximumSystemIndex, max(0, visibleSystemIndex))
-        let lowerSystemIndex = max(0, clampedVisibleSystemIndex - renderBufferSystems)
+        guard let availableSystemRange = prepared.availableSystemIndexRange else { return nil }
+        let clampedVisibleSystemIndex = min(
+            availableSystemRange.upperBound,
+            max(availableSystemRange.lowerBound, visibleSystemIndex)
+        )
+        let lowerSystemIndex = max(
+            availableSystemRange.lowerBound,
+            clampedVisibleSystemIndex - renderBufferSystems
+        )
         var minimumMeasureIndex = Int.max
-        var maximumMeasureIndex = Int.min
-        for measurePlan in renderPlan.measures
-        where measurePlan.systemIndex >= lowerSystemIndex
-            && measurePlan.systemIndex <= clampedVisibleSystemIndex {
-            minimumMeasureIndex = min(minimumMeasureIndex, measurePlan.measureIndexInPart)
-            maximumMeasureIndex = max(maximumMeasureIndex, measurePlan.measureIndexInPart)
+        var maximumMeasureUpperBound = Int.min
+        for systemIndex in lowerSystemIndex...clampedVisibleSystemIndex {
+            guard let range = prepared.measureRangeBySystem[systemIndex] else { continue }
+            minimumMeasureIndex = min(minimumMeasureIndex, range.lowerBound)
+            maximumMeasureUpperBound = max(maximumMeasureUpperBound, range.upperBound)
         }
-        guard minimumMeasureIndex != Int.max, maximumMeasureIndex >= minimumMeasureIndex else {
+        guard minimumMeasureIndex != Int.max, maximumMeasureUpperBound > minimumMeasureIndex else {
             return nil
         }
-        return minimumMeasureIndex..<(maximumMeasureIndex + 1)
+        return minimumMeasureIndex..<maximumMeasureUpperBound
     }
 
     private func maybeExpandLazyMeasureWindow(
@@ -888,7 +1071,7 @@ public struct MusicDisplayLazyScoreView: View {
         clampHighestVisibleSystemIndex(prepared: prepared)
         let total = totalMeasureCount(in: score)
         guard total > 0 else { return }
-        guard let visibleRange = visibleMeasureRange(for: prepared.renderPlan) else { return }
+        guard let visibleRange = visibleMeasureRange(for: prepared) else { return }
 
         let currentRange = clampedMeasureRange(
             lazyMeasureRangeOverride ?? initialMeasureRange(for: score, baseOptions: baseOptions),

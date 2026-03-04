@@ -14,7 +14,7 @@ Use these cache boundaries:
 
 - `Score + LayoutOptions -> LaidOutScore`
 - `LaidOutScore + RenderTarget -> VexRenderPlan`
-- Lazy view only: `VexRenderPlan -> [LazySystemGroup] + [systemIndex: VexRenderPlan]` (pre-sliced system plans)
+- Lazy view only: `VexRenderPlan -> [PreparedLazySystemRender] + system index range + measure range by system` (pre-sliced row plans and visibility metadata)
 - Lazy score + source `Score`: apply a viewport-driven `measureRange` window, and expand it as the visible systems approach the loaded range edge.
 
 These values are deterministic for the same input and should be recomputed only when inputs change.
@@ -44,6 +44,12 @@ Avoid doing any of the following directly in SwiftUI `body` evaluation:
 
 Compute these in cache objects keyed by input value equality, then make `body` mostly a lightweight selection layer.
 
+For lazy system rendering specifically:
+
+- precompute each system row's `VexRenderPlan` once in cache (`PreparedLazySystemRender`)
+- precompute `availableSystemIndexRange` and `measureRangeBySystem`
+- avoid per-row fallback `systemSlice` work inside `ForEach`
+
 For geometry-driven relayout (`autoResize`), debounce width commits to
 avoid layout thrash while users resize/split views.
 
@@ -55,12 +61,24 @@ Use coarse-grained partial redraw instead:
 
 - split long scores into per-system canvases (`MusicDisplayLazyScoreView`)
 - rely on `LazyVStack` materialization so only nearby rows are active
-- clip each system row (`.clipped()`)
+- avoid hard row clipping when system bounds are tight; only clip if row bounds include glyph overflow margins
 
 This is the supported way to avoid redrawing the entire score on scroll.
 Use monotonic visibility signals (for example, highest visible system seen)
 for window expansion to avoid scroll flicker from rapid
 `onAppear`/`onDisappear` churn.
+
+When `MusicDisplayLazyScoreView` is fed a precomputed `LaidOutScore` (not
+raw `Score`), skip visibility-window bookkeeping entirely. There is no
+measure-window expansion path in that mode, so updating visibility state on
+every row appearance just adds invalidation churn.
+
+### Host-App SwiftUI Idiom
+
+If a host app overlays playback cursors or selection UI on top of a score,
+keep the score surface in its own `Equatable` subview keyed by
+`laidOutScore.renderRevision`. This prevents high-frequency playback state
+updates from re-diffing static score content.
 
 ### Font/Glyph Performance
 
