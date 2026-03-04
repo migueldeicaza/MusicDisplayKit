@@ -85,11 +85,13 @@ private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySyste
     let sortedSystemIndices = verticalBoundsBySystemIndex.keys.sorted()
     guard !sortedSystemIndices.isEmpty else { return [] }
 
-    // Keep more of the inter-system gap below the preceding system because
-    // stave-level glyphs (e.g. time signatures) descend below staff bounds.
-    let preferredCurrentTopGapRatio: Double = 0.2
-    let minimumCurrentTopGap: Double = 2
+    // Reserve explicit vertical bleed so row-local clipping does not cut glyphs
+    // that extend above/below staff bounds (clefs, time signatures, stems, etc.).
+    let leadingBleed: Double = 28
+    let minimumPreviousBottomGap: Double = 16
+    let minimumCurrentTopGap: Double = 24
     let trailingBleed: Double = 40
+    let minimumRowHeight: Double = 48
 
     var systemBoundaries: [Double] = []
     if sortedSystemIndices.count > 1 {
@@ -110,30 +112,43 @@ private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySyste
             }
 
             let gap = gapEnd - gapStart
-            let currentTopGap = min(
-                gap,
-                max(minimumCurrentTopGap, gap * preferredCurrentTopGapRatio)
-            )
-            systemBoundaries.append(gapEnd - currentTopGap)
+            let minimumCombinedGap = minimumPreviousBottomGap + minimumCurrentTopGap
+            let boundary: Double
+            if gap >= minimumCombinedGap {
+                boundary = gapEnd - minimumCurrentTopGap
+            } else {
+                boundary = gapStart + (gap * 0.5)
+            }
+            systemBoundaries.append(boundary)
         }
     }
 
     var groups: [LazySystemGroup] = []
-    var previousBottom: Double = 0
+    var previousBottom: Double?
     for (offset, systemIndex) in sortedSystemIndices.enumerated() {
         guard let bounds = verticalBoundsBySystemIndex[systemIndex] else { continue }
-        let rawTop: Double = offset == 0 ? 0 : systemBoundaries[offset - 1]
+        let rawTop: Double
+        if offset == 0 {
+            rawTop = bounds.minimumY - leadingBleed
+        } else {
+            rawTop = systemBoundaries[offset - 1]
+        }
 
         let rawBottom: Double
         if offset < systemBoundaries.count {
-            rawBottom = systemBoundaries[offset]
+            rawBottom = max(bounds.maximumY + minimumPreviousBottomGap, systemBoundaries[offset])
         } else {
             rawBottom = bounds.maximumY + trailingBleed
         }
 
-        let top = max(previousBottom, rawTop)
-        let bottom = max(top + 40, max(bounds.maximumY, rawBottom))
-        let height = max(40, bottom - top)
+        let top: Double
+        if let previousBottom {
+            top = max(previousBottom, rawTop)
+        } else {
+            top = rawTop
+        }
+        let bottom = max(top + minimumRowHeight, max(bounds.maximumY, rawBottom))
+        let height = max(minimumRowHeight, bottom - top)
         groups.append(
             LazySystemGroup(
                 systemIndex: systemIndex,
@@ -494,6 +509,8 @@ private extension VexRenderPlan {
             notes: notes
                 .filter { $0.systemIndex == systemIndex }
                 .map { $0.offsetting(y: yOffset) },
+            inlineClefChanges: inlineClefChanges
+                .filter { $0.systemIndex == systemIndex },
             beams: beams
                 .filter { $0.systemIndex == systemIndex },
             tuplets: tuplets

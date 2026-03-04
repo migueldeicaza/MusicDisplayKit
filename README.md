@@ -63,6 +63,32 @@ Use coarse-grained partial redraw instead:
 - rely on `LazyVStack` materialization so only nearby rows are active
 - avoid hard row clipping when system bounds are tight; only clip if row bounds include glyph overflow margins
 
+### OSMD Parity Note: Stave Vertical Insets
+
+OSMD's `VexFlowMeasure.resetLayout()` creates staves with:
+
+- `space_above_staff_ln = 0`
+- `space_below_staff_ln = 0`
+
+Mirror this in Swift (`StaveOptions(spaceAboveStaffLn: 0, spaceBelowStaffLn: 0)`),
+otherwise VexFoundation default inset values shift staff lines downward relative
+to layout frames and can cause bottom-line clipping in lazy row slices.
+
+### OSMD Parity Note: Inline Clef Changes
+
+OSMD renders mid-system clef changes as inline note modifiers (`ClefNote`
+inside `NoteSubGroup`) attached to the target staff entry. Do the same in Swift:
+
+- detect measure-transition clef changes in `makeRenderPlan`
+- attach a small `ClefNote` via `NoteSubGroup` during `executeRenderPlan`
+
+`MusicDisplayKitModel` now keeps timed in-measure clef events (`Measure.clefEvents`),
+so clef changes can render both at measure start and mid-measure on the
+first note at/after the change onset.
+
+Current model caveat: key/time/transposition remain measure-scoped in
+`MeasureAttributes` (no timed intra-measure events yet).
+
 This is the supported way to avoid redrawing the entire score on scroll.
 Use monotonic visibility signals (for example, highest visible system seen)
 for window expansion to avoid scroll flicker from rapid

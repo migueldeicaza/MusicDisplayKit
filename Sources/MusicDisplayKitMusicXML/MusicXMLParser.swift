@@ -127,6 +127,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var figuredBassEvents: [FiguredBassEvent] = []
         var repetitionInstructions: [RepetitionInstruction] = []
         var tempoEvents: [TempoEvent] = []
+        var clefEvents: [ClefEvent] = []
         var timeCursorDivisions: Int = 0
         var lastNonChordOnsetByVoice: [Int: Int] = [:]
         var implicit: Bool = false
@@ -146,6 +147,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 figuredBassEvents: figuredBassEvents,
                 repetitionInstructions: repetitionInstructions,
                 tempoEvents: tempoEvents,
+                clefEvents: clefEvents,
                 implicit: implicit,
                 newSystem: newSystem,
                 newPage: newPage
@@ -1624,9 +1626,17 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "clef":
             if let clef = buildClefSetting(), var currentMeasure {
-                var attributes = currentMeasure.attributes ?? MeasureAttributes()
-                attributes.clefs.append(clef)
-                currentMeasure.attributes = attributes
+                let onset = max(0, currentMeasure.timeCursorDivisions)
+                let isInlineClefChange = onset > 0 || !currentMeasure.noteEvents.isEmpty
+                if isInlineClefChange {
+                    currentMeasure.clefEvents.append(
+                        ClefEvent(onsetDivisions: onset, clef: clef)
+                    )
+                } else {
+                    var attributes = currentMeasure.attributes ?? MeasureAttributes()
+                    attributes.clefs.append(clef)
+                    currentMeasure.attributes = attributes
+                }
                 self.currentMeasure = currentMeasure
             }
             currentClefBuilder = nil

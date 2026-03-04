@@ -276,6 +276,108 @@ private let singleVoiceRenderNotesXML = """
 </score-partwise>
 """
 
+private let inlineClefChangeAtMeasureStartXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Solo</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <clef><sign>F</sign><line>4</line></clef>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <note>
+        <pitch><step>C</step><octave>3</octave></pitch>
+        <duration>16</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+    <measure number="2">
+      <attributes>
+        <clef><sign>C</sign><line>4</line></clef>
+      </attributes>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>16</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let inlineClefChangeMidMeasureXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Solo</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <clef><sign>F</sign><line>4</line></clef>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <note>
+        <pitch><step>A</step><octave>2</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <attributes>
+        <clef><sign>C</sign><line>4</line></clef>
+      </attributes>
+      <note>
+        <pitch><step>A</step><octave>3</octave></pitch>
+        <duration>12</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+private let inlineClefChangeCarryForwardXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Solo</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <clef><sign>F</sign><line>4</line></clef>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <note>
+        <pitch><step>A</step><octave>2</octave></pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+      </note>
+      <attributes>
+        <clef><sign>C</sign><line>4</line></clef>
+      </attributes>
+      <note>
+        <pitch><step>A</step><octave>3</octave></pitch>
+        <duration>12</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>B</step><octave>3</octave></pitch>
+        <duration>16</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
 private let multiVoiceChordRenderNotesXML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
@@ -12479,6 +12581,17 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(attributes.clefs[1] == ClefSetting(sign: "F", line: 4, number: 2, octaveChange: -1))
 }
 
+@Test func parserCapturesMidMeasureClefChangesAsTimedEvents() throws {
+    let score = try MusicXMLParser().parse(xml: inlineClefChangeMidMeasureXML)
+    let measure = try #require(score.parts.first?.measures.first)
+    let attributes = try #require(measure.attributes)
+
+    #expect(attributes.clefs == [ClefSetting(sign: "F", line: 4, number: nil, octaveChange: nil)])
+    #expect(measure.clefEvents.count == 1)
+    #expect(measure.clefEvents[0].onsetDivisions == 4)
+    #expect(measure.clefEvents[0].clef == ClefSetting(sign: "C", line: 4, number: nil, octaveChange: nil))
+}
+
 @Test func parserReadsLyricTieAndSlurMarkers() throws {
     let score = try MusicXMLParser().parse(xml: lyricTieSlurXML)
     let measure = try #require(score.parts.first?.measures.first)
@@ -15706,6 +15819,108 @@ private let pngSignaturePrefix: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
     #expect(beginModifierCategories.contains("Clef"))
     #expect(beginModifierCategories.contains("KeySignature"))
     #expect(beginModifierCategories.contains("TimeSignature"))
+}
+
+@Test func vexAdapterStaveTopLineAlignsWithLayoutFrame() throws {
+    let score = try MusicXMLParser().parse(xml: singleVoiceRenderNotesXML)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions())
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+    let stave = try #require(execution.staves.first)
+    let firstSystem = try #require(laidOut.systems.first)
+
+    #expect(abs(stave.getYForLine(0) - firstSystem.frame.y) < 0.0001)
+}
+
+@Test func vexAdapterPlansInlineClefChangesAtMeasureTransitions() throws {
+    let score = try MusicXMLParser().parse(xml: inlineClefChangeAtMeasureStartXML)
+    let laidOut = try MusicLayoutEngine().layout(
+        score: score,
+        options: LayoutOptions(pageWidth: 1200)
+    )
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.inlineClefChanges.count == 1)
+    let clefChange = try #require(plan.inlineClefChanges.first)
+    #expect(clefChange.measureIndexInPart == 1)
+    #expect(clefChange.clef == ClefName.tenor.rawValue)
+}
+
+@Test func vexAdapterExecutesInlineClefChangesAsNoteSubGroupModifiers() throws {
+    let score = try MusicXMLParser().parse(xml: inlineClefChangeAtMeasureStartXML)
+    let laidOut = try MusicLayoutEngine().layout(
+        score: score,
+        options: LayoutOptions(pageWidth: 1200)
+    )
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+    let execution = renderer.executeRenderPlan(plan)
+
+    let hasInlineTenorClef = execution.notes.contains { note in
+        let subGroups = note.getModifiersByType(NoteSubGroup.category).compactMap { modifier in
+            modifier as? NoteSubGroup
+        }
+        return subGroups.contains { group in
+            group.subNotes.contains { subNote in
+                (subNote as? ClefNote)?.clefTypeName == .tenor
+            }
+        }
+    }
+    #expect(hasInlineTenorClef)
+}
+
+@Test func vexAdapterPlansAndExecutesInlineMidMeasureClefChanges() throws {
+    let score = try MusicXMLParser().parse(xml: inlineClefChangeMidMeasureXML)
+    let laidOut = try MusicLayoutEngine().layout(
+        score: score,
+        options: LayoutOptions(pageWidth: 1200)
+    )
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    #expect(plan.inlineClefChanges.count == 1)
+    let inlineClef = try #require(plan.inlineClefChanges.first)
+    #expect(inlineClef.clef == ClefName.tenor.rawValue)
+
+    let measureNotes = plan.notes
+        .filter { $0.measureIndexInPart == 0 }
+        .sorted { lhs, rhs in lhs.onsetDivisions < rhs.onsetDivisions }
+    #expect(measureNotes.count == 2)
+    #expect(measureNotes[0].clef == ClefName.bass.rawValue)
+    #expect(measureNotes[1].clef == ClefName.tenor.rawValue)
+
+    let execution = renderer.executeRenderPlan(plan)
+    let hasInlineTenorClef = execution.notes.contains { note in
+        let subGroups = note.getModifiersByType(NoteSubGroup.category).compactMap { modifier in
+            modifier as? NoteSubGroup
+        }
+        return subGroups.contains { group in
+            group.subNotes.contains { subNote in
+                (subNote as? ClefNote)?.clefTypeName == .tenor
+            }
+        }
+    }
+    #expect(hasInlineTenorClef)
+}
+
+@Test func vexAdapterCarriesForwardMidMeasureClefChangesToFollowingMeasures() throws {
+    let score = try MusicXMLParser().parse(xml: inlineClefChangeCarryForwardXML)
+    let laidOut = try MusicLayoutEngine().layout(
+        score: score,
+        options: LayoutOptions(pageWidth: 1200)
+    )
+    let renderer = VexFoundationRenderer()
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .view(identifier: "preview"))
+
+    let secondMeasureFirstNote = try #require(
+        plan.notes
+            .filter { $0.measureIndexInPart == 1 }
+            .sorted { lhs, rhs in lhs.onsetDivisions < rhs.onsetDivisions }
+            .first
+    )
+    #expect(secondMeasureFirstNote.clef == ClefName.tenor.rawValue)
 }
 
 @Test func vexAdapterExecutesSingleVoiceNotesIntoVoices() throws {

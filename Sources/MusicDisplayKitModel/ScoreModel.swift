@@ -240,6 +240,7 @@ public struct Measure: Equatable, Sendable {
     public var tieSpans: [TieSpan]
     public var slurSpans: [SlurSpan]
     public var lyricWords: [LyricWord]
+    public var clefEvents: [ClefEvent]
     public var implicit: Bool
     public var newSystem: Bool
     public var newPage: Bool
@@ -259,6 +260,7 @@ public struct Measure: Equatable, Sendable {
         tieSpans: [TieSpan] = [],
         slurSpans: [SlurSpan] = [],
         lyricWords: [LyricWord] = [],
+        clefEvents: [ClefEvent] = [],
         implicit: Bool = false,
         newSystem: Bool = false,
         newPage: Bool = false
@@ -277,9 +279,20 @@ public struct Measure: Equatable, Sendable {
         self.tieSpans = tieSpans
         self.slurSpans = slurSpans
         self.lyricWords = lyricWords
+        self.clefEvents = clefEvents
         self.implicit = implicit
         self.newSystem = newSystem
         self.newPage = newPage
+    }
+}
+
+public struct ClefEvent: Equatable, Sendable {
+    public var onsetDivisions: Int
+    public var clef: ClefSetting
+
+    public init(onsetDivisions: Int, clef: ClefSetting) {
+        self.onsetDivisions = onsetDivisions
+        self.clef = clef
     }
 }
 

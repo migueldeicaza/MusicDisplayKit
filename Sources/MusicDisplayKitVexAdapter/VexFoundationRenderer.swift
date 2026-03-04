@@ -506,6 +506,34 @@ public struct VexNotePlan: Sendable {
     }
 }
 
+public struct VexInlineClefChangePlan: Sendable {
+    public let systemIndex: Int
+    public let partIndex: Int
+    public let measureIndexInPart: Int
+    public let voice: Int
+    public let entryIndexInVoice: Int
+    public let clef: String
+    public let annotation: String?
+
+    public init(
+        systemIndex: Int,
+        partIndex: Int,
+        measureIndexInPart: Int,
+        voice: Int,
+        entryIndexInVoice: Int,
+        clef: String,
+        annotation: String? = nil
+    ) {
+        self.systemIndex = systemIndex
+        self.partIndex = partIndex
+        self.measureIndexInPart = measureIndexInPart
+        self.voice = voice
+        self.entryIndexInVoice = entryIndexInVoice
+        self.clef = clef
+        self.annotation = annotation
+    }
+}
+
 public struct VexBeamPlan: Sendable {
     public let systemIndex: Int
     public let partIndex: Int
@@ -1230,6 +1258,7 @@ public struct VexRenderPlan: Sendable {
     public let measures: [VexMeasurePlan]
     public let measureBoundaries: [VexMeasureBoundaryPlan]
     public let notes: [VexNotePlan]
+    public let inlineClefChanges: [VexInlineClefChangePlan]
     public let beams: [VexBeamPlan]
     public let tuplets: [VexTupletPlan]
     public let ties: [VexTiePlan]
@@ -1264,6 +1293,7 @@ public struct VexRenderPlan: Sendable {
         measures: [VexMeasurePlan],
         measureBoundaries: [VexMeasureBoundaryPlan],
         notes: [VexNotePlan],
+        inlineClefChanges: [VexInlineClefChangePlan] = [],
         beams: [VexBeamPlan],
         tuplets: [VexTupletPlan],
         ties: [VexTiePlan],
@@ -1297,6 +1327,7 @@ public struct VexRenderPlan: Sendable {
         self.measures = measures
         self.measureBoundaries = measureBoundaries
         self.notes = notes
+        self.inlineClefChanges = inlineClefChanges
         self.beams = beams
         self.tuplets = tuplets
         self.ties = ties
@@ -1481,6 +1512,7 @@ private extension VexRenderPlan {
         let notesAndRhythm = staves.count +
             measures.count +
             notes.count +
+            inlineClefChanges.count +
             beams.count +
             tuplets.count +
             ties.count +
@@ -1649,6 +1681,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
 
         struct MeasureRenderPlans {
             let notes: [VexNotePlan]
+            let inlineClefChanges: [VexInlineClefChangePlan]
             let beams: [VexBeamPlan]
             let tuplets: [VexTupletPlan]
             let ties: [VexTiePlan]
@@ -1674,6 +1707,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                   laidOutMeasure.partIndex < score.score.parts.count else {
                 return MeasureRenderPlans(
                     notes: [],
+                    inlineClefChanges: [],
                     beams: [],
                     tuplets: [],
                     ties: [],
@@ -1697,6 +1731,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                   laidOutMeasure.measureIndexInPart < part.measures.count else {
                 return MeasureRenderPlans(
                     notes: [],
+                    inlineClefChanges: [],
                     beams: [],
                     tuplets: [],
                     ties: [],
@@ -1724,7 +1759,42 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 in: part,
                 upToMeasureIndex: laidOutMeasure.measureIndexInPart
             )
-            let effectiveClef = effectiveAttributes.clef.flatMap(vexClefName(for:))?.rawValue
+            let effectiveClefName = effectiveAttributes.clef.flatMap(vexClefName(for:))
+            struct ClefChangeAtOnset {
+                let onsetDivisions: Int
+                let clefName: ClefName
+            }
+            let inMeasureClefChanges: [ClefChangeAtOnset] = {
+                let groupedByOnset = Dictionary(grouping: sourceMeasure.clefEvents) { clefEvent in
+                    max(0, clefEvent.onsetDivisions)
+                }
+                return groupedByOnset
+                    .keys
+                    .filter { $0 > 0 }
+                    .sorted()
+                    .compactMap { onset in
+                        guard let events = groupedByOnset[onset] else {
+                            return nil
+                        }
+                        let clefsAtOnset = events.map(\.clef)
+                        guard let selected = selectedClef(from: clefsAtOnset),
+                              let clefName = vexClefName(for: selected),
+                              clefName != .tab else {
+                            return nil
+                        }
+                        return ClefChangeAtOnset(
+                            onsetDivisions: onset,
+                            clefName: clefName
+                        )
+                    }
+            }()
+            let clefNameForOnset: (Int) -> ClefName? = { onsetDivisions in
+                var resolved = effectiveClefName
+                for clefChange in inMeasureClefChanges where clefChange.onsetDivisions <= onsetDivisions {
+                    resolved = clefChange.clefName
+                }
+                return resolved
+            }
 
             let nonGraceEvents = sourceMeasure.noteEvents
                 .enumerated()
@@ -1806,7 +1876,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     isFirstMeasureInSystem: isFirstMeasureInSystem,
                     voice: key.voice,
                     staff: resolvedStaff,
-                    clef: effectiveClef,
+                    clef: clefNameForOnset(key.onsetDivisions)?.rawValue,
                     entryIndexInVoice: entryIndex,
                     onsetDivisions: key.onsetDivisions,
                     durationDivisions: max(1, maxDuration),
@@ -1831,6 +1901,15 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     crossStaffTarget: firstEvent?.crossStaffTarget
                 )
             }
+
+            let inlineClefChanges = buildInlineClefChangePlans(
+                laidOutMeasure: laidOutMeasure,
+                sourceMeasure: sourceMeasure,
+                part: part,
+                isFirstMeasureInSystem: isFirstMeasureInSystem,
+                notePlans: notePlans,
+                effectiveMeasureClef: effectiveClefName
+            )
 
             let nonGraceIndices = sourceMeasure.noteEvents.indices.filter { index in
                 !sourceMeasure.noteEvents[index].isGrace
@@ -2004,6 +2083,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
 
             return MeasureRenderPlans(
                 notes: notePlans,
+                inlineClefChanges: inlineClefChanges,
                 beams: beamPlans,
                 tuplets: tupletPlans,
                 ties: tiePlans,
@@ -2023,6 +2103,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
             )
         }
         let notes = measureRenderPlans.flatMap(\.notes)
+        let inlineClefChanges = measureRenderPlans.flatMap(\.inlineClefChanges)
         let beams = measureRenderPlans.flatMap(\.beams)
         let tuplets = measureRenderPlans.flatMap(\.tuplets)
         let ties = measureRenderPlans.flatMap(\.ties)
@@ -2159,6 +2240,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
             measures: measures,
             measureBoundaries: measureBoundaries,
             notes: notes,
+            inlineClefChanges: inlineClefChanges,
             beams: beams,
             tuplets: tuplets,
             ties: ties,
@@ -2260,16 +2342,27 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     partIndex: stavePlan.partIndex
                 )
                 if tabStaveKeys.contains(lookupKey) {
+                    let tabStaveOptions = StaveOptions(
+                        spaceBelowStaffLn: 0,
+                        spaceAboveStaffLn: 0,
+                        spacingBetweenLinesPx: Tables.STAVE_LINE_DISTANCE * 1.3
+                    )
                     return factory.TabStave(
                         x: stavePlan.frame.x,
                         y: stavePlan.frame.y,
-                        width: stavePlan.frame.width
+                        width: stavePlan.frame.width,
+                        options: tabStaveOptions
                     ) as Stave
                 }
+                let staveOptions = StaveOptions(
+                    spaceBelowStaffLn: 0,
+                    spaceAboveStaffLn: 0
+                )
                 return factory.Stave(
                     x: stavePlan.frame.x,
                     y: stavePlan.frame.y,
-                    width: stavePlan.frame.width
+                    width: stavePlan.frame.width,
+                    options: staveOptions
                 ) as Stave
             }
 
@@ -2494,6 +2587,13 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 measureIndexInPart: notePlan.measureIndexInPart
             )
         }
+        let groupedInlineClefChanges = Dictionary(grouping: plan.inlineClefChanges) { clefPlan in
+            NoteGroupKey(
+                systemIndex: clefPlan.systemIndex,
+                partIndex: clefPlan.partIndex,
+                measureIndexInPart: clefPlan.measureIndexInPart
+            )
+        }
         let groupedBeams = Dictionary(grouping: plan.beams) { beamPlan in
             NoteGroupKey(
                 systemIndex: beamPlan.systemIndex,
@@ -2681,6 +2781,31 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 }
                 return mapping
             }()
+            let inlineClefChangesByEntryKey: [NoteEntryKey: [VexInlineClefChangePlan]] = {
+                guard let clefPlans = groupedInlineClefChanges[groupKey], !clefPlans.isEmpty else {
+                    return [:]
+                }
+                var mapping: [NoteEntryKey: [VexInlineClefChangePlan]] = [:]
+                let sortedClefPlans = clefPlans.sorted { lhs, rhs in
+                    if lhs.voice != rhs.voice {
+                        return lhs.voice < rhs.voice
+                    }
+                    return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+                }
+                for clefPlan in sortedClefPlans {
+                    mapping[
+                        NoteEntryKey(
+                            systemIndex: clefPlan.systemIndex,
+                            partIndex: clefPlan.partIndex,
+                            measureIndexInPart: clefPlan.measureIndexInPart,
+                            voice: clefPlan.voice,
+                            entryIndexInVoice: clefPlan.entryIndexInVoice
+                        ),
+                        default: []
+                    ].append(clefPlan)
+                }
+                return mapping
+            }()
 
             // Ghost note voice alignment (4.15): collect onset positions per voice
             // for multi-voice measures to insert ghost note spacers.
@@ -2813,6 +2938,26 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         stemDirection: stemDirection
                     ) else {
                         continue
+                    }
+
+                    // Render clef changes inline at measure transitions by attaching
+                    // a small ClefNote as a NoteSubGroup modifier.
+                    if let clefPlans = inlineClefChangesByEntryKey[entryKey] {
+                        for clefPlan in clefPlans {
+                            guard let inlineClefName = clefName(from: clefPlan.clef) else {
+                                continue
+                            }
+                            let inlineClefAnnotation = clefPlan.annotation.flatMap {
+                                ClefAnnotation(rawValue: $0)
+                            }
+                            let clefNote = factory.ClefNote(
+                                type: inlineClefName,
+                                size: .small,
+                                annotation: inlineClefAnnotation
+                            )
+                            let subgroup = factory.NoteSubGroup(notes: [clefNote])
+                            _ = note.addModifier(subgroup, index: 0)
+                        }
                     }
 
                     // Attach explicit accidentals from MusicXML <accidental> element.
@@ -4316,7 +4461,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
 
     private func effectiveStaveAttributes(
         in part: MusicDisplayKitModel.Part,
-        upToMeasureIndex: Int
+        upToMeasureIndex: Int,
+        includeInlineClefEventsInCurrentMeasure: Bool = false
     ) -> EffectiveStaveAttributes {
         guard !part.measures.isEmpty else {
             return EffectiveStaveAttributes(key: nil, time: nil, clef: nil)
@@ -4331,17 +4477,32 @@ public struct VexFoundationRenderer: ScoreRenderer {
         }
 
         for measureIndex in 0...lastIndex {
-            guard let attributes = part.measures[measureIndex].attributes else {
-                continue
+            let measure = part.measures[measureIndex]
+            if let attributes = measure.attributes {
+                if let nextKey = attributes.key {
+                    key = nextKey
+                }
+                if let nextTime = attributes.time {
+                    time = nextTime
+                }
+                if let nextClef = selectedClef(from: attributes.clefs) {
+                    clef = nextClef
+                }
             }
-            if let nextKey = attributes.key {
-                key = nextKey
-            }
-            if let nextTime = attributes.time {
-                time = nextTime
-            }
-            if let nextClef = selectedClef(from: attributes.clefs) {
-                clef = nextClef
+
+            let shouldApplyInlineClefEvents = measureIndex < lastIndex || includeInlineClefEventsInCurrentMeasure
+            if shouldApplyInlineClefEvents, !measure.clefEvents.isEmpty {
+                let groupedByOnset = Dictionary(grouping: measure.clefEvents) { clefEvent in
+                    max(0, clefEvent.onsetDivisions)
+                }
+                for onset in groupedByOnset.keys.sorted() {
+                    guard let events = groupedByOnset[onset] else {
+                        continue
+                    }
+                    if let nextClef = selectedClef(from: events.map(\.clef)) {
+                        clef = nextClef
+                    }
+                }
             }
         }
 
@@ -7810,6 +7971,107 @@ public struct VexFoundationRenderer: ScoreRenderer {
             total += current
         }
         return total
+    }
+
+    private func buildInlineClefChangePlans(
+        laidOutMeasure: LaidOutMeasure,
+        sourceMeasure: MusicDisplayKitModel.Measure,
+        part: MusicDisplayKitModel.Part,
+        isFirstMeasureInSystem: Bool,
+        notePlans: [VexNotePlan],
+        effectiveMeasureClef: ClefName?
+    ) -> [VexInlineClefChangePlan] {
+        var plans: [VexInlineClefChangePlan] = []
+        let previousMeasureIndex = laidOutMeasure.measureIndexInPart - 1
+        let previousVexClef: ClefName?
+        if previousMeasureIndex >= 0 {
+            previousVexClef = effectiveStaveAttributes(
+                in: part,
+                upToMeasureIndex: previousMeasureIndex,
+                includeInlineClefEventsInCurrentMeasure: true
+            ).clef.flatMap(vexClefName(for:))
+        } else {
+            previousVexClef = nil
+        }
+        let anchorComparator: (VexNotePlan, VexNotePlan) -> Bool = { lhs, rhs in
+            if lhs.onsetDivisions != rhs.onsetDivisions {
+                return lhs.onsetDivisions < rhs.onsetDivisions
+            }
+            if lhs.voice != rhs.voice {
+                return lhs.voice < rhs.voice
+            }
+            if lhs.entryIndexInVoice != rhs.entryIndexInVoice {
+                return lhs.entryIndexInVoice < rhs.entryIndexInVoice
+            }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+        func appendPlanIfAnchored(
+            onsetDivisions: Int,
+            clefName: ClefName,
+            annotation: ClefAnnotation?
+        ) {
+            guard let anchorNote = notePlans
+                .filter({ $0.onsetDivisions >= onsetDivisions })
+                .min(by: anchorComparator) else {
+                return
+            }
+            plans.append(
+                VexInlineClefChangePlan(
+                    systemIndex: laidOutMeasure.systemIndex,
+                    partIndex: laidOutMeasure.partIndex,
+                    measureIndexInPart: laidOutMeasure.measureIndexInPart,
+                    voice: anchorNote.voice,
+                    entryIndexInVoice: anchorNote.entryIndexInVoice,
+                    clef: clefName.rawValue,
+                    annotation: annotation?.rawValue
+                )
+            )
+        }
+
+        let explicitMeasureStartClef = sourceMeasure.attributes
+            .flatMap { selectedClef(from: $0.clefs) }
+            .flatMap(vexClefName(for:))
+
+        if !isFirstMeasureInSystem,
+           let explicitMeasureStartClef,
+           explicitMeasureStartClef != .tab,
+           explicitMeasureStartClef != previousVexClef {
+            let explicitAnnotation = sourceMeasure.attributes
+                .flatMap { selectedClef(from: $0.clefs) }
+                .flatMap(vexClefAnnotation(for:))
+            appendPlanIfAnchored(
+                onsetDivisions: 0,
+                clefName: explicitMeasureStartClef,
+                annotation: explicitAnnotation
+            )
+        }
+
+        let groupedByOnset = Dictionary(grouping: sourceMeasure.clefEvents) { clefEvent in
+            max(0, clefEvent.onsetDivisions)
+        }
+        var activeClef = effectiveMeasureClef
+        for onset in groupedByOnset.keys.filter({ $0 > 0 }).sorted() {
+            guard let events = groupedByOnset[onset] else {
+                continue
+            }
+            let selectedAtOnset = selectedClef(from: events.map(\.clef))
+            guard let selectedAtOnset,
+                  let nextClef = vexClefName(for: selectedAtOnset),
+                  nextClef != .tab else {
+                continue
+            }
+            defer { activeClef = nextClef }
+            guard nextClef != activeClef else {
+                continue
+            }
+            appendPlanIfAnchored(
+                onsetDivisions: onset,
+                clefName: nextClef,
+                annotation: vexClefAnnotation(for: selectedAtOnset)
+            )
+        }
+
+        return plans
     }
 
     private func selectedClef(
