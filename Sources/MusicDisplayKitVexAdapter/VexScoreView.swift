@@ -64,7 +64,211 @@ private struct PreparedLazyScoreRender {
     let measureRangeBySystem: [Int: Range<Int>]
 }
 
-private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySystemGroup] {
+private struct LazySystemVerticalBleed: Sendable {
+    var top: Double
+    var bottom: Double
+
+    static let `default` = LazySystemVerticalBleed(top: 0, bottom: 26)
+}
+
+private func makeLazySystemVerticalBleed(from renderPlan: VexRenderPlan) -> [Int: LazySystemVerticalBleed] {
+    var bleedBySystemIndex: [Int: LazySystemVerticalBleed] = [:]
+
+    func updateBleed(
+        for systemIndex: Int,
+        _ body: (inout LazySystemVerticalBleed) -> Void
+    ) {
+        var bleed = bleedBySystemIndex[systemIndex] ?? .default
+        body(&bleed)
+        bleedBySystemIndex[systemIndex] = bleed
+    }
+
+    // Seed systems from stave plans so gaps with sparse notation still get defaults.
+    for stave in renderPlan.staves {
+        updateBleed(for: stave.systemIndex) { bleed in
+            if stave.startMeasureNumber != nil {
+                // Measure numbers typically live inside the stave's built-in top headroom,
+                // but reserve a small extra margin for text ascenders.
+                bleed.top = max(bleed.top, 18)
+            }
+            if stave.initialClef != nil {
+                bleed.top = max(bleed.top, 24)
+            }
+            if stave.initialTimeSignature != nil {
+                bleed.top = max(bleed.top, 24)
+            }
+            if stave.initialKeySignature != nil {
+                bleed.top = max(bleed.top, 20)
+            }
+        }
+    }
+
+    for note in renderPlan.notes {
+        updateBleed(for: note.systemIndex) { bleed in
+            switch note.stemDirection {
+            case .some(.down):
+                bleed.bottom = max(bleed.bottom, 30)
+            case .some(.up):
+                break
+            case .some(.none), .some(.double):
+                bleed.bottom = max(bleed.bottom, 28)
+            case nil:
+                // When stem direction is auto/unknown, keep a small safety margin.
+                bleed.bottom = max(bleed.bottom, 28)
+            }
+
+            if !note.dynamics.isEmpty {
+                bleed.bottom = max(bleed.bottom, 42)
+            }
+
+            if !note.graceNotes.isEmpty {
+                bleed.top = max(bleed.top, 10)
+                bleed.bottom = max(bleed.bottom, 34)
+            }
+        }
+    }
+
+    for articulation in renderPlan.articulations {
+        updateBleed(for: articulation.systemIndex) { bleed in
+            switch articulation.position {
+            case .above:
+                bleed.top = max(bleed.top, 20)
+            case .below:
+                bleed.bottom = max(bleed.bottom, 36)
+            case nil:
+                bleed.bottom = max(bleed.bottom, 32)
+            }
+        }
+    }
+
+    for fingering in renderPlan.fingerings {
+        updateBleed(for: fingering.systemIndex) { bleed in
+            switch fingering.position {
+            case .above:
+                bleed.top = max(bleed.top, 22)
+            case .below:
+                bleed.bottom = max(bleed.bottom, 38)
+            case .left, .right, nil:
+                break
+            }
+        }
+    }
+
+    for stringNumber in renderPlan.stringNumbers {
+        updateBleed(for: stringNumber.systemIndex) { bleed in
+            switch stringNumber.position {
+            case .above:
+                bleed.top = max(bleed.top, 22)
+            case .below:
+                bleed.bottom = max(bleed.bottom, 38)
+            case .left, .right, nil:
+                break
+            }
+        }
+    }
+
+    for tuplet in renderPlan.tuplets {
+        updateBleed(for: tuplet.systemIndex) { bleed in
+            switch tuplet.location {
+            case .top:
+                bleed.top = max(bleed.top, 24)
+            case .bottom:
+                bleed.bottom = max(bleed.bottom, 34)
+            case nil:
+                bleed.top = max(bleed.top, 20)
+            }
+        }
+    }
+
+    for lyric in renderPlan.lyrics {
+        updateBleed(for: lyric.systemIndex) { bleed in
+            bleed.bottom = max(bleed.bottom, 50)
+        }
+    }
+
+    for lyricConnector in renderPlan.lyricConnectors {
+        if lyricConnector.startSystemIndex == lyricConnector.endSystemIndex {
+            updateBleed(for: lyricConnector.startSystemIndex) { bleed in
+                bleed.bottom = max(bleed.bottom, 50)
+            }
+        }
+    }
+
+    for chordSymbol in renderPlan.chordSymbols {
+        updateBleed(for: chordSymbol.systemIndex) { bleed in
+            switch chordSymbol.placement {
+            case .above:
+                bleed.top = max(bleed.top, 28)
+            case .below:
+                bleed.bottom = max(bleed.bottom, 40)
+            }
+        }
+    }
+
+    for directionText in renderPlan.directionTexts {
+        updateBleed(for: directionText.systemIndex) { bleed in
+            switch directionText.placement {
+            case .above:
+                bleed.top = max(bleed.top, 28)
+            case .below:
+                bleed.bottom = max(bleed.bottom, 40)
+            case nil:
+                bleed.top = max(bleed.top, 24)
+            }
+        }
+    }
+
+    for tempo in renderPlan.tempoMarks {
+        updateBleed(for: tempo.systemIndex) { bleed in
+            bleed.top = max(bleed.top, 34)
+        }
+    }
+
+    for repetition in renderPlan.roadmapRepetitions {
+        updateBleed(for: repetition.systemIndex) { bleed in
+            bleed.top = max(bleed.top, 34)
+        }
+    }
+
+    for wedge in renderPlan.directionWedges {
+        updateBleed(for: wedge.systemIndex) { bleed in
+            switch wedge.placement {
+            case .above:
+                bleed.top = max(bleed.top, 26)
+            case .below:
+                bleed.bottom = max(bleed.bottom, 48)
+            case nil:
+                // Unknown placement: keep a moderate safety margin without
+                // starving the next system's top headroom in tight gaps.
+                bleed.bottom = max(bleed.bottom, 36)
+            }
+        }
+    }
+
+    for octaveShift in renderPlan.octaveShiftSpanners {
+        updateBleed(for: octaveShift.systemIndex) { bleed in
+            switch octaveShift.position {
+            case .top:
+                bleed.top = max(bleed.top, 34)
+            case .bottom:
+                bleed.bottom = max(bleed.bottom, 46)
+            }
+        }
+    }
+
+    for pedal in renderPlan.pedalMarkings {
+        updateBleed(for: pedal.systemIndex) { bleed in
+            bleed.bottom = max(bleed.bottom, 70)
+        }
+    }
+
+    return bleedBySystemIndex
+}
+
+private func makeLazySystemGroups(
+    from laidOutScore: LaidOutScore,
+    bleedBySystemIndex: [Int: LazySystemVerticalBleed]
+) -> [LazySystemGroup] {
     var verticalBoundsBySystemIndex: [Int: (minimumY: Double, maximumY: Double)] = [:]
     for system in laidOutScore.systems {
         let minimumY = system.frame.y
@@ -85,73 +289,22 @@ private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySyste
     let sortedSystemIndices = verticalBoundsBySystemIndex.keys.sorted()
     guard !sortedSystemIndices.isEmpty else { return [] }
 
-    // Reserve explicit vertical bleed so row-local clipping does not cut glyphs
-    // that extend above/below staff bounds (measure numbers, clefs, stems, wedges).
+    // Preserve generous page-level bleed at top/bottom.
     let leadingBleed: Double = 72
-    let minimumPreviousBottomGap: Double = 56
-    let minimumCurrentTopGap: Double = 80
-    // In tightly packed systems, keep enough top headroom for measure numbers and
-    // top text while still reserving a small bottom bleed for below-staff items.
-    let tightGapMinimumPreviousBottomGap: Double = 6
-    let tightGapMinimumCurrentTopGap: Double = 18
     let trailingBleed: Double = 80
     let minimumRowHeight: Double = 48
 
-    var systemBoundaries: [Double] = []
-    if sortedSystemIndices.count > 1 {
-        systemBoundaries.reserveCapacity(sortedSystemIndices.count - 1)
-        for index in 0..<(sortedSystemIndices.count - 1) {
-            let previousSystemIndex = sortedSystemIndices[index]
-            let nextSystemIndex = sortedSystemIndices[index + 1]
-            guard let previousBounds = verticalBoundsBySystemIndex[previousSystemIndex],
-                  let nextBounds = verticalBoundsBySystemIndex[nextSystemIndex] else {
-                continue
-            }
-
-            let gapStart = previousBounds.maximumY
-            let gapEnd = nextBounds.minimumY
-            guard gapEnd > gapStart else {
-                systemBoundaries.append(gapStart)
-                continue
-            }
-
-            let preferredBoundary = gapEnd - minimumCurrentTopGap
-            let minimumBoundary = gapStart + minimumPreviousBottomGap
-            let boundary: Double
-            if preferredBoundary >= minimumBoundary {
-                // Enough room for both rows: bias towards preserving current-row top extents.
-                boundary = preferredBoundary
-            } else {
-                // Tight system spacing: prioritize current-row top headroom (measure numbers)
-                // while keeping a minimal bottom bleed for the previous row.
-                let favoredBoundary = gapEnd - tightGapMinimumCurrentTopGap
-                boundary = max(
-                    gapStart + tightGapMinimumPreviousBottomGap,
-                    min(gapEnd, favoredBoundary)
-                )
-            }
-            systemBoundaries.append(boundary)
-        }
-    }
-
     var groups: [LazySystemGroup] = []
+    groups.reserveCapacity(sortedSystemIndices.count)
     for (offset, systemIndex) in sortedSystemIndices.enumerated() {
         guard let bounds = verticalBoundsBySystemIndex[systemIndex] else { continue }
-        let rawTop: Double
-        if offset == 0 {
-            rawTop = max(0, bounds.minimumY - leadingBleed)
-        } else {
-            rawTop = systemBoundaries[offset - 1]
-        }
+        let bleed = bleedBySystemIndex[systemIndex] ?? .default
+        let topBleed = offset == 0 ? max(leadingBleed, bleed.top) : bleed.top
+        let isLast = offset == sortedSystemIndices.count - 1
+        let bottomBleed = isLast ? max(trailingBleed, bleed.bottom) : bleed.bottom
 
-        let rawBottom: Double
-        if offset < systemBoundaries.count {
-            rawBottom = systemBoundaries[offset]
-        } else {
-            rawBottom = bounds.maximumY + trailingBleed
-        }
-
-        let top = rawTop
+        let top = max(0, bounds.minimumY - topBleed)
+        let rawBottom = bounds.maximumY + bottomBleed
         let bottom = max(top + minimumRowHeight, max(bounds.maximumY, rawBottom))
         let height = max(minimumRowHeight, bottom - top)
         groups.append(
@@ -172,7 +325,8 @@ private enum LazyRowDiagnostics {
     static func emitIfEnabled(
         laidOutScore: LaidOutScore,
         groups: [LazySystemGroup],
-        canvasHeight: Double
+        canvasHeight: Double,
+        bleedBySystemIndex: [Int: LazySystemVerticalBleed]
     ) {
 //        guard ProcessInfo.processInfo.environment["MDK_LAZY_ROW_DIAGNOSTICS"] == "1" else {
 //            return
@@ -222,19 +376,35 @@ private enum LazyRowDiagnostics {
             let bottom = group.top + group.height
             let topHeadroom = sourceBounds.minimumY - group.top
             let bottomHeadroom = bottom - sourceBounds.maximumY
-            let interRowDelta: Double
+            let bleed = bleedBySystemIndex[group.systemIndex] ?? .default
+            let sourceGap: Double
+            let requestedGap: Double
+            let overflowPastSourceGap: Double
             if offset == 0 {
-                interRowDelta = 0
+                sourceGap = 0
+                requestedGap = 0
+                overflowPastSourceGap = 0
             } else {
                 let previous = sortedGroups[offset - 1]
-                interRowDelta = group.top - (previous.top + previous.height)
+                let previousSourceBounds = sourceBoundsBySystem[previous.systemIndex]
+                let previousBleed = bleedBySystemIndex[previous.systemIndex] ?? .default
+                if let previousSourceBounds {
+                    sourceGap = sourceBounds.minimumY - previousSourceBounds.maximumY
+                } else {
+                    sourceGap = 0
+                }
+                requestedGap = previousBleed.bottom + bleed.top
+                overflowPastSourceGap = requestedGap - sourceGap
             }
             print(
                 "[MDK lazy rows] system=\(group.systemIndex) " +
                 "source=(\(Int(sourceBounds.minimumY))...\(Int(sourceBounds.maximumY))) " +
                 "slice=(\(Int(group.top))...\(Int(bottom))) " +
                 "headroomTop=\(Int(topHeadroom)) headroomBottom=\(Int(bottomHeadroom)) " +
-                "deltaFromPrevious=\(Int(interRowDelta))"
+                "requestedTop=\(Int(bleed.top)) requestedBottom=\(Int(bleed.bottom)) " +
+                "sourceGapFromPrevious=\(Int(sourceGap)) " +
+                "requestedGapFromPrevious=\(Int(requestedGap)) " +
+                "overflowFromPrevious=\(Int(overflowPastSourceGap))"
             )
         }
     }
@@ -436,11 +606,16 @@ private final class LazyLaidOutScoreRenderCache {
 
         let renderer = VexFoundationRenderer()
         let renderPlan = renderer.makeRenderPlan(from: laidOutScore, target: target)
-        let systemGroups = makeLazySystemGroups(from: laidOutScore)
+        let bleedBySystemIndex = makeLazySystemVerticalBleed(from: renderPlan)
+        let systemGroups = makeLazySystemGroups(
+            from: laidOutScore,
+            bleedBySystemIndex: bleedBySystemIndex
+        )
         LazyRowDiagnostics.emitIfEnabled(
             laidOutScore: laidOutScore,
             groups: systemGroups,
-            canvasHeight: renderPlan.canvasHeight
+            canvasHeight: renderPlan.canvasHeight,
+            bleedBySystemIndex: bleedBySystemIndex
         )
         let systems = makePreparedLazySystems(from: renderPlan, systemGroups: systemGroups)
         let prepared = PreparedLazyScoreRender(
