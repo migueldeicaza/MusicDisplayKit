@@ -2709,6 +2709,71 @@ public struct VexFoundationRenderer: ScoreRenderer {
             return lhs.measureIndexInPart < rhs.measureIndexInPart
         }
 
+        // Pre-compute per-system below-staff stacking offsets.
+        // Categories stack in this order (closest to staff first):
+        //   direction text (dynamics) → wedges → pedals → lyrics
+        // Each category that is present shifts subsequent categories further down.
+        struct BelowStaffOffsets {
+            var wedgeYShift: Double = 0
+            var pedalLineOffset: Double = 0
+            var lyricTextLineOffset: Double = 0
+        }
+        var belowStaffOffsetsBySystem: [Int: BelowStaffOffsets] = [:]
+        do {
+            var systemIndices: Set<Int> = []
+            for key in sortedNoteGroups { systemIndices.insert(key.systemIndex) }
+
+            for systemIndex in systemIndices {
+                let hasDirectionTextBelow = plan.directionTexts.contains {
+                    $0.systemIndex == systemIndex && ($0.placement == .below || $0.placement == nil)
+                }
+                let hasDynamicsBelow = plan.notes.contains {
+                    $0.systemIndex == systemIndex && !$0.dynamics.isEmpty
+                }
+                let hasWedgesBelow = plan.directionWedges.contains {
+                    $0.systemIndex == systemIndex && ($0.placement == .below || $0.placement == nil)
+                }
+                let hasPedals = plan.pedalMarkings.contains {
+                    $0.systemIndex == systemIndex
+                }
+                let hasLyrics = plan.lyrics.contains {
+                    $0.systemIndex == systemIndex
+                }
+
+                var offsets = BelowStaffOffsets()
+
+                // Direction text and dynamics are rendered at the default position
+                // (directly below the stave/stem). Other categories must shift down
+                // to avoid overlapping them.
+                var cumulativeShift: Double = 0
+                if hasDirectionTextBelow || hasDynamicsBelow {
+                    cumulativeShift += 20
+                }
+
+                // Wedges: shift by cumulative amount from dynamics above them
+                offsets.wedgeYShift = cumulativeShift
+                if hasWedgesBelow {
+                    cumulativeShift += 18
+                }
+
+                // Pedals: shift by cumulative from dynamics + wedges
+                // pedalLine is in "text line" units (~10px each)
+                offsets.pedalLineOffset = cumulativeShift / 10.0
+                if hasPedals {
+                    cumulativeShift += 24
+                }
+
+                // Lyrics: shift by cumulative from all above categories
+                // textLine is in annotation spacing units (~10px each)
+                offsets.lyricTextLineOffset = cumulativeShift / 10.0
+
+                // Only store offsets if there are stacking categories that need shifting
+                if hasLyrics || hasPedals || hasWedgesBelow {
+                    belowStaffOffsetsBySystem[systemIndex] = offsets
+                }
+            }
+        }
+
         var allAnchorNotesByEntryKey: [NoteEntryKey: Note] = [:]
         var lyricVoiceOffsetByGroupVoice: [GroupVoiceKey: Int] = [:]
         for groupKey in sortedNoteGroups {
@@ -3179,8 +3244,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         )
                     ] ?? 0
                     _ = annotation.setPosition(.below)
+                    let lyricStackingOffset = belowStaffOffsetsBySystem[lyricPlan.systemIndex]?.lyricTextLineOffset ?? 0
                     _ = annotation.setTextLine(
-                        lyricTextLine(verse: lyricPlan.verse, voiceOffset: voiceOffset)
+                        lyricTextLine(verse: lyricPlan.verse, voiceOffset: voiceOffset, stackingOffset: lyricStackingOffset)
                     )
                     _ = note.addModifier(annotation, index: 0)
                     createdLyrics.append(annotation)
@@ -3366,6 +3432,11 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     if let position = directionWedgePosition(for: wedgePlan.placement) {
                         _ = wedge.setPosition(position)
                     }
+                    // Apply stacking Y shift so wedges don't overlap dynamics text
+                    if wedgePlan.placement != .above,
+                       let offsets = belowStaffOffsetsBySystem[wedgePlan.systemIndex] {
+                        wedge.renderOptions.yShift = offsets.wedgeYShift
+                    }
                     createdDirectionWedges.append(wedge)
                 }
             }
@@ -3454,6 +3525,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
                         notes: [startNote, endNote],
                         type: pedalMarkingType(for: pedalPlan.kind)
                     )
+                    // Apply stacking line offset so pedals don't overlap wedges/dynamics
+                    if let offsets = belowStaffOffsetsBySystem[pedalPlan.systemIndex] {
+                        _ = pedal.setLine(offsets.pedalLineOffset)
+                    }
                     createdPedalMarkings.append(pedal)
                 }
             }
@@ -4058,8 +4133,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 )
             ] ?? 0
             _ = annotation.setPosition(.below)
+            let connectorStackingOffset = belowStaffOffsetsBySystem[connectorPlan.startSystemIndex]?.lyricTextLineOffset ?? 0
             _ = annotation.setTextLine(
-                lyricTextLine(verse: connectorPlan.verse, voiceOffset: voiceOffset)
+                lyricTextLine(verse: connectorPlan.verse, voiceOffset: voiceOffset, stackingOffset: connectorStackingOffset)
             )
             _ = annotation.setXShift(xShift)
             _ = startNote.addModifier(annotation, index: 0)
@@ -7173,9 +7249,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
         return String(repeating: "_", count: count)
     }
 
-    private func lyricTextLine(verse: Int, voiceOffset: Int) -> Double {
+    private func lyricTextLine(verse: Int, voiceOffset: Int, stackingOffset: Double = 0) -> Double {
         let line = max(0, verse - 1 + voiceOffset)
-        return Double(line)
+        return Double(line) + stackingOffset
     }
 
     private func harmonyDisplayText(
