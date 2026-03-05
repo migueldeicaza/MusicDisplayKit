@@ -1004,7 +1004,11 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
             contentWidth = 0
         }
 
-        return max(options.measureMinWidth, durationWidth, contentWidth)
+        // Reserve horizontal space for explicit begin instructions in this measure
+        // (clef/key/time) so first-system measures don't starve note content.
+        let beginInstructionWidth = estimatedBeginInstructionWidth(measure: measure)
+
+        return max(options.measureMinWidth, durationWidth, contentWidth + beginInstructionWidth)
     }
 
     private func inferredDurationUnits(
@@ -1035,5 +1039,30 @@ public struct MusicLayoutEngine: ScoreLayoutEngine {
         }
 
         return max(0.25, defaultUnits)
+    }
+
+    private func estimatedBeginInstructionWidth(measure: Measure) -> Double {
+        guard let attributes = measure.attributes else {
+            return 0
+        }
+
+        var width: Double = 0
+
+        if !attributes.clefs.isEmpty {
+            width += 26
+        }
+
+        if let key = attributes.key {
+            // Approximate key signature width by accidental count.
+            width += 8 + (Double(abs(key.fifths)) * 7)
+        }
+
+        if let time = attributes.time {
+            if time.beats > 0, time.beatType > 0 {
+                width += 24
+            }
+        }
+
+        return width
     }
 }

@@ -18535,6 +18535,58 @@ private let singlePartDenseSixteenthsXML = """
     }
 }
 
+private let sixEightClusterSpacingXML = """
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="P1"><part-name>Bassoon</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>6</beats><beat-type>8</beat-type></time>
+        <clef><sign>C</sign><line>4</line></clef>
+      </attributes>
+      <note><rest/><duration>2</duration><voice>1</voice><type>eighth</type></note>
+      <note><pitch><step>A</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type></note>
+      <note><pitch><step>G</step><alter>1</alter><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type><accidental>sharp</accidental></note>
+      <note><pitch><step>A</step><octave>3</octave></pitch><duration>3</duration><voice>1</voice><type>eighth</type><dot/></note>
+      <note><pitch><step>B</step><octave>3</octave></pitch><duration>1</duration><voice>1</voice><type>16th</type></note>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type></note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+/// Regression for crowded note clusters in 6/8 caused by meter/spacing mismatch.
+@Test func sixEightClusterSpacingKeepsMinimumGap() throws {
+    let score = try MusicXMLParser().parse(data: Data(sixEightClusterSpacingXML.utf8))
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 900))
+    let renderer = VexFoundationRenderer(contextProvider: MockContextProvider())
+    let plan = renderer.makeRenderPlan(from: laidOut, target: .image(width: 900, height: 300))
+    let execution = renderer.executeRenderPlan(plan)
+
+    let positions = execution.notePositions
+        .filter { $0.partIndex == 0 && $0.measureIndexInPart == 0 }
+        .sorted { lhs, rhs in
+            if lhs.sourceOrder != rhs.sourceOrder {
+                return lhs.sourceOrder < rhs.sourceOrder
+            }
+            return lhs.x < rhs.x
+        }
+
+    #expect(positions.count >= 6)
+
+    var minimumGap = Double.greatestFiniteMagnitude
+    for index in 1..<positions.count {
+        let gap = positions[index].x - positions[index - 1].x
+        #expect(gap > 0, "Note x positions must be strictly increasing.")
+        minimumGap = min(minimumGap, gap)
+    }
+    #expect(minimumGap >= 10, "Dense 6/8 cluster spacing fell below minimum readable gap.")
+}
+
 // MARK: - print-object="no" support
 
 @Test func parsePrintObjectNoOnNotes() throws {

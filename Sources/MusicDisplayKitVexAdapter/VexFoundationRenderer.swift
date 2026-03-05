@@ -418,6 +418,8 @@ public struct VexNotePlan: Sendable {
     public let onsetDivisions: Int
     public let durationDivisions: Int
     public let divisions: Int
+    public let timeSignatureBeats: Int
+    public let timeSignatureBeatType: Int
     public let isRest: Bool
     public let keyTokens: [String]
     public let sourceOrder: Int
@@ -452,6 +454,8 @@ public struct VexNotePlan: Sendable {
         onsetDivisions: Int,
         durationDivisions: Int,
         divisions: Int,
+        timeSignatureBeats: Int = 4,
+        timeSignatureBeatType: Int = 4,
         isRest: Bool,
         keyTokens: [String],
         sourceOrder: Int,
@@ -485,6 +489,8 @@ public struct VexNotePlan: Sendable {
         self.onsetDivisions = onsetDivisions
         self.durationDivisions = durationDivisions
         self.divisions = divisions
+        self.timeSignatureBeats = max(1, timeSignatureBeats)
+        self.timeSignatureBeatType = max(1, timeSignatureBeatType)
         self.isRest = isRest
         self.keyTokens = keyTokens
         self.sourceOrder = sourceOrder
@@ -1832,6 +1838,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
             }
             let firstMeasureIndexInSystem = firstMeasureIndexBySystem[laidOutMeasure.systemIndex] ?? Int.max
             let isFirstMeasureInSystem = laidOutMeasure.index == firstMeasureIndexInSystem
+            let measureTimeSignature = effectiveAttributes.time ?? sourceMeasure.attributes?.time
+            let timeSignatureBeats = max(1, measureTimeSignature?.beats ?? 4)
+            let timeSignatureBeatType = max(1, measureTimeSignature?.beatType ?? 4)
 
             var voiceEntryCounters: [Int: Int] = [:]
             var entryIndexByVoiceOnset: [VoiceOnsetKey: Int] = [:]
@@ -1881,6 +1890,8 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     onsetDivisions: key.onsetDivisions,
                     durationDivisions: max(1, maxDuration),
                     divisions: max(1, effectiveDivisions),
+                    timeSignatureBeats: timeSignatureBeats,
+                    timeSignatureBeatType: timeSignatureBeatType,
                     isRest: isRest,
                     keyTokens: keyTokens,
                     sourceOrder: sourceOrder,
@@ -3184,7 +3195,9 @@ public struct VexFoundationRenderer: ScoreRenderer {
                     continue
                 }
 
-                let voice = factory.Voice(timeSignature: .meter(4, 4))
+                let meterBeats = max(1, sortedVoicePlans.first?.timeSignatureBeats ?? 4)
+                let meterBeatType = max(1, sortedVoicePlans.first?.timeSignatureBeatType ?? 4)
+                let voice = factory.Voice(timeSignature: .meter(meterBeats, meterBeatType))
                 _ = voice.setMode(.soft)
                 _ = voice.setStave(stave)
                 _ = voice.addTickables(voiceTickables)
@@ -3623,9 +3636,21 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 let formatterSpan = ctxMaxX - ctxMinX
                 if formatterSpan > justifyWidth && justifyWidth > 0 {
                     let scale = justifyWidth / formatterSpan
-                    for context in contexts {
-                        let relativeX = context.getX() - ctxMinX
-                        _ = context.setX(ctxMinX + relativeX * scale)
+                    let sortedX = contexts.map({ $0.getX() }).sorted()
+                    var minGap = Double.infinity
+                    if sortedX.count >= 2 {
+                        for index in 1..<sortedX.count {
+                            minGap = min(minGap, sortedX[index] - sortedX[index - 1])
+                        }
+                    }
+                    // Keep dense passages readable: avoid post-format compression that
+                    // would force adjacent tick contexts too close together.
+                    let minimumAllowedGap = 12.0
+                    if minGap.isFinite, minGap * scale >= minimumAllowedGap {
+                        for context in contexts {
+                            let relativeX = context.getX() - ctxMinX
+                            _ = context.setX(ctxMinX + relativeX * scale)
+                        }
                     }
                 }
             }

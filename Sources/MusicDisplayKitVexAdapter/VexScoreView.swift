@@ -813,6 +813,8 @@ private extension VexNotePlan {
             onsetDivisions: onsetDivisions,
             durationDivisions: durationDivisions,
             divisions: divisions,
+            timeSignatureBeats: timeSignatureBeats,
+            timeSignatureBeatType: timeSignatureBeatType,
             isRest: isRest,
             keyTokens: keyTokens,
             sourceOrder: sourceOrder,
