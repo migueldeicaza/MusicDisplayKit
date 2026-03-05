@@ -86,11 +86,15 @@ private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySyste
     guard !sortedSystemIndices.isEmpty else { return [] }
 
     // Reserve explicit vertical bleed so row-local clipping does not cut glyphs
-    // that extend above/below staff bounds (clefs, time signatures, stems, etc.).
-    let leadingBleed: Double = 28
-    let minimumPreviousBottomGap: Double = 16
-    let minimumCurrentTopGap: Double = 24
-    let trailingBleed: Double = 40
+    // that extend above/below staff bounds (measure numbers, clefs, stems, wedges).
+    let leadingBleed: Double = 72
+    let minimumPreviousBottomGap: Double = 56
+    let minimumCurrentTopGap: Double = 80
+    // In tightly packed systems, keep enough top headroom for measure numbers and
+    // top text while still reserving a small bottom bleed for below-staff items.
+    let tightGapMinimumPreviousBottomGap: Double = 6
+    let tightGapMinimumCurrentTopGap: Double = 18
+    let trailingBleed: Double = 80
     let minimumRowHeight: Double = 48
 
     var systemBoundaries: [Double] = []
@@ -111,42 +115,43 @@ private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySyste
                 continue
             }
 
-            let gap = gapEnd - gapStart
-            let minimumCombinedGap = minimumPreviousBottomGap + minimumCurrentTopGap
+            let preferredBoundary = gapEnd - minimumCurrentTopGap
+            let minimumBoundary = gapStart + minimumPreviousBottomGap
             let boundary: Double
-            if gap >= minimumCombinedGap {
-                boundary = gapEnd - minimumCurrentTopGap
+            if preferredBoundary >= minimumBoundary {
+                // Enough room for both rows: bias towards preserving current-row top extents.
+                boundary = preferredBoundary
             } else {
-                boundary = gapStart + (gap * 0.5)
+                // Tight system spacing: prioritize current-row top headroom (measure numbers)
+                // while keeping a minimal bottom bleed for the previous row.
+                let favoredBoundary = gapEnd - tightGapMinimumCurrentTopGap
+                boundary = max(
+                    gapStart + tightGapMinimumPreviousBottomGap,
+                    min(gapEnd, favoredBoundary)
+                )
             }
             systemBoundaries.append(boundary)
         }
     }
 
     var groups: [LazySystemGroup] = []
-    var previousBottom: Double?
     for (offset, systemIndex) in sortedSystemIndices.enumerated() {
         guard let bounds = verticalBoundsBySystemIndex[systemIndex] else { continue }
         let rawTop: Double
         if offset == 0 {
-            rawTop = bounds.minimumY - leadingBleed
+            rawTop = max(0, bounds.minimumY - leadingBleed)
         } else {
             rawTop = systemBoundaries[offset - 1]
         }
 
         let rawBottom: Double
         if offset < systemBoundaries.count {
-            rawBottom = max(bounds.maximumY + minimumPreviousBottomGap, systemBoundaries[offset])
+            rawBottom = systemBoundaries[offset]
         } else {
             rawBottom = bounds.maximumY + trailingBleed
         }
 
-        let top: Double
-        if let previousBottom {
-            top = max(previousBottom, rawTop)
-        } else {
-            top = rawTop
-        }
+        let top = rawTop
         let bottom = max(top + minimumRowHeight, max(bounds.maximumY, rawBottom))
         let height = max(minimumRowHeight, bottom - top)
         groups.append(
@@ -156,9 +161,83 @@ private func makeLazySystemGroups(from laidOutScore: LaidOutScore) -> [LazySyste
                 height: height
             )
         )
-        previousBottom = bottom
     }
     return groups
+}
+
+@MainActor
+private enum LazyRowDiagnostics {
+    private static var lastLoggedRenderRevision: UInt64?
+
+    static func emitIfEnabled(
+        laidOutScore: LaidOutScore,
+        groups: [LazySystemGroup],
+        canvasHeight: Double
+    ) {
+//        guard ProcessInfo.processInfo.environment["MDK_LAZY_ROW_DIAGNOSTICS"] == "1" else {
+//            return
+//        }
+        guard lastLoggedRenderRevision != laidOutScore.renderRevision else {
+            return
+        }
+        lastLoggedRenderRevision = laidOutScore.renderRevision
+
+        var sourceBoundsBySystem: [Int: (minimumY: Double, maximumY: Double)] = [:]
+        for system in laidOutScore.systems {
+            let minimumY = system.frame.y
+            let maximumY = system.frame.y + system.frame.height
+            if let existing = sourceBoundsBySystem[system.systemIndex] {
+                sourceBoundsBySystem[system.systemIndex] = (
+                    minimumY: min(existing.minimumY, minimumY),
+                    maximumY: max(existing.maximumY, maximumY)
+                )
+            } else {
+                sourceBoundsBySystem[system.systemIndex] = (
+                    minimumY: minimumY,
+                    maximumY: maximumY
+                )
+            }
+        }
+
+        let sortedGroups = groups.sorted { $0.systemIndex < $1.systemIndex }
+        guard let firstGroup = sortedGroups.first, let lastGroup = sortedGroups.last else {
+            print("[MDK lazy rows] no groups")
+            return
+        }
+
+        let firstTop = firstGroup.top
+        let lastBottom = lastGroup.top + lastGroup.height
+        let spanHeight = lastBottom - firstTop
+        let stackedHeight = sortedGroups.reduce(0) { partial, group in
+            partial + group.height
+        }
+
+        print(
+            "[MDK lazy rows] revision=\(laidOutScore.renderRevision) systems=\(sortedGroups.count) " +
+            "canvasHeight=\(Int(canvasHeight)) spanHeight=\(Int(spanHeight)) stackedHeight=\(Int(stackedHeight))"
+        )
+
+        for (offset, group) in sortedGroups.enumerated() {
+            guard let sourceBounds = sourceBoundsBySystem[group.systemIndex] else { continue }
+            let bottom = group.top + group.height
+            let topHeadroom = sourceBounds.minimumY - group.top
+            let bottomHeadroom = bottom - sourceBounds.maximumY
+            let interRowDelta: Double
+            if offset == 0 {
+                interRowDelta = 0
+            } else {
+                let previous = sortedGroups[offset - 1]
+                interRowDelta = group.top - (previous.top + previous.height)
+            }
+            print(
+                "[MDK lazy rows] system=\(group.systemIndex) " +
+                "source=(\(Int(sourceBounds.minimumY))...\(Int(sourceBounds.maximumY))) " +
+                "slice=(\(Int(group.top))...\(Int(bottom))) " +
+                "headroomTop=\(Int(topHeadroom)) headroomBottom=\(Int(bottomHeadroom)) " +
+                "deltaFromPrevious=\(Int(interRowDelta))"
+            )
+        }
+    }
 }
 
 private func makePreparedLazySystems(
@@ -358,6 +437,11 @@ private final class LazyLaidOutScoreRenderCache {
         let renderer = VexFoundationRenderer()
         let renderPlan = renderer.makeRenderPlan(from: laidOutScore, target: target)
         let systemGroups = makeLazySystemGroups(from: laidOutScore)
+        LazyRowDiagnostics.emitIfEnabled(
+            laidOutScore: laidOutScore,
+            groups: systemGroups,
+            canvasHeight: renderPlan.canvasHeight
+        )
         let systems = makePreparedLazySystems(from: renderPlan, systemGroups: systemGroups)
         let prepared = PreparedLazyScoreRender(
             renderPlan: renderPlan,
