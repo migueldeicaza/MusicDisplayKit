@@ -44,7 +44,7 @@ private struct PreparedScoreRender {
     let renderPlan: VexRenderPlan
 }
 
-private struct LazySystemGroup: Identifiable, Equatable {
+struct LazySystemGroup: Identifiable, Equatable {
     let systemIndex: Int
     let top: Double
     let height: Double
@@ -64,7 +64,7 @@ private struct PreparedLazyScoreRender {
     let measureRangeBySystem: [Int: Range<Int>]
 }
 
-private struct LazySystemVerticalBleed: Sendable {
+struct LazySystemVerticalBleed: Sendable {
     var top: Double
     var bottom: Double
 
@@ -73,63 +73,78 @@ private struct LazySystemVerticalBleed: Sendable {
 
 /// Estimates additional bleed needed for notes that extend far above/below
 /// the staff via ledger lines. Returns (top, bottom) bleed in pixels.
-private func estimateLedgerLineBleed(
+func estimateLedgerLineBleed(
     keyTokens: [String],
     clef: String?
 ) -> (top: Double, bottom: Double) {
-    // Parse the highest and lowest note position from key tokens (e.g. "C/6", "F/2").
-    // VexFlow note line 0 = top of staff, line 4 = bottom of staff (for 5-line staves).
-    // Each line unit beyond the staff boundary is ~8px (half space between staff lines).
-    // We use a simplified estimate based on octave relative to the clef's reference.
+    // Compute the VexFoundation line number for each note and estimate how far
+    // it extends beyond the 5-line staff (lines 1–5).
+    //
+    // Line formula:  line = (octave * 7 - 28 + noteIndex) / 2 + clefShift
+    // Rendered Y:    noteY = staveY + (5 - line) * spacing   (spacing ≈ 10)
+    //
+    // Notes above the staff have line > 5 → extend upward (top bleed).
+    // Notes below the staff have line < 1 → extend downward (bottom bleed).
     var topBleed: Double = 0
     var bottomBleed: Double = 0
 
-    // Reference middle line (line 2 of the staff) pitch for each clef:
-    // treble (G2): B4 = line 2, so octave 4 center. Notes above C6+ need top bleed.
-    // bass (F4): D3 = line 2. Notes below C2 need bottom bleed.
-    // alto (C3): C4 = line 2.
-    let clefMiddleOctave: Int
+    let clefShift: Double
     switch clef {
-    case "treble": clefMiddleOctave = 4
-    case "bass": clefMiddleOctave = 3
-    case "alto", "tenor": clefMiddleOctave = 4
-    default: clefMiddleOctave = 4
+    case "bass":   clefShift = 6
+    case "alto":   clefShift = 3
+    case "tenor":  clefShift = 4
+    default:       clefShift = 0   // treble and others
     }
 
+    let noteIndices: [Character: Int] = [
+        "c": 0, "C": 0, "d": 1, "D": 1, "e": 2, "E": 2, "f": 3, "F": 3,
+        "g": 4, "G": 4, "a": 5, "A": 5, "b": 6, "B": 6,
+    ]
+
     for token in keyTokens {
-        // Token format: "STEP/OCTAVE" e.g. "C/6", "F#/2"
+        // Token format: "STEP/OCTAVE" e.g. "c/6", "f#/2"
         let parts = token.split(separator: "/")
         guard parts.count >= 2, let octave = Int(parts[1]) else { continue }
+        guard let firstChar = parts[0].first, let noteIdx = noteIndices[firstChar] else { continue }
 
-        let octaveDiff = octave - clefMiddleOctave
-        if octaveDiff >= 2 {
-            // Notes significantly above staff
-            let extraLines = max(0, (octaveDiff - 1) * 3)
-            topBleed = max(topBleed, Double(extraLines) * 8 + 20)
-        } else if octaveDiff <= -2 {
-            // Notes significantly below staff
-            let extraLines = max(0, (-octaveDiff - 1) * 3)
-            bottomBleed = max(bottomBleed, Double(extraLines) * 8 + 20)
+        let line = Double(octave * 7 - 28 + noteIdx) / 2.0 + clefShift
+
+        if line > 5 {
+            // Note is above the staff — needs ledger lines and stem clearance.
+            let linesAbove = line - 5
+            let px = linesAbove * 10 + 30  // 10px per line unit + stem/padding
+            topBleed = max(topBleed, px)
+        } else if line < 1 {
+            // Note is below the staff — needs ledger lines and stem clearance.
+            let linesBelow = 1 - line
+            let px = linesBelow * 10 + 20  // 10px per line unit + stem/padding
+            bottomBleed = max(bottomBleed, px)
         }
     }
 
     return (top: topBleed, bottom: bottomBleed)
 }
 
-/// Tracks which below-staff element categories are present per system,
+/// Tracks which element categories are present per system,
 /// so the bleed can be computed cumulatively (stacking) rather than via `max`.
-private struct BelowStaffPresence {
+struct SystemPresence {
+    // Below-staff
     var hasDynamicsBelow: Bool = false
     var hasWedgesBelow: Bool = false
     var hasPedals: Bool = false
     var maxLyricVerses: Int = 0
     var hasOctaveShiftBelow: Bool = false
     var hasDirectionTextBelow: Bool = false
+    // Above-staff (these stack: rehearsal, tempo, direction text)
+    var hasRehearsalAbove: Bool = false
+    var hasTempoAbove: Bool = false
+    var hasDirectionTextAbove: Bool = false
+    var hasOctaveShiftAbove: Bool = false
 }
 
-private func makeLazySystemVerticalBleed(from renderPlan: VexRenderPlan) -> [Int: LazySystemVerticalBleed] {
+func makeLazySystemVerticalBleed(from renderPlan: VexRenderPlan) -> [Int: LazySystemVerticalBleed] {
     var bleedBySystemIndex: [Int: LazySystemVerticalBleed] = [:]
-    var presenceBySystemIndex: [Int: BelowStaffPresence] = [:]
+    var presenceBySystemIndex: [Int: SystemPresence] = [:]
 
     func updateBleed(
         for systemIndex: Int,
@@ -142,9 +157,9 @@ private func makeLazySystemVerticalBleed(from renderPlan: VexRenderPlan) -> [Int
 
     func updatePresence(
         for systemIndex: Int,
-        _ body: (inout BelowStaffPresence) -> Void
+        _ body: (inout SystemPresence) -> Void
     ) {
-        var presence = presenceBySystemIndex[systemIndex] ?? BelowStaffPresence()
+        var presence = presenceBySystemIndex[systemIndex] ?? SystemPresence()
         body(&presence)
         presenceBySystemIndex[systemIndex] = presence
     }
@@ -278,28 +293,22 @@ private func makeLazySystemVerticalBleed(from renderPlan: VexRenderPlan) -> [Int
     }
 
     for directionText in renderPlan.directionTexts {
-        updateBleed(for: directionText.systemIndex) { bleed in
-            switch directionText.placement {
-            case .above:
-                bleed.top = max(bleed.top, 28)
-            case .below:
-                updatePresence(for: directionText.systemIndex) { $0.hasDirectionTextBelow = true }
-            case nil:
-                bleed.top = max(bleed.top, 24)
-            }
+        switch directionText.placement {
+        case .above:
+            updatePresence(for: directionText.systemIndex) { $0.hasDirectionTextAbove = true }
+        case .below:
+            updatePresence(for: directionText.systemIndex) { $0.hasDirectionTextBelow = true }
+        case nil:
+            updatePresence(for: directionText.systemIndex) { $0.hasDirectionTextAbove = true }
         }
     }
 
     for tempo in renderPlan.tempoMarks {
-        updateBleed(for: tempo.systemIndex) { bleed in
-            bleed.top = max(bleed.top, 34)
-        }
+        updatePresence(for: tempo.systemIndex) { $0.hasTempoAbove = true }
     }
 
     for repetition in renderPlan.roadmapRepetitions {
-        updateBleed(for: repetition.systemIndex) { bleed in
-            bleed.top = max(bleed.top, 34)
-        }
+        updatePresence(for: repetition.systemIndex) { $0.hasRehearsalAbove = true }
     }
 
     for wedge in renderPlan.directionWedges {
@@ -316,13 +325,11 @@ private func makeLazySystemVerticalBleed(from renderPlan: VexRenderPlan) -> [Int
     }
 
     for octaveShift in renderPlan.octaveShiftSpanners {
-        updateBleed(for: octaveShift.systemIndex) { bleed in
-            switch octaveShift.position {
-            case .top:
-                bleed.top = max(bleed.top, 34)
-            case .bottom:
-                updatePresence(for: octaveShift.systemIndex) { $0.hasOctaveShiftBelow = true }
-            }
+        switch octaveShift.position {
+        case .top:
+            updatePresence(for: octaveShift.systemIndex) { $0.hasOctaveShiftAbove = true }
+        case .bottom:
+            updatePresence(for: octaveShift.systemIndex) { $0.hasOctaveShiftBelow = true }
         }
     }
 
@@ -330,44 +337,53 @@ private func makeLazySystemVerticalBleed(from renderPlan: VexRenderPlan) -> [Int
         updatePresence(for: pedal.systemIndex) { $0.hasPedals = true }
     }
 
-    // Compute cumulative bottom bleed from stacking below-staff categories.
-    // Each category occupies its own vertical band; they stack on top of each other.
+    // Compute cumulative bleed from stacking categories.
     let allSystemIndices = Set(bleedBySystemIndex.keys).union(presenceBySystemIndex.keys)
     for systemIndex in allSystemIndices {
-        let presence = presenceBySystemIndex[systemIndex] ?? BelowStaffPresence()
-        var stackedBleed: Double = 0
+        let presence = presenceBySystemIndex[systemIndex] ?? SystemPresence()
 
-        // Stacking order (closest to staff first):
-        // 1. Direction text (dynamics text like "p", "pp") — ~20px
+        // Above-staff stacking: these elements stack above notes/articulations.
+        var aboveStackedBleed: Double = 0
+        if presence.hasDirectionTextAbove { aboveStackedBleed += 20 }
+        if presence.hasTempoAbove { aboveStackedBleed += 24 }
+        if presence.hasRehearsalAbove { aboveStackedBleed += 24 }
+        if presence.hasOctaveShiftAbove { aboveStackedBleed += 24 }
+
+        // Below-staff stacking: these elements stack below the staff.
+        // Use max with base bleed (from note ledger lines/stems) since the
+        // stacked elements and note extensions overlap in Y space.
+        var belowStackedBleed: Double = 0
         if presence.hasDynamicsBelow || presence.hasDirectionTextBelow {
-            stackedBleed += 22
+            belowStackedBleed += 20
         }
-        // 2. Wedges (crescendo/decrescendo hairpins) — ~20px
         if presence.hasWedgesBelow {
-            stackedBleed += 22
+            belowStackedBleed += 20
         }
-        // 3. Octave shift below — ~20px
         if presence.hasOctaveShiftBelow {
-            stackedBleed += 22
+            belowStackedBleed += 20
         }
-        // 4. Pedal markings — ~28px
         if presence.hasPedals {
-            stackedBleed += 30
+            belowStackedBleed += 30
         }
-        // 5. Lyrics — ~18px per verse
         if presence.maxLyricVerses > 0 {
-            stackedBleed += Double(presence.maxLyricVerses) * 18
+            belowStackedBleed += Double(presence.maxLyricVerses) * 16
         }
 
         updateBleed(for: systemIndex) { bleed in
-            bleed.bottom = max(bleed.bottom, stackedBleed)
+            // Above-staff: annotations (rehearsal, tempo, text, 8va) render above
+            // notes with ledger lines, so ADD stacking on top of the ledger bleed.
+            bleed.top = bleed.top + aboveStackedBleed
+            // Below-staff: stacking elements (dynamics, wedges, pedals, lyrics) are
+            // positioned at fixed offsets from the staff bottom and overlap with
+            // ledger lines. Use the greater of the two extents.
+            bleed.bottom = max(bleed.bottom, belowStackedBleed)
         }
     }
 
     return bleedBySystemIndex
 }
 
-private func makeLazySystemGroups(
+func makeLazySystemGroups(
     from laidOutScore: LaidOutScore,
     bleedBySystemIndex: [Int: LazySystemVerticalBleed]
 ) -> [LazySystemGroup] {
@@ -409,7 +425,12 @@ private func makeLazySystemGroups(
         let isLast = offset == sortedSystemIndices.count - 1
         let bottomBleed = isLast ? max(trailingBleed, bleed.bottom) : bleed.bottom
 
-        let top = max(0, bounds.minimumY - topBleed)
+        // First system: allow negative top so title/metadata above the staff
+        // becomes visible (yOffset shifts content into the canvas).
+        // Other systems: clamp to 0 since they don't need extra above-canvas space.
+        let top = offset == 0
+            ? bounds.minimumY - topBleed
+            : max(0, bounds.minimumY - topBleed)
         let rawBottom = bounds.maximumY + bottomBleed
         let bottom = max(top + minimumRowHeight, max(bounds.maximumY, rawBottom))
         let height = max(minimumRowHeight, bottom - top)

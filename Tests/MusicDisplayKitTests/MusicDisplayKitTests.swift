@@ -18655,3 +18655,102 @@ private let singlePartDenseSixteenthsXML = """
     #expect(hiddenNotes.count == 1, "Expected 1 gray note for print-object=no, got \(hiddenNotes.count)")
     #expect(visibleNotes.count == 3, "Expected 3 visible notes without color override, got \(visibleNotes.count)")
 }
+
+@Test func extremePitchLedgerLineRendering() throws {
+    // Verify VexFoundation computes correct line values for extreme pitches.
+    let c2 = try Tables.keyProperties("c/2", clef: ClefName.treble)
+    #expect(c2.line == -7.0, "C2 on treble should be line -7 (8 ledger lines below)")
+
+    let d2 = try Tables.keyProperties("d/2", clef: ClefName.treble)
+    #expect(d2.line == -6.5, "D2 on treble should be line -6.5")
+
+    // Load stress.xml and verify the render plan produces correct key tokens.
+    let stressData = try Data(contentsOf: URL(fileURLWithPath: "/Users/miguel/cvs/music/MusicDisplayKit/stress.xml"))
+    let score = try MusicXMLParser().parse(data: stressData)
+    let laidOut = try MusicLayoutEngine().layout(score: score, options: LayoutOptions(pageWidth: 600))
+    let plan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .image(width: 600, height: 0))
+
+    let sys0LowNotes = plan.notes.filter { !$0.isRest && $0.systemIndex == 0 && $0.keyTokens.contains(where: { $0.contains("/2") }) }
+    #expect(sys0LowNotes.count == 2, "System 0 should have 2 notes with octave 2")
+    #expect(sys0LowNotes.allSatisfy { $0.clef == "treble" }, "Low notes should be on treble clef")
+
+    // Verify SVG output contains ledger lines at all expected Y positions for C2.
+    let svg = try VexFoundationRenderer().renderSVG(laidOut)
+    // C2 on treble at staveY=40: bottom staff line at y=80, ledger lines at y=90..160
+    for expectedY in stride(from: 90.0, through: 160.0, by: 10.0) {
+        let yStr = String(format: "%.0f", expectedY)
+        #expect(svg.contains(" \(yStr) L"), "SVG should contain ledger line at y=\(yStr) for C2")
+    }
+
+    // Verify canvas height is sufficient for extreme below-staff content.
+    // G1 on treble (line -8.5) at staveY=340 renders at y≈475, so canvas must be > 475.
+    let viewPlan = VexFoundationRenderer().makeRenderPlan(from: laidOut, target: .view(identifier: "test"))
+    #expect(viewPlan.canvasHeight >= 520, "Canvas height \(viewPlan.canvasHeight) must accommodate G1 ledger lines below last system")
+
+    // Verify lazy system row dimensions accommodate all note content.
+    let bleedMap = makeLazySystemVerticalBleed(from: viewPlan)
+    let groups = makeLazySystemGroups(from: laidOut, bleedBySystemIndex: bleedMap)
+
+    // Diagnostic: dump system frames, bleed, and groups
+    for group in groups {
+        let bleed = bleedMap[group.systemIndex] ?? LazySystemVerticalBleed(top: 0, bottom: 26)
+        print("DIAG system[\(group.systemIndex)]: top=\(group.top) height=\(group.height) bleed.top=\(bleed.top) bleed.bottom=\(bleed.bottom)")
+    }
+    for sys in laidOut.systems {
+        print("DIAG frame system[\(sys.systemIndex)]: y=\(sys.frame.y) h=\(sys.frame.height)")
+    }
+
+    for group in groups {
+        let yOffset = -group.top
+        let staves = viewPlan.staves.filter { $0.systemIndex == group.systemIndex }
+        let notes = viewPlan.notes.filter { $0.systemIndex == group.systemIndex && !$0.isRest }
+        for note in notes {
+            guard let stave = staves.first(where: { $0.partIndex == note.partIndex }) else { continue }
+            let staveY = stave.frame.y + yOffset
+            for token in note.keyTokens {
+                let parts = token.split(separator: "/")
+                guard parts.count >= 2, let octave = Int(parts[1]) else { continue }
+                let noteIndices: [Character: Int] = [
+                    "c": 0, "d": 1, "e": 2, "f": 3, "g": 4, "a": 5, "b": 6
+                ]
+                guard let firstChar = parts[0].first,
+                      let noteIdx = noteIndices[Character(firstChar.lowercased())] else { continue }
+                let clefShift: Double = (note.clef == "bass") ? 6 : (note.clef == "alto" ? 3 : (note.clef == "tenor" ? 4 : 0))
+                let line = Double(octave * 7 - 28 + noteIdx) / 2.0 + clefShift
+                let noteY = staveY + (5 - line) * 10
+
+                // Note head must be within row canvas (0 ..< group.height), with
+                // some margin for stem (~40px in either direction).
+                let stemMargin = 40.0
+                let fits = noteY - stemMargin >= 0 && noteY + stemMargin <= group.height
+                if !fits {
+                    print("DIAG OVERFLOW: system[\(group.systemIndex)] note=\(token) clef=\(note.clef ?? "nil") line=\(line) staveY=\(staveY) noteY=\(noteY) groupHeight=\(group.height)")
+                }
+                #expect(
+                    fits,
+                    "System \(group.systemIndex) note \(token) clef=\(note.clef ?? "nil") line=\(line) noteY=\(noteY) exceeds row height \(group.height) (top=\(group.top))"
+                )
+            }
+        }
+    }
+
+    // Save SVG for visual inspection
+    try svg.write(toFile: "/tmp/stress_ledger_audit.svg", atomically: true, encoding: .utf8)
+    print("DIAG SVG written to /tmp/stress_ledger_audit.svg")
+
+
+    // Verify G1 ledger lines in SVG (9 ledger lines below visual staff on treble)
+    // G1 on treble: line = -8.5
+    // Last system staves
+    let lastSysStaves = viewPlan.staves.filter { $0.systemIndex == groups.last?.systemIndex ?? -1 }
+    if let lastStave = lastSysStaves.first {
+        let staveY = lastStave.frame.y
+        print("DIAG last system staveY=\(staveY)")
+        for ledgerLine in stride(from: 0.0, through: -9.0, by: -1.0) {
+            let expectedY = staveY + (5 - ledgerLine) * 10
+            let yStr = String(format: "%.0f", expectedY)
+            let found = svg.contains("M \(yStr) ") || svg.contains(" \(yStr) L") || svg.contains(",\(yStr) ")
+            print("DIAG ledger line=\(ledgerLine) Y=\(yStr): \(found ? "FOUND" : "MISSING")")
+        }
+    }
+}

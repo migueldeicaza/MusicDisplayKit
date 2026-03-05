@@ -2214,7 +2214,7 @@ public struct VexFoundationRenderer: ScoreRenderer {
             if let pageHeight = score.pageHeight {
                 canvasHeight = pageHeight * Double(pageCount)
             } else {
-                canvasHeight = computedContentHeight(for: score)
+                canvasHeight = computedContentHeight(for: score, notes: notes, staves: staves)
             }
         }
 
@@ -2742,10 +2742,32 @@ public struct VexFoundationRenderer: ScoreRenderer {
 
                 var offsets = BelowStaffOffsets()
 
+                // Check if this system has notes with stems extending below the staff.
+                // If so, pedals and lyrics need extra offset to avoid collision.
+                let hasLowStemNotes = plan.notes.contains { notePlan in
+                    guard notePlan.systemIndex == systemIndex,
+                          notePlan.stemDirection == .some(.down) else { return false }
+                    // Check if note is below the staff
+                    for token in notePlan.keyTokens {
+                        let parts = token.split(separator: "/")
+                        if parts.count >= 2, let octave = Int(parts[1]) {
+                            let clefMiddle: Int
+                            switch notePlan.clef {
+                            case "bass": clefMiddle = 3
+                            case "alto", "tenor": clefMiddle = 4
+                            default: clefMiddle = 4 // treble
+                            }
+                            if octave <= clefMiddle - 1 { return true }
+                        }
+                    }
+                    return false
+                }
+                let stemExtensionShift: Double = hasLowStemNotes ? 16 : 0
+
                 // Direction text and dynamics are rendered at the default position
                 // (directly below the stave/stem). Other categories must shift down
                 // to avoid overlapping them.
-                var cumulativeShift: Double = 0
+                var cumulativeShift: Double = stemExtensionShift
                 if hasDirectionTextBelow || hasDynamicsBelow {
                     cumulativeShift += 20
                 }
@@ -2760,7 +2782,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 // pedalLine is in "text line" units (~10px each)
                 offsets.pedalLineOffset = cumulativeShift / 10.0
                 if hasPedals {
-                    cumulativeShift += 24
+                    // PedalMarking internally adds +3 to the line value, plus ~2 lines
+                    // for the marking height. Advance cumulative past the pedal's
+                    // actual visual bottom so lyrics don't overlap.
+                    cumulativeShift = (offsets.pedalLineOffset + 5.5) * 10.0
                 }
 
                 // Lyrics: shift by cumulative from all above categories
@@ -4413,12 +4438,58 @@ public struct VexFoundationRenderer: ScoreRenderer {
         return max(1, maxPage + 1)
     }
 
-    private func computedContentHeight(for score: LaidOutScore) -> Double {
+    private func computedContentHeight(
+        for score: LaidOutScore,
+        notes: [VexNotePlan],
+        staves: [VexStavePlan]
+    ) -> Double {
         let maxSystemY = score.systems.map { $0.frame.y + $0.frame.height }.max() ?? 0
         let maxGroupY = score.partGroups.map { $0.frame.y + $0.frame.height }.max() ?? 0
         let maxConnectorY = score.barlineConnectors.map { $0.frame.y + $0.frame.height }.max() ?? 0
-        let maxY = max(maxSystemY, maxGroupY, maxConnectorY)
-        return max(200, maxY + 40)
+        let maxFrameY = max(maxSystemY, maxGroupY, maxConnectorY)
+
+        // Estimate the maximum rendered Y from extreme-pitch notes that extend
+        // far below the staff via ledger lines.  Each VexFoundation line unit
+        // corresponds to half a staff space ≈ 5px (with spacing_between_lines=10).
+        // For a note at line L on a stave whose top is at staveY:
+        //   noteY ≈ staveY + (5 - L) * (spacing / 2)  where spacing ≈ 10
+        // Notes with very negative line values render far below the staff.
+        var staveTopBySystem: [Int: Double] = [:]
+        for stave in staves {
+            let y = stave.frame.y
+            if let existing = staveTopBySystem[stave.systemIndex] {
+                staveTopBySystem[stave.systemIndex] = min(existing, y)
+            } else {
+                staveTopBySystem[stave.systemIndex] = y
+            }
+        }
+
+        let clefMiddleOctave: (String?) -> Int = { clef in
+            switch clef {
+            case "bass": return 3
+            default: return 4
+            }
+        }
+
+        var maxNoteY = maxFrameY
+        for note in notes where !note.isRest {
+            guard let staveY = staveTopBySystem[note.systemIndex] else { continue }
+            for token in note.keyTokens {
+                let parts = token.split(separator: "/")
+                guard parts.count >= 2, let octave = Int(parts[1]) else { continue }
+                let midOct = clefMiddleOctave(note.clef)
+                let octaveDiff = octave - midOct
+                guard octaveDiff <= -1 else { continue }
+                // Approximate line value for low notes:
+                //   line ≈ (octave * 7 - 28 + noteIndex) / 2 + clefShift
+                // Rendered Y ≈ staveY + (5 - line) * 5
+                // We use a conservative estimate: each octave below mid is ~35px.
+                let extraPx = Double(-octaveDiff) * 35 + 20
+                maxNoteY = max(maxNoteY, staveY + 40 + extraPx)
+            }
+        }
+
+        return max(200, maxNoteY + 40)
     }
 
     private struct InitialStaveState {
