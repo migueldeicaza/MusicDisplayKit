@@ -431,6 +431,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
         var pitchStep: String?
         var pitchAlter: Double?
         var pitchOctave: Int?
+        var instrumentID: String?
         var lyrics: [LyricEvent] = []
         var ties: [TieMarker] = []
         var slurs: [SlurMarker] = []
@@ -494,6 +495,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                     stemDirection: stemDirection,
                     voice: resolvedVoice,
                     staff: staff,
+                    instrumentID: instrumentID,
                     isChord: isChord,
                     isGrace: isGrace,
                     isGraceSlash: isGraceSlash,
@@ -536,6 +538,7 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
                 stemDirection: stemDirection,
                 voice: resolvedVoice,
                 staff: staff,
+                instrumentID: instrumentID,
                 isChord: isChord,
                 isGrace: isGrace,
                 lyrics: lyrics,
@@ -1488,6 +1491,12 @@ private final class ScorePartwiseXMLDelegate: NSObject, XMLParserDelegate {
 
         case "staff" where currentNote != nil:
             startTextCapture(.noteStaff)
+
+        case "instrument" where currentNote != nil:
+            if var currentNote {
+                currentNote.instrumentID = attributeDict["id"]?.trimmedNonEmpty
+                self.currentNote = currentNote
+            }
 
         case "step" where currentNote != nil:
             startTextCapture(.pitchStep)

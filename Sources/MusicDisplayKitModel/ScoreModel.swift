@@ -406,6 +406,8 @@ public struct NoteEvent: Equatable, Sendable {
     public var stemDirection: NoteStemDirection?
     public var voice: Int
     public var staff: Int?
+    /// MusicXML `<note><instrument id="..."/>` reference, used to resolve per-note playback instrument.
+    public var instrumentID: String?
     public var isChord: Bool
     public var isGrace: Bool
     public var isGraceSlash: Bool
@@ -447,6 +449,7 @@ public struct NoteEvent: Equatable, Sendable {
         stemDirection: NoteStemDirection? = nil,
         voice: Int = 1,
         staff: Int? = nil,
+        instrumentID: String? = nil,
         isChord: Bool = false,
         isGrace: Bool = false,
         isGraceSlash: Bool = false,
@@ -483,6 +486,7 @@ public struct NoteEvent: Equatable, Sendable {
         self.stemDirection = stemDirection
         self.voice = voice
         self.staff = staff
+        self.instrumentID = instrumentID
         self.isChord = isChord
         self.isGrace = isGrace
         self.isGraceSlash = isGraceSlash
