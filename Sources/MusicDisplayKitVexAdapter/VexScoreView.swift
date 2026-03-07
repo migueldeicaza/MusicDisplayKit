@@ -44,11 +44,22 @@ private struct PreparedScoreRender {
     let renderPlan: VexRenderPlan
 }
 
-struct LazySystemGroup: Identifiable, Equatable {
-    let systemIndex: Int
-    let top: Double
-    let height: Double
-    var id: Int { systemIndex }
+public struct LazySystemGroup: Identifiable, Equatable {
+    public let systemIndex: Int
+    public let top: Double
+    public let height: Double
+    public var id: Int { systemIndex }
+}
+
+/// Preference key that reports per-system vertical offsets mapping layout-engine
+/// coordinates to the rendered coordinates used by ``MusicDisplayLazyScoreView``.
+/// Add the offset to a layout `frame.y` to obtain the actual Y in the rendered output.
+@available(iOS 17.0, macOS 14.0, *)
+public struct LazyScoreSystemYOffsetsKey: PreferenceKey {
+    nonisolated(unsafe) public static var defaultValue: [Int: Double] = [:]
+    public static func reduce(value: inout [Int: Double], nextValue: () -> [Int: Double]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
 }
 
 private struct PreparedLazySystemRender: Identifiable {
@@ -1309,15 +1320,28 @@ public struct MusicDisplayLazyScoreView: View {
     private func systemRows(preparedResult: Result<PreparedLazyScoreRender, Error>) -> some View {
         switch preparedResult {
         case .success(let prepared):
+            let offsets = Self.computeSystemYOffsets(from: prepared.systems.map(\.group))
             LazyVStack(spacing: 0) {
                 ForEach(prepared.systems) { system in
                     systemRow(system, prepared: prepared)
                 }
             }
             .frame(width: max(1, prepared.renderPlan.canvasWidth))
+            .preference(key: LazyScoreSystemYOffsetsKey.self, value: offsets)
         case .failure:
             LayoutFailureView()
         }
+    }
+
+    private static func computeSystemYOffsets(from groups: [LazySystemGroup]) -> [Int: Double] {
+        let sorted = groups.sorted { $0.systemIndex < $1.systemIndex }
+        var offsets: [Int: Double] = [:]
+        var cumulativeY: Double = 0
+        for group in sorted {
+            offsets[group.systemIndex] = cumulativeY - group.top
+            cumulativeY += group.height
+        }
+        return offsets
     }
 
     @ViewBuilder
