@@ -1197,6 +1197,13 @@ public struct MusicDisplayScrollableScoreView: View {
 /// initial render time for long scores.
 @available(iOS 17.0, macOS 14.0, *)
 public struct MusicDisplayLazyScoreView: View {
+    /// Composite identity for system rows so that SwiftUI recreates the
+    /// `Canvas` when the active-beat highlight changes.
+    private struct SystemRowIdentity: Hashable {
+        let systemIndex: Int
+        let activeBeatRange: ClosedRange<Double>?
+    }
+
     private enum Source {
         case score(score: Score, layoutOptions: LayoutOptions)
         case laidOutScore(LaidOutScore)
@@ -1206,6 +1213,7 @@ public struct MusicDisplayLazyScoreView: View {
     private let target: RenderTarget
     private let embedInScrollView: Bool
     private let renderBufferSystems: Int
+    private let activeBeatRange: ClosedRange<Double>?
     @State private var lazyMeasureRangeOverride: Range<Int>?
     @State private var visibleSystemTracker = LazyVisibleSystemTracker()
     @State private var layoutCache = ScoreLayoutCache()
@@ -1216,12 +1224,14 @@ public struct MusicDisplayLazyScoreView: View {
         layoutOptions: LayoutOptions = LayoutOptions(),
         target: RenderTarget = .view(identifier: "music-display-view"),
         embedInScrollView: Bool = true,
-        renderBufferSystems: Int = 2
+        renderBufferSystems: Int = 2,
+        activeBeatRange: ClosedRange<Double>? = nil
     ) {
         self.source = .score(score: score, layoutOptions: layoutOptions)
         self.target = target
         self.embedInScrollView = embedInScrollView
         self.renderBufferSystems = max(0, renderBufferSystems)
+        self.activeBeatRange = activeBeatRange
     }
 
     public init(
@@ -1229,14 +1239,16 @@ public struct MusicDisplayLazyScoreView: View {
         layoutOptions: LayoutOptions = LayoutOptions(),
         targetIdentifier: String,
         embedInScrollView: Bool = true,
-        renderBufferSystems: Int = 2
+        renderBufferSystems: Int = 2,
+        activeBeatRange: ClosedRange<Double>? = nil
     ) {
         self.init(
             score: score,
             layoutOptions: layoutOptions,
             target: .view(identifier: targetIdentifier),
             embedInScrollView: embedInScrollView,
-            renderBufferSystems: renderBufferSystems
+            renderBufferSystems: renderBufferSystems,
+            activeBeatRange: activeBeatRange
         )
     }
 
@@ -1244,25 +1256,29 @@ public struct MusicDisplayLazyScoreView: View {
         laidOutScore: LaidOutScore,
         target: RenderTarget = .view(identifier: "music-display-view"),
         embedInScrollView: Bool = true,
-        renderBufferSystems: Int = 2
+        renderBufferSystems: Int = 2,
+        activeBeatRange: ClosedRange<Double>? = nil
     ) {
         self.source = .laidOutScore(laidOutScore)
         self.target = target
         self.embedInScrollView = embedInScrollView
         self.renderBufferSystems = max(0, renderBufferSystems)
+        self.activeBeatRange = activeBeatRange
     }
 
     public init(
         laidOutScore: LaidOutScore,
         targetIdentifier: String,
         embedInScrollView: Bool = true,
-        renderBufferSystems: Int = 2
+        renderBufferSystems: Int = 2,
+        activeBeatRange: ClosedRange<Double>? = nil
     ) {
         self.init(
             laidOutScore: laidOutScore,
             target: .view(identifier: targetIdentifier),
             embedInScrollView: embedInScrollView,
-            renderBufferSystems: renderBufferSystems
+            renderBufferSystems: renderBufferSystems,
+            activeBeatRange: activeBeatRange
         )
     }
 
@@ -1357,7 +1373,10 @@ public struct MusicDisplayLazyScoreView: View {
             context.clear()
             do {
                 // Factory.draw() resets the factory queue, so executions are single-use.
-                let execution = VexFoundationRenderer().executeRenderPlan(system.renderPlan)
+                let execution = VexFoundationRenderer().executeRenderPlan(
+                    system.renderPlan,
+                    activeBeatRange: activeBeatRange
+                )
                 try drawExecution(execution, on: context)
             } catch {
                 context.setFillStyle("#B00020")
@@ -1370,7 +1389,7 @@ public struct MusicDisplayLazyScoreView: View {
             height: max(1, group.height)
         )
         .clipped()
-        .id("system-\(group.systemIndex)")
+        .id(SystemRowIdentity(systemIndex: group.systemIndex, activeBeatRange: activeBeatRange))
 
         switch source {
         case .score(let score, let layoutOptions):

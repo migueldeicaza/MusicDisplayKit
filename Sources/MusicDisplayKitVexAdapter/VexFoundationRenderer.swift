@@ -2274,7 +2274,10 @@ public struct VexFoundationRenderer: ScoreRenderer {
         )
     }
 
-    public func executeRenderPlan(_ plan: VexRenderPlan) -> VexFactoryExecution {
+    public func executeRenderPlan(
+        _ plan: VexRenderPlan,
+        activeBeatRange: ClosedRange<Double>? = nil
+    ) -> VexFactoryExecution {
         let startedAt = ProcessInfo.processInfo.systemUptime
         let signpost = VexRendererSignpost.begin("executeRenderPlan")
         defer {
@@ -4365,6 +4368,113 @@ public struct VexFoundationRenderer: ScoreRenderer {
                 ys: ys,
                 boundingBox: bbox
             ))
+        }
+
+        // Apply dimmed style to elements outside the active beat range.
+        // Pre-format systems so that formatting-triggered resets (e.g.
+        // stem direction changes that rebuild noteheads) happen before we
+        // set the dimmed style; otherwise formatting would discard the style.
+        if activeBeatRange != nil {
+            factory.formatSystems()
+        }
+        if let activeBeatRange {
+            // Compute the absolute beat of each measure start from the
+            // primary part (partIndex 0), matching TimelineMapBuilder logic.
+            let primaryPartNotes = plan.notes
+                .filter { $0.partIndex == 0 }
+            var measureBeats: [Int: Double] = [:]
+            var cumulativeBeat = 0.0
+            let measureIndices = Set(primaryPartNotes.map(\.measureIndexInPart)).sorted()
+            for measureIndex in measureIndices {
+                measureBeats[measureIndex] = cumulativeBeat
+                if let sample = primaryPartNotes.first(where: { $0.measureIndexInPart == measureIndex }) {
+                    let measureDurationBeats = Double(sample.timeSignatureBeats) * 4.0
+                        / Double(sample.timeSignatureBeatType)
+                    cumulativeBeat += measureDurationBeats
+                }
+            }
+
+            // Build a lookup of absolute beat per entry key.
+            var absoluteBeatByEntryKey: [NoteEntryKey: Double] = [:]
+            for notePlan in plan.notes {
+                let key = NoteEntryKey(
+                    systemIndex: notePlan.systemIndex,
+                    partIndex: notePlan.partIndex,
+                    measureIndexInPart: notePlan.measureIndexInPart,
+                    voice: notePlan.voice,
+                    entryIndexInVoice: notePlan.entryIndexInVoice
+                )
+                let measureStartBeat = measureBeats[notePlan.measureIndexInPart] ?? 0
+                let divisions = max(notePlan.divisions, 1)
+                let onsetBeat = Double(notePlan.onsetDivisions) / Double(divisions)
+                absoluteBeatByEntryKey[key] = measureStartBeat + onsetBeat
+            }
+
+            let dimStyle = ElementStyle(
+                fillStyle: "#B0B0B0",
+                strokeStyle: "#B0B0B0"
+            )
+            // Build a set of dimmed note object identities for efficient lookup.
+            var dimmedNotes = Set<ObjectIdentifier>()
+            for (entryKey, note) in allAnchorNotesByEntryKey {
+                let beat = absoluteBeatByEntryKey[entryKey]
+                    ?? absoluteBeatByEntryKey[
+                        NoteEntryKey(
+                            systemIndex: entryKey.systemIndex,
+                            partIndex: 0,
+                            measureIndexInPart: entryKey.measureIndexInPart,
+                            voice: entryKey.voice,
+                            entryIndexInVoice: entryKey.entryIndexInVoice
+                        )
+                    ]
+                let outsideRange: Bool
+                if let beat {
+                    outsideRange = beat < activeBeatRange.lowerBound - 0.001
+                        || beat >= activeBeatRange.upperBound + 0.001
+                } else {
+                    // Fallback: dim if the entire measure is outside.
+                    let mStart = measureBeats[entryKey.measureIndexInPart] ?? 0
+                    let sample = primaryPartNotes.first {
+                        $0.measureIndexInPart == entryKey.measureIndexInPart
+                    }
+                    let mDuration = sample.map {
+                        Double($0.timeSignatureBeats) * 4.0 / Double($0.timeSignatureBeatType)
+                    } ?? 4.0
+                    let mEnd = mStart + mDuration
+                    outsideRange = mEnd <= activeBeatRange.lowerBound + 0.001
+                        || mStart >= activeBeatRange.upperBound - 0.001
+                }
+                if outsideRange {
+                    _ = note.setGroupStyle(dimStyle)
+                    dimmedNotes.insert(ObjectIdentifier(note))
+                }
+            }
+            for beam in createdBeams {
+                if let firstNote = beam.getNotes().first,
+                   dimmedNotes.contains(ObjectIdentifier(firstNote)) {
+                    _ = beam.setStyle(dimStyle)
+                }
+            }
+            for tie in createdTies {
+                let noteToCheck = tie.notes.firstNote ?? tie.notes.lastNote
+                if let note = noteToCheck,
+                   dimmedNotes.contains(ObjectIdentifier(note)) {
+                    _ = tie.setStyle(dimStyle)
+                }
+            }
+            for tuplet in createdTuplets {
+                if let firstNote = tuplet.notes.first,
+                   dimmedNotes.contains(ObjectIdentifier(firstNote)) {
+                    _ = tuplet.setStyle(dimStyle)
+                }
+            }
+            for slur in createdSlurs {
+                let noteToCheck = slur.from ?? slur.to
+                if let note = noteToCheck,
+                   dimmedNotes.contains(ObjectIdentifier(note)) {
+                    _ = slur.setStyle(dimStyle)
+                }
+            }
         }
 
         return VexFactoryExecution(
